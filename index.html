@@ -131,6 +131,32 @@ const SN_RAW = [
 ["ATHLETIC","Alonso Cabello",3,81,15,"M"],
 ["ATHLETIC","Vicente Godoy",1,80,15,"M"],
 ["ATHLETIC","Mauricio Arancibia",1,89,33,"M"],
+["SUDAKA","Carlos Sepulveda",2,60,17,"M"],
+["GORILAS PSUR","Jhosua Ureta",1,60,29,"M"],
+["DOMINGUEZ","Joaquin Lopez",1,70,20,"M"],
+["SUDAKA","Rodrigo Bravo",2,60,21,"M"],
+["AZUAJE","Sebastian Rueda",3,58,17,"M"],
+["AZUAJE","Cesar Donoso",2,75,23,"M"],
+["AZUAJE","Leonardo Fuentealba",5,90,32,"M"],
+["PATRICIO BRAVO","Jimi Andrade",10,60,17,"M"],
+["PATRICIO BRAVO","Juan Pedro",5,58,15,"M"],
+["PATRICIO BRAVO","Cristobal Lopez",3,48,13,"M"],
+["PATRICIO BRAVO","Sebastian Curillan",5,92,18,"M"],
+["PATRICIO BRAVO","Lucas Diaz",0,71,16,"M"],
+["PATRICIO BRAVO","Vicente Morales",3,67,18,"M"],
+["PATRICIO BRAVO","Cristobal Astorga",0,70,16,"M"],
+["BOXEO HIDALGO","Sebastian Vasquez",2,69,28,"M"],
+["BOXEO HIDALGO","Cristofer Villanueva",0,85,14,"M"],
+["AZUAJE","Vili Urdaneta",3,60,19,"M"],
+["PRIMAL CLUB","Tomas Espindola",4,52,13,"M"],
+["PRIMAL CLUB","Lucas Villaroel",2,71,18,"M"],
+["PRIMAL CLUB","Elias Espindola",4,88,17,"M"],
+["PRIMAL CLUB","Isabella Cordova",0,52,15,"F"],
+["PRIMAL CLUB","Benjamin Osorio",12,69,22,"M"],
+["BAM TALCA","Pablo Gaete",3,67,15,"M"],
+["BAM TALCA","Ignacio Castillo",1,70,23,"M"],
+["BAM TALCA","Vicente Concha",4,90,19,"M"],
+["BAM TALCA","Ignacio Gonzales",1,91,28,"M"],
 ];
 const SN_FIGHTERS = SN_RAW.map((r,i)=>({
 id:"sn"+(i+1), fullName:r[1], phone:"", gym:r[0], age:r[4], weightKg:r[3],
@@ -1187,7 +1213,7 @@ function cancel(){setEditF(null);setView("list");}
 
 function handleExport(){const d={fighters,matchups,expenses,tickets};const b=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="evento_"+new Date().toISOString().split("T")[0]+".json";a.click();URL.revokeObjectURL(u);}
 function handleImport(){const i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.fighters){setFighters(d.fighters);save("bm_fighters_v4",d.fighters);}if(d.matchups){setMatchups(d.matchups);save("bm_matchups_v3",d.matchups);}if(d.expenses){setExpenses(d.expenses);save("bm_expenses_v3",d.expenses);}if(d.tickets){setTickets(d.tickets);save("bm_tickets_v3",d.tickets);}}catch{alert("JSON inválido");}};r.readAsText(f);};i.click();}
-function resetDemo(){if(!confirm("¿Restaurar los 17 atletas originales y borrar peleas, gastos y ventas?"))return;setFighters([...SN_FIGHTERS]);save("bm_fighters_v4",SN_FIGHTERS);setMatchups([]);save("bm_matchups_v3",[]);setExpenses([]);save("bm_expenses_v3",[]);setTickets([]);save("bm_tickets_v3",[]);setTicketsNew([]);saveTicketsV4([]);saveCountersV4({general:0,ringside:0,vip:0});}
+function resetDemo(){if(!confirm("¿Restaurar los 43 atletas originales y borrar peleas, gastos y ventas?"))return;setFighters([...SN_FIGHTERS]);save("bm_fighters_v4",SN_FIGHTERS);setMatchups([]);save("bm_matchups_v3",[]);setExpenses([]);save("bm_expenses_v3",[]);setTickets([]);save("bm_tickets_v3",[]);setTicketsNew([]);saveTicketsV4([]);saveCountersV4({general:0,ringside:0,vip:0});}
 
 const nav=(active)=>"flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors "+(active?"text-yellow-500":"text-gray-500 active:text-gray-300");
 
