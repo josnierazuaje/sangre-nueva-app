@@ -189,6 +189,20 @@ const SYNC_KEYS = {
 const FB = { db:null, ready:false };
 function fbPath(k){ return "sangre_nueva/"+k; }
 
+// Config pública del proyecto de Firebase del equipo (la apiKey de un SDK
+// web de Firebase no es secreta: la seguridad la dan las Reglas de la base
+// de datos, no ocultar esta clave). Se usa para que cualquier dispositivo
+// se conecte automáticamente a la misma base de datos sin pegar nada.
+const DEFAULT_FB_CONFIG = {
+  apiKey: "AIzaSyCpt37J3Nph8KIL6rGXNcGOUNnk08paYTc",
+  authDomain: "velada-sangre-nueva-22fb0.firebaseapp.com",
+  databaseURL: "https://velada-sangre-nueva-22fb0-default-rtdb.firebaseio.com",
+  projectId: "velada-sangre-nueva-22fb0",
+  storageBucket: "velada-sangre-nueva-22fb0.firebasestorage.app",
+  messagingSenderId: "41697069846",
+  appId: "1:41697069846:web:a7726fe384e8730b2e1e37",
+};
+
 function parseFbConfig(t){
 t=(t||"").trim();
 const m=t.match(/\{[\s\S]*\}/); if(m) t=m[0];
@@ -1175,7 +1189,7 @@ const [ticketsNew,setTicketsNew]=useState([]);
 const [view,setView]=useState("list");
 const [editF,setEditF]=useState(null);
 const [eventLabel,setEventLabel]=useState(()=>load("bm_event_label","La Velada — próxima fecha por definir"));
-const [sync,setSync]=useState(()=>localStorage.getItem("bm_fb_config")?"connecting":"off");
+const [sync,setSync]=useState(()=>(localStorage.getItem("bm_fb_config")||!localStorage.getItem("bm_fb_disabled"))?"connecting":"off");
 const [menuOpen,setMenuOpen]=useState(false);
 
 function applyRemote(k,val){
@@ -1190,19 +1204,27 @@ else if(k==="bm_event_label") setEventLabel(val);
 
 function toggleSync(){
 const raw=localStorage.getItem("bm_fb_config");
-if(raw){
+const disabled=localStorage.getItem("bm_fb_disabled");
+if(raw||!disabled){
 if(confirm("¿Desconectar la sincronización en la nube en este dispositivo?\n\nLos datos locales se conservan; solo dejan de sincronizarse.")){
 localStorage.removeItem("bm_fb_config");
+localStorage.setItem("bm_fb_disabled","1");
 location.reload();
 }
 return;
 }
-const t=prompt("Pega aquí tu firebaseConfig (el bloque { apiKey: ..., databaseURL: ... } de la consola de Firebase).\n\nSi aún no lo tienes, sigue la GUÍA incluida.");
+localStorage.removeItem("bm_fb_disabled");
+location.reload();
+}
+
+function pasteCustomFbConfig(){
+const t=prompt("Pega aquí tu firebaseConfig (el bloque { apiKey: ..., databaseURL: ... } de la consola de Firebase).\n\nSolo úsalo si quieres conectar este dispositivo a otro proyecto distinto al de por defecto.");
 if(!t) return;
 const cfg=parseFbConfig(t);
 if(!cfg){ alert("No pude leer la configuración. Copia el bloque completo entre llaves { }."); return; }
 if(initFirebase(cfg, setSync, applyRemote)){
 localStorage.setItem("bm_fb_config", JSON.stringify(cfg));
+localStorage.removeItem("bm_fb_disabled");
 }
 }
 
@@ -1213,7 +1235,9 @@ setExpenses(load("bm_expenses_v3",[]));
 setTickets(load("bm_tickets_v3",[]));
 setTicketsNew(loadTicketsV4());
 const raw=localStorage.getItem("bm_fb_config");
-if(raw){ try{ initFirebase(JSON.parse(raw), setSync, applyRemote); }catch(e){ setSync("error"); } }
+const disabled=localStorage.getItem("bm_fb_disabled");
+const cfgToUse=raw?JSON.parse(raw):(disabled?null:DEFAULT_FB_CONFIG);
+if(cfgToUse){ try{ initFirebase(cfgToUse, setSync, applyRemote); }catch(e){ setSync("error"); } }
 },[]);
 
 function addFighter(f){let u;if(editF){u=fighters.map(x=>x.id===f.id?f:x);setEditF(null);}else{u=[...fighters,f];}setFighters(u);save("bm_fighters_v4",u);setView("list");}
@@ -1243,6 +1267,7 @@ return (
 <button onClick={()=>{setMenuOpen(false);resetDemo();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Restaurar</button>
 <button onClick={()=>{setMenuOpen(false);handleImport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
 <button onClick={()=>{setMenuOpen(false);handleExport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
+<button onClick={()=>{setMenuOpen(false);pasteCustomFbConfig();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Firebase manual</button>
 </div>
 </>}
 </div>
