@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="manifest" href="manifest.json" />
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Playfair+Display:ital@1&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -19,7 +19,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
-theme: { extend: { colors: { boxing: { red:'#DC2626', blue:'#2563EB', gold:'#F59E0B', dark:'#111827', card:'#1F2937' } } } }
+theme: { extend: { colors: { boxing: { red:'#DC2626', blue:'#2563EB', gold:'#F59E0B', dark:'#111827', card:'#1F2937',
+crimson:'#9b1a2a', crimsonLight:'#c42438', goldFight:'#c8a04a', goldDim:'#8a6d2f', cream:'#e8ddd0', muted:'#6b5f6e', line:'#2a1f2e', lineBright:'#3d2d42', raised:'#16111a', panel:'#100d10' } } } }
 }
 </script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -32,17 +33,18 @@ window.addEventListener('resize',setAppHeight);
 window.addEventListener('orientationchange',function(){setTimeout(setAppHeight,300);});
 </script>
 <style>
-html { background: linear-gradient(160deg,#000000 0%,#0a0703 45%,#1a1206 100%); min-height:100%; }
-body { background: transparent; margin:0; font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+html { background: #080608; min-height:100%; }
+body { background: transparent; margin:0; font-family:'Barlow Condensed',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; position:relative; }
+body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:1000; opacity:0.6; }
 /* Tarjetas semitransparentes */
-.bg-gray-800\/60 { background-color: rgba(10,0,0,0.55) !important; }
-.bg-gray-800\/50 { background-color: rgba(10,0,0,0.45) !important; }
-.bg-gray-800\/40 { background-color: rgba(10,0,0,0.35) !important; }
-.bg-gray-900\/80 { background-color: rgba(5,0,0,0.75) !important; }
+.bg-gray-800\/60 { background-color: rgba(16,13,16,0.75) !important; }
+.bg-gray-800\/50 { background-color: rgba(16,13,16,0.6) !important; }
+.bg-gray-800\/40 { background-color: rgba(16,13,16,0.5) !important; }
+.bg-gray-900\/80 { background-color: rgba(8,6,8,0.85) !important; }
 header { background: transparent !important; }
 ::-webkit-scrollbar { width:6px; }
-::-webkit-scrollbar-track { background:rgba(0,0,0,0.4); }
-::-webkit-scrollbar-thumb { background:#B8860B; border-radius:3px; }
+::-webkit-scrollbar-track { background:#080608; }
+::-webkit-scrollbar-thumb { background:#3d2d42; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 input[type="number"] { -moz-appearance:textfield; }
@@ -387,26 +389,30 @@ onSubmit({id:editingFighter?.id||genId(),fullName:fn.trim(),phone:ph.trim()?cc+p
 if(!editingFighter){setFn("");setPh("");setGy("");setAg("");setWt("");setFc("0");setNt("");setEr({});}
 }
 
-const ic="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 text-base";
+const ic="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim focus:bg-boxing-raised text-base transition-colors";
+const lbl="block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase";
 return (
-<form onSubmit={submit} className="space-y-4">
-<h2 className="text-xl font-bold text-white">{editingFighter?"Editar":"Registrar"} Peleador</h2>
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Nombre</label><input type="text" value={fn} onChange={e=>setFn(e.target.value)} placeholder="Juan Pérez" className={ic}/>{er.fn&&<p className="text-red-400 text-xs mt-1">{er.fn}</p>}</div>
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Sexo</label><div className="flex gap-2">
-<button type="button" onClick={()=>setSx("M")} className={"flex-1 py-2.5 rounded-lg text-sm font-bold border transition-colors "+(sx==="M"?"bg-blue-600/20 border-blue-500 text-blue-300":"bg-gray-800 border-gray-600 text-gray-400")}>Masculino</button>
-<button type="button" onClick={()=>setSx("F")} className={"flex-1 py-2.5 rounded-lg text-sm font-bold border transition-colors "+(sx==="F"?"bg-pink-600/20 border-pink-500 text-pink-300":"bg-gray-800 border-gray-600 text-gray-400")}>Femenino</button>
+<form onSubmit={submit} className="space-y-4 bg-boxing-panel border border-boxing-line p-5">
+<h2 className="flex items-center gap-3 text-boxing-cream" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"0.05em"}}>
+<span style={{width:"4px",height:"26px",background:"#c42438",display:"block",flexShrink:0}}/>
+{editingFighter?"Editar":"Agregar"} Peleador
+</h2>
+<div><label className={lbl}>Nombre</label><input type="text" value={fn} onChange={e=>setFn(e.target.value)} placeholder="Juan Pérez" className={ic}/>{er.fn&&<p className="text-red-400 text-xs mt-1">{er.fn}</p>}</div>
+<div><label className={lbl}>Sexo</label><div className="flex gap-2">
+<button type="button" onClick={()=>setSx("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sx==="M"?"bg-blue-600/15 border-blue-500 text-blue-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>
+<button type="button" onClick={()=>setSx("F")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sx==="F"?"bg-pink-600/15 border-pink-500 text-pink-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Femenino</button>
 </div></div>
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Teléfono <span className="text-gray-500 font-normal">(opcional)</span></label><div className="flex gap-2"><select value={cc} onChange={e=>setCc(e.target.value)} className="w-28 px-2 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm">{COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select><input type="tel" value={ph} onChange={e=>setPh(e.target.value.replace(/\D/g,""))} placeholder="912345678" className="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"/></div>{er.ph&&<p className="text-red-400 text-xs mt-1">{er.ph}</p>}</div>
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Escuela / Gimnasio</label><input type="text" value={gy} onChange={e=>setGy(e.target.value)} placeholder="Barrio Franklin" className={ic}/>{er.gy&&<p className="text-red-400 text-xs mt-1">{er.gy}</p>}</div>
+<div><label className={lbl}>Teléfono <span className="normal-case text-boxing-muted/70 font-normal tracking-normal">(opcional)</span></label><div className="flex gap-2"><select value={cc} onChange={e=>setCc(e.target.value)} className="w-28 px-2 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm">{COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select><input type="tel" value={ph} onChange={e=>setPh(e.target.value.replace(/\D/g,""))} placeholder="912345678" className="flex-1 px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim"/></div>{er.ph&&<p className="text-red-400 text-xs mt-1">{er.ph}</p>}</div>
+<div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gy} onChange={e=>setGy(e.target.value)} placeholder="Barrio Franklin" className={ic}/>{er.gy&&<p className="text-red-400 text-xs mt-1">{er.gy}</p>}</div>
 <div className="grid grid-cols-2 gap-3">
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Edad</label><input type="number" value={ag} onChange={e=>setAg(e.target.value)} placeholder="25" className={ic}/>{er.ag&&<p className="text-red-400 text-xs mt-1">{er.ag}</p>}</div>
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Peso (kg)</label><input type="number" value={wt} onChange={e=>setWt(e.target.value)} placeholder="68.5" step="0.1" className={ic}/>{er.wt&&<p className="text-red-400 text-xs mt-1">{er.wt}</p>}</div>
+<div><label className={lbl}>Edad</label><input type="number" value={ag} onChange={e=>setAg(e.target.value)} placeholder="25" className={ic}/>{er.ag&&<p className="text-red-400 text-xs mt-1">{er.ag}</p>}</div>
+<div><label className={lbl}>Peso (kg)</label><input type="number" value={wt} onChange={e=>setWt(e.target.value)} placeholder="68.5" step="0.1" className={ic}/>{er.wt&&<p className="text-red-400 text-xs mt-1">{er.wt}</p>}</div>
 </div>
-{ci&&<div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700 fade-in"><span className="text-sm text-gray-400">Categoría: </span><span className="text-yellow-500 font-semibold">{ci.label}</span></div>}
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Nº peleas</label><input type="number" value={fc} onChange={e=>setFc(e.target.value)} placeholder="0" min="0" className={ic}/></div>
-{ei&&<div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700 flex items-center gap-2 fade-in"><span className="text-sm text-gray-400">Nivel: </span><span className="text-sm font-semibold px-2 py-0.5 rounded-full" style={{backgroundColor:ei.color+"20",color:ei.color}}>{ei.label}</span></div>}
-<div><label className="block text-sm font-medium text-gray-300 mb-1">Notas</label><textarea value={nt} onChange={e=>setNt(e.target.value)} placeholder="Zurdo, buen juego de pies..." rows={2} className={ic+" resize-none"}/></div>
-<div className="flex gap-3 pt-2"><button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-lg">{editingFighter?"Guardar":"Registrar"}</button>{editingFighter&&onCancel&&<button type="button" onClick={onCancel} className="px-4 py-3.5 bg-gray-700 text-gray-300 rounded-lg">Cancelar</button>}</div>
+{ci&&<div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría: </span><span className="text-boxing-goldFight font-semibold">{ci.label}</span></div>}
+<div><label className={lbl}>Nº peleas</label><input type="number" value={fc} onChange={e=>setFc(e.target.value)} placeholder="0" min="0" className={ic}/></div>
+{ei&&<div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Nivel: </span><span className="text-xs font-bold px-2 py-0.5 tracking-widest uppercase border" style={{borderColor:ei.color+"60",color:ei.color}}>{ei.label}</span></div>}
+<div><label className={lbl}>Notas</label><textarea value={nt} onChange={e=>setNt(e.target.value)} placeholder="Zurdo, buen juego de pies..." rows={2} className={ic+" resize-none"}/></div>
+<div className="flex gap-3 pt-2"><button type="submit" className="flex-1 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream py-3.5 transition-colors active:scale-[0.98]" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"20px",letterSpacing:"0.1em"}}>{editingFighter?"Guardar":"+ Añadir al Cartel"}</button>{editingFighter&&onCancel&&<button type="button" onClick={onCancel} className="px-4 py-3.5 bg-black border border-boxing-lineBright text-boxing-muted tracking-widest uppercase text-sm">Cancelar</button>}</div>
 </form>
 );
 }
@@ -427,33 +433,36 @@ return r;
 const stats=useMemo(()=>{const e={};fighters.forEach(f=>{e[f.experienceLevel]=(e[f.experienceLevel]||0)+1;});return e;},[fighters]);
 function del(id){if(cd===id){onDelete(id);setCd(null);}else{setCd(id);setTimeout(()=>setCd(null),3000);}}
 
-if(!fighters.length) return <div className="text-center py-16"><div className="text-5xl mb-4">{"\u{1F94A}"}</div><p className="text-gray-400">No hay peleadores registrados</p></div>;
+if(!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"22px",letterSpacing:"0.08em"}}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
 return (
 <div className="space-y-3">
-<h2 className="text-xl font-bold text-white">Peleadores <span className="text-yellow-500">({fighters.length})</span></h2>
+<h2 className="flex items-center gap-3 text-boxing-cream" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"0.05em"}}>
+<span style={{width:"4px",height:"26px",background:"#c42438",display:"block",flexShrink:0}}/>
+Peleadores <span className="text-boxing-goldFight">({fighters.length})</span>
+</h2>
 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-{EXPERIENCE_LEVELS.map(e=>{const c=stats[e.key]||0;if(!c)return null;return <button key={e.key} onClick={()=>setFe(fe===e.key?"all":e.key)} className={"flex-shrink-0 flex flex-col items-center px-3 py-1.5 rounded-lg border transition-colors min-w-[64px] "+(fe===e.key?"border-white/30":"border-transparent")} style={{backgroundColor:e.color+"18"}}>
+{EXPERIENCE_LEVELS.map(e=>{const c=stats[e.key]||0;if(!c)return null;return <button key={e.key} onClick={()=>setFe(fe===e.key?"all":e.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{borderColor:fe===e.key?e.color:e.color+"40"}}>
 <span className="text-sm font-bold leading-none" style={{color:e.color}}>{c}</span>
-<span className="text-[9px] mt-0.5" style={{color:e.color}}>{e.label}</span>
+<span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{color:e.color}}>{e.label}</span>
 </button>;})}
 </div>
-<input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 text-sm transition-colors"/>
+<input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors"/>
 <div className="flex gap-2">
-<select value={fc} onChange={e=>setFc(e.target.value)} className="flex-1 px-2 py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
-<select value={sb} onChange={e=>setSb(e.target.value)} className="px-2 py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
+<select value={fc} onChange={e=>setFc(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
+<select value={sb} onChange={e=>setSb(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
 </div>
 <div className="space-y-2">
-{!filtered.length?<p className="text-gray-500 text-center py-8 text-sm">Sin resultados</p>:filtered.map(f=>{
+{!filtered.length?<p className="text-boxing-muted text-center py-8 text-sm">Sin resultados</p>:filtered.map(f=>{
 const cat=getCategoryInfo(f.weightCategory);const exp=getExperienceInfo(f.experienceLevel);
-return(<div key={f.id} className="bg-white/[0.04] backdrop-blur-sm border border-white/10 rounded-lg p-3 space-y-2 fade-in transition-colors hover:bg-white/[0.06]" style={{borderLeft:"2px solid "+(exp?.color||"#4B5563")+"B3"}}>
+return(<div key={f.id} className="bg-boxing-panel border border-boxing-line p-3 space-y-2 fade-in transition-colors hover:border-boxing-lineBright" style={{borderLeft:"3px solid "+(exp?.color||"#4B5563")}}>
 <div className="flex items-start justify-between">
 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-<div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold" style={{backgroundColor:(cat?.color||"#6B7280")+"25",color:cat?.color||"#9CA3AF"}}>{getInitials(f.fullName)}</div>
-<div className="min-w-0 flex-1"><h3 className="text-white font-medium text-base leading-tight truncate">{f.fullName}</h3><p className="text-gray-400 text-xs mt-0.5 truncate">{f.gym}</p></div>
+<div className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-xs font-bold border" style={{borderColor:(cat?.color||"#9CA3AF")+"60",color:cat?.color||"#9CA3AF"}}>{getInitials(f.fullName)}</div>
+<div className="min-w-0 flex-1"><h3 className="text-boxing-cream font-medium text-base leading-tight truncate">{f.fullName}</h3><p className="text-boxing-muted text-xs mt-0.5 truncate tracking-wide uppercase">{f.gym}</p></div>
 </div>
-<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 rounded-full text-gray-400 hover:text-yellow-500 hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 rounded-full transition-colors hover:bg-white/5 "+(cd===f.id?"text-red-400":"text-gray-400 hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
-<div className="flex flex-wrap gap-1.5 pl-11"><span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{backgroundColor:(cat?.color||"#F59E0B")+"20",color:cat?.color||"#F59E0B"}}>{"⚖️"} {f.weightKg}kg · {cat?.label}</span><span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{backgroundColor:exp?.color+"20",color:exp?.color}}>{"\u{1F94A}"} {f.fightCount}p · {exp?.label}</span><span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">{f.age}a{f.age<18?" · Jr":""}</span><span className={"text-xs px-2 py-0.5 rounded-full font-medium "+((f.sexo||"M")==="F"?"bg-pink-900/40 text-pink-300":"bg-blue-900/40 text-blue-300")}>{(f.sexo||"M")==="F"?"F":"M"}</span></div>
-{f.phone&&<div className="text-xs text-gray-500 pl-11"><a href={"https://wa.me/"+f.phone.replace("+","")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
+<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 text-boxing-muted hover:text-boxing-goldFight hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 transition-colors hover:bg-white/5 "+(cd===f.id?"text-red-400":"text-boxing-muted hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
+<div className="flex flex-wrap gap-1.5 pl-11"><span className="text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase" style={{borderColor:(cat?.color||"#F59E0B")+"50",color:cat?.color||"#F59E0B"}}>{f.weightKg}kg · {cat?.label}</span><span className="text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase" style={{borderColor:(exp?.color||"#9CA3AF")+"50",color:exp?.color}}>{f.fightCount}p · {exp?.label}</span><span className="text-[10px] px-2 py-0.5 border border-boxing-lineBright text-boxing-muted tracking-widest uppercase">{f.age}a{f.age<18?" · Jr":""}</span><span className={"text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase "+((f.sexo||"M")==="F"?"border-pink-500/50 text-pink-300":"border-blue-500/50 text-blue-300")}>{(f.sexo||"M")==="F"?"F":"M"}</span></div>
+{f.phone&&<div className="text-xs text-boxing-muted pl-11"><a href={"https://wa.me/"+f.phone.replace("+","")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
 {cd===f.id&&<p className="text-red-400 text-xs fade-in pl-11">{"⚠️"} Toca de nuevo para eliminar</p>}
 </div>);})}
 </div>
@@ -472,14 +481,35 @@ const wd=Math.abs(r.weightKg-b.weightKg).toFixed(1);
 const warnings=matchup.warnings||[];
 const hh=warnings.some(w=>w.severity==="high");const hm=warnings.some(w=>w.severity==="medium");
 return (
-<div className={"rounded-xl overflow-hidden border scale-in "+(hh?"border-red-500/50":hm?"border-yellow-500/30":"border-gray-700")}>
-<div className="bg-gray-800 px-3 py-1.5 flex items-center justify-between"><span className="text-xs text-gray-400">Pelea #{matchup.roundNumber}</span><div className="flex items-center gap-2"><span className="text-xs text-yellow-500">{rc?.label} · Δ{wd}kg</span>{onRemove&&<button onClick={()=>onRemove(matchup.id)} className="text-gray-500 hover:text-red-400 p-0.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>}</div></div>
-<div className="flex items-stretch">
-<div className="flex-1 bg-gradient-to-r from-red-900/40 to-red-900/10 p-3 text-left"><div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Rojo</div><p className="text-white font-bold text-sm leading-tight truncate">{r.fullName}</p><p className="text-gray-400 text-[11px] truncate">{r.gym}</p><div className="flex flex-wrap gap-1 mt-1.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700/80 text-gray-300">{r.weightKg}kg · {r.age}a</span><span className="text-[10px] px-1.5 py-0.5 rounded" style={{backgroundColor:re?.color+"20",color:re?.color}}>{r.fightCount}p</span></div></div>
-<div className="flex items-center justify-center w-12 bg-gray-900"><span className="text-yellow-500 font-black text-lg vs-pulse">VS</span></div>
-<div className="flex-1 bg-gradient-to-l from-blue-900/40 to-blue-900/10 p-3 text-right"><div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Azul</div><p className="text-white font-bold text-sm leading-tight truncate">{b.fullName}</p><p className="text-gray-400 text-[11px] truncate">{b.gym}</p><div className="flex flex-wrap gap-1 mt-1.5 justify-end"><span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700/80 text-gray-300">{b.weightKg}kg · {b.age}a</span><span className="text-[10px] px-1.5 py-0.5 rounded" style={{backgroundColor:be?.color+"20",color:be?.color}}>{b.fightCount}p</span></div></div>
+<div className={"bg-boxing-panel overflow-hidden scale-in relative border "+(hh?"border-red-500/50":hm?"border-boxing-goldDim/50":"border-boxing-line")}>
+<div style={{position:"absolute",top:0,left:0,right:0,height:"2px",background:"linear-gradient(90deg,transparent,#9b1a2a,transparent)"}}/>
+<div className="flex items-center justify-between px-4 py-2 bg-black/30 border-b border-boxing-line">
+<div className="flex items-center gap-2.5">
+<span className="text-boxing-muted" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"13px",letterSpacing:"0.2em"}}>PELEA {matchup.roundNumber}</span>
+<span className="text-[9px] font-bold px-2 py-0.5 border border-boxing-goldDim/40 text-boxing-goldFight tracking-widest uppercase">{rc?.label} · Δ{wd}kg</span>
 </div>
-{warnings.length>0&&<div className="bg-gray-900/80 px-3 py-1.5 space-y-0.5">{warnings.map((w,i)=><div key={i} className="flex items-center gap-1.5 text-[11px]"><span>{w.severity==="high"?"\u{1F534}":w.severity==="medium"?"\u{1F7E1}":"\u{1F7E2}"}</span><span className={w.severity==="high"?"text-red-400":w.severity==="medium"?"text-yellow-400":"text-gray-400"}>{w.message}</span></div>)}</div>}
+{onRemove&&<button onClick={()=>onRemove(matchup.id)} className="text-boxing-muted hover:text-red-400 p-0.5"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>}
+</div>
+<div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-5 gap-3">
+<div className="flex flex-col gap-1 min-w-0">
+<span className="text-[9px] font-bold tracking-widest uppercase text-red-400/80">Rojo</span>
+<div className="text-boxing-cream font-bold leading-none truncate" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"22px",letterSpacing:"0.03em"}}>{r.fullName}</div>
+<div className="text-[11px] text-boxing-muted truncate">{r.gym} · {r.weightKg}kg · {r.age}a</div>
+<div className="text-[10px] font-semibold tracking-widest uppercase mt-0.5" style={{color:re?.color}}>{r.fightCount}p · {re?.label}</div>
+</div>
+<div className="flex flex-col items-center gap-1">
+<div style={{width:"1px",height:"22px",background:"linear-gradient(180deg,transparent,#9b1a2a)"}}/>
+<span className="font-bold vs-pulse" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"18px",letterSpacing:"0.1em",color:"#c42438",textShadow:"0 0 16px rgba(155,26,42,0.4)"}}>VS</span>
+<div style={{width:"1px",height:"22px",background:"linear-gradient(180deg,#9b1a2a,transparent)"}}/>
+</div>
+<div className="flex flex-col gap-1 items-end text-right min-w-0">
+<span className="text-[9px] font-bold tracking-widest uppercase text-blue-400/80">Azul</span>
+<div className="text-boxing-cream font-bold leading-none truncate" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"22px",letterSpacing:"0.03em"}}>{b.fullName}</div>
+<div className="text-[11px] text-boxing-muted truncate">{b.weightKg}kg · {b.age}a · {b.gym}</div>
+<div className="text-[10px] font-semibold tracking-widest uppercase mt-0.5" style={{color:be?.color}}>{b.fightCount}p · {be?.label}</div>
+</div>
+</div>
+{warnings.length>0&&<div className="border-t border-boxing-line px-4 py-2 space-y-1 bg-black/20">{warnings.map((w,i)=><div key={i} className="flex items-center gap-1.5 text-[11px]"><span>{w.severity==="high"?"\u{1F534}":w.severity==="medium"?"\u{1F7E1}":"\u{1F7E2}"}</span><span className={w.severity==="high"?"text-red-400":w.severity==="medium"?"text-boxing-goldFight":"text-boxing-muted"}>{w.message}</span></div>)}</div>}
 </div>
 );
 }
@@ -513,13 +543,19 @@ setSortCount(0);
 }
 },120);
 }
-if(fighters.length<2) return <div className="text-center py-16"><div className="text-5xl mb-4">{"\u{1F94A}"}</div><p className="text-gray-400">Necesitas al menos 2 peleadores</p></div>;
+if(fighters.length<2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"22px",letterSpacing:"0.08em"}}>Necesitas al menos 2 peleadores</p></div>;
 return (
 <div className="space-y-4">
-<div className="flex items-center justify-between"><h2 className="text-xl font-bold text-white">Emparejamientos</h2><span className="text-xs text-gray-500">{matchups.length} peleas</span></div>
+<div className="flex items-center justify-between">
+<h2 className="flex items-center gap-3 text-boxing-cream" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"0.05em"}}>
+<span style={{width:"4px",height:"26px",background:"#c42438",display:"block",flexShrink:0}}/>
+Emparejamientos
+</h2>
+<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>
+</div>
 
 {/* Botón Sorteo destacado */}
-<button onClick={runSorteo} disabled={sorting} className={"w-full py-4 rounded-xl font-black text-lg tracking-widest flex items-center justify-center gap-3 transition-all "+(sorting?"bg-red-900/60 border border-red-500/50 text-red-300 cursor-not-allowed":"bg-gradient-to-r from-red-800 to-red-600 hover:from-red-700 hover:to-red-500 text-white border border-red-500/30 active:scale-95")} style={{fontFamily:"'Bebas Neue',Impact,sans-serif",fontSize:"22px",letterSpacing:"4px"}}>
+<button onClick={runSorteo} disabled={sorting} className={"w-full py-4 font-black text-lg tracking-widest flex items-center justify-center gap-3 transition-all "+(sorting?"bg-boxing-crimson/60 border border-red-500/50 text-red-300 cursor-not-allowed":"bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream border border-red-500/30 active:scale-95")} style={{fontFamily:"'Bebas Neue',Impact,sans-serif",fontSize:"22px",letterSpacing:"4px"}}>
 {sorting
 ? <><span className="text-3xl" style={{animation:"spin 0.3s linear infinite",display:"inline-block"}}>🎲</span> SORTEANDO...</>
 : <><span className="text-2xl">🎲</span> SORTEO</>
@@ -527,7 +563,7 @@ return (
 </button>
 
 {/* Overlay animado durante sorteo */}
-{sorting&&<div className="bg-black/60 border border-red-500/30 rounded-xl p-6 text-center scale-in">
+{sorting&&<div className="bg-black/60 border border-red-500/30 p-6 text-center scale-in">
 <div className="text-4xl mb-3" style={{animation:"vsFlash 0.3s ease-in-out infinite"}}>🥊</div>
 <p className="text-red-400 font-bold text-lg" style={{fontFamily:"'Bebas Neue',Impact,sans-serif",letterSpacing:"3px"}}>MEZCLANDO PELEADORES...</p>
 <div className="flex justify-center gap-1 mt-3">{[...Array(5)].map((_,i)=><div key={i} className="w-2 h-2 rounded-full bg-red-500" style={{animation:`vsFlash 0.6s ease-in-out ${i*0.1}s infinite`}}></div>)}</div>
@@ -535,17 +571,17 @@ return (
 
 {/* Botón Auto VS (secundario) */}
 <div className="flex gap-2">
-<button onClick={autoM} disabled={sorting} className="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 text-sm font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2">
+<button onClick={autoM} disabled={sorting} className="flex-1 bg-transparent hover:bg-boxing-goldDim/10 border border-boxing-goldDim text-boxing-goldFight text-sm font-semibold py-2.5 flex items-center justify-center gap-2 tracking-widest uppercase transition-colors" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"16px"}}>
 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
 Auto VS
 </button>
-{matchups.length>0&&<button onClick={clearAll} disabled={sorting} className="px-4 py-2.5 bg-gray-800 border border-gray-600 text-gray-400 rounded-lg text-sm">Limpiar</button>}
+{matchups.length>0&&<button onClick={clearAll} disabled={sorting} className="px-4 py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar</button>}
 </div>
 
-{!matchups.length&&!sorting&&<div className="bg-black/30 border border-gray-700/50 rounded-lg p-4 text-center"><p className="text-gray-400 text-sm">Usa <span className="text-red-400 font-bold">SORTEO</span> para emparejamientos aleatorios<br/>o <span className="text-gray-300 font-semibold">Auto VS</span> para emparejamiento inteligente</p><p className="text-gray-600 text-xs mt-1">Respeta categoría · nivel · escuela</p></div>}
+{!matchups.length&&!sorting&&<div className="border border-dashed border-boxing-lineBright p-4 text-center"><p className="text-boxing-muted text-sm">Usa <span className="text-red-400 font-bold">SORTEO</span> para emparejamientos aleatorios<br/>o <span className="text-boxing-cream font-semibold">Auto VS</span> para emparejamiento inteligente</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría · nivel · escuela</p></div>}
 <div className="space-y-3">{matchups.map((m,i)=><VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM}/>)}</div>
-{unmatched.length>0&&matchups.length>0&&<div><button onClick={()=>setShowUn(!showUn)} className="text-sm text-gray-400 hover:text-yellow-500 flex items-center gap-1"><svg className={"w-4 h-4 transition-transform "+(showUn?"rotate-90":"")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>Sin pelea ({unmatched.length})</button>
-{showUn&&<div className="mt-2 space-y-1.5">{unmatched.map(f=>{const c=getCategoryInfo(f.weightCategory);const e=getExperienceInfo(f.experienceLevel);return <div key={f.id} className="bg-gray-800/40 rounded-lg px-3 py-2 flex items-center justify-between fade-in"><div><span className="text-white text-sm">{f.fullName}</span><span className="text-gray-500 text-xs ml-2">{c?.label} · {f.weightKg}kg</span></div><span className="text-xs px-1.5 py-0.5 rounded" style={{backgroundColor:e?.color+"20",color:e?.color}}>{e?.label}</span></div>;})}</div>}</div>}
+{unmatched.length>0&&matchups.length>0&&<div><button onClick={()=>setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform "+(showUn?"rotate-90":"")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>Sin pelea ({unmatched.length})</button>
+{showUn&&<div className="mt-2 space-y-1.5">{unmatched.map(f=>{const c=getCategoryInfo(f.weightCategory);const e=getExperienceInfo(f.experienceLevel);return <div key={f.id} className="bg-boxing-panel border border-boxing-line px-3 py-2 flex items-center justify-between fade-in"><div><span className="text-boxing-cream text-sm">{f.fullName}</span><span className="text-boxing-muted text-xs ml-2">{c?.label} · {f.weightKg}kg</span></div><span className="text-[10px] font-bold px-1.5 py-0.5 border tracking-widest uppercase" style={{borderColor:e?.color+"50",color:e?.color}}>{e?.label}</span></div>;})}</div>}</div>}
 </div>
 );
 }
@@ -1249,35 +1285,42 @@ function handleExport(){const d={fighters,matchups,expenses,tickets};const b=new
 function handleImport(){const i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.fighters){setFighters(d.fighters);save("bm_fighters_v4",d.fighters);}if(d.matchups){setMatchups(d.matchups);save("bm_matchups_v3",d.matchups);}if(d.expenses){setExpenses(d.expenses);save("bm_expenses_v3",d.expenses);}if(d.tickets){setTickets(d.tickets);save("bm_tickets_v3",d.tickets);}}catch{alert("JSON inválido");}};r.readAsText(f);};i.click();}
 function resetDemo(){if(!confirm("¿Restaurar los 43 atletas originales y borrar peleas, gastos y ventas?"))return;setFighters([...SN_FIGHTERS]);save("bm_fighters_v4",SN_FIGHTERS);setMatchups([]);save("bm_matchups_v3",[]);setExpenses([]);save("bm_expenses_v3",[]);setTickets([]);save("bm_tickets_v3",[]);setTicketsNew([]);saveTicketsV4([]);saveCountersV4({general:0,ringside:0,vip:0});}
 
-const nav=(active)=>"flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors "+(active?"text-yellow-500":"text-gray-500 active:text-gray-300");
+const nav=(active)=>"flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors "+(active?"text-boxing-goldFight":"text-boxing-muted active:text-gray-300");
 
 return (
 <div className="app-root" style={{maxWidth:"512px",margin:"0 auto",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-<header style={{flexShrink:0,borderBottom:"1px solid rgba(212,160,23,0.35)",zIndex:10}}>
-<div className="flex justify-end px-3 pt-1.5 pb-0">
+<header style={{flexShrink:0,borderBottom:"1px solid #2a1f2e",zIndex:10,position:"relative",overflow:"hidden"}}>
+<div style={{position:"absolute",top:"-40px",left:"50%",transform:"translateX(-50%)",width:"320px",height:"160px",background:"radial-gradient(ellipse, rgba(155,26,42,0.25) 0%, transparent 70%)",pointerEvents:"none"}}/>
+<div className="flex justify-end px-3 pt-1.5 pb-0" style={{position:"relative"}}>
 <div className="flex gap-1 items-center">
-<button onClick={toggleSync} className={"text-[10px] px-2 py-0.5 rounded-full transition-colors font-semibold "+(sync==="on"?"text-green-400 bg-green-500/10":sync==="connecting"?"text-yellow-400 bg-yellow-500/10":sync==="error"?"text-red-400 bg-red-500/10":"text-gray-500 bg-gray-500/10 hover:text-yellow-500")}>
+<button onClick={toggleSync} className={"text-[10px] px-2 py-0.5 border font-semibold tracking-widest uppercase transition-colors "+(sync==="on"?"text-green-400 border-green-500/40":sync==="connecting"?"text-yellow-400 border-yellow-500/40":sync==="error"?"text-red-400 border-red-500/40":"text-gray-500 border-gray-600 hover:text-boxing-goldFight hover:border-boxing-goldDim")}>
 {sync==="on"?"☁ Sincronizado":sync==="connecting"?"☁ Conectando…":sync==="error"?"☁ Error":"☁ Nube"}
 </button>
 <div className="relative">
-<button onClick={()=>setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-yellow-500 hover:bg-white/5 rounded-full w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
+<button onClick={()=>setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-boxing-goldFight hover:bg-white/5 w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
 {menuOpen&&<>
 <div className="fixed inset-0 z-10" onClick={()=>setMenuOpen(false)}/>
-<div className="absolute right-0 top-7 z-20 bg-gray-900/95 backdrop-blur border border-white/10 rounded-lg py-1 min-w-[110px] shadow-lg">
+<div className="absolute right-0 top-7 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[110px] shadow-lg">
 <button onClick={()=>{setMenuOpen(false);resetDemo();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Restaurar</button>
-<button onClick={()=>{setMenuOpen(false);handleImport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
-<button onClick={()=>{setMenuOpen(false);handleExport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
-<button onClick={()=>{setMenuOpen(false);pasteCustomFbConfig();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Firebase manual</button>
+<button onClick={()=>{setMenuOpen(false);handleImport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
+<button onClick={()=>{setMenuOpen(false);handleExport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
+<button onClick={()=>{setMenuOpen(false);pasteCustomFbConfig();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Firebase manual</button>
 </div>
 </>}
 </div>
 </div>
 </div>
-<div className="flex flex-col items-center pb-3 pt-1 gap-2">
-<img src="assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{height:"96px",width:"auto",objectFit:"contain",filter:"drop-shadow(0 0 14px rgba(212,160,23,0.45))"}} />
-<div className="text-center leading-none">
-<div style={{fontFamily:"'Bebas Neue', Impact, sans-serif",fontSize:"30px",letterSpacing:"5px",color:"#EAB308",lineHeight:1,textShadow:"0 0 20px rgba(234,179,8,0.55)"}}>SANGRE NUEVA</div>
-<div style={{fontFamily:"'Bebas Neue', Impact, sans-serif",fontSize:"18px",letterSpacing:"9px",color:"white",lineHeight:1.2,textShadow:"0 2px 8px rgba(0,0,0,0.8)"}}>LA VELADA</div>
+<div className="flex flex-col items-center pb-4 pt-2 gap-1" style={{position:"relative"}}>
+<div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"11px",fontWeight:600,letterSpacing:"0.4em",color:"#c8a04a",textTransform:"uppercase"}}>Azuaje Team & HH Arias</div>
+<img src="assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{height:"88px",width:"auto",objectFit:"contain",filter:"drop-shadow(0 0 14px rgba(200,160,74,0.35))",marginTop:"4px"}} />
+<div className="text-center leading-none" style={{marginTop:"2px"}}>
+<div style={{fontFamily:"'Bebas Neue', Impact, sans-serif",fontSize:"32px",letterSpacing:"0.04em",color:"#e8ddd0",lineHeight:1}}>SANGRE NUEVA</div>
+<div style={{fontFamily:"'Playfair Display', serif",fontStyle:"italic",fontSize:"16px",color:"#c8a04a",letterSpacing:"0.15em",marginTop:"4px"}}>La Velada</div>
+</div>
+<div style={{display:"flex",alignItems:"center",gap:"12px",marginTop:"10px"}}>
+<div style={{width:"50px",height:"1px",background:"linear-gradient(90deg,transparent,#8a6d2f)"}}/>
+<div style={{width:"5px",height:"5px",background:"#c8a04a",transform:"rotate(45deg)"}}/>
+<div style={{width:"50px",height:"1px",background:"linear-gradient(90deg,#8a6d2f,transparent)"}}/>
 </div>
 </div>
 </header>
@@ -1291,13 +1334,13 @@ return (
 </main>
 
 {/* Event Dates Bar (editable: tocar para cambiar) */}
-<div onClick={()=>{const cur=load("bm_event_label","La Velada — próxima fecha por definir");const v=prompt("Nombre y fecha del evento:",cur);if(v!==null&&v.trim()){save("bm_event_label",v.trim());setEventLabel(v.trim());}}} style={{flexShrink:0,display:"flex",justifyContent:"center",alignItems:"center",gap:"8px",padding:"5px 0",borderTop:"1px solid rgba(234,179,8,0.25)",background:"rgba(5,3,0,0.75)",cursor:"pointer"}}>
-<svg className="w-3 h-3 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-<span className="text-[10px] text-yellow-500 font-bold tracking-wide">{eventLabel}</span>
+<div onClick={()=>{const cur=load("bm_event_label","La Velada — próxima fecha por definir");const v=prompt("Nombre y fecha del evento:",cur);if(v!==null&&v.trim()){save("bm_event_label",v.trim());setEventLabel(v.trim());}}} style={{flexShrink:0,display:"flex",justifyContent:"center",alignItems:"center",gap:"8px",padding:"5px 0",borderTop:"1px solid #2a1f2e",background:"#100d10",cursor:"pointer"}}>
+<svg className="w-3 h-3 text-boxing-goldFight" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+<span className="text-[10px] text-boxing-goldFight font-bold tracking-wide">{eventLabel}</span>
 <span className="text-[9px] text-gray-600">(tocar para editar)</span>
 </div>
 
-<nav className="nav-safe" style={{flexShrink:0,background:"rgba(5,0,0,0.9)",borderTop:"1px solid rgba(212,160,23,0.3)"}}>
+<nav className="nav-safe" style={{flexShrink:0,background:"#080608",borderTop:"1px solid #2a1f2e"}}>
 <div className="max-w-lg mx-auto flex">
 <button onClick={()=>{setView("list");setEditF(null);}} className={nav(view==="list")}>
 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
