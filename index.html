@@ -212,15 +212,19 @@ try{ return JSON.parse(t); }catch(e){}
 try{ return (new Function("return ("+t+")"))(); }catch(e){ return null; }
 }
 
-function initFirebase(cfg, onStatus, onRemote){
-try{
-if(typeof firebase==="undefined"){ onStatus("error"); alert("No se pudieron cargar las librerías de Firebase. Revisa tu conexión a internet."); return false; }
-if(!cfg || !cfg.apiKey){ onStatus("error"); alert("Configuración inválida. Pega el bloque firebaseConfig completo."); return false; }
-if(!cfg.databaseURL){ onStatus("error"); alert("A tu configuración le falta databaseURL.\n\nEn la consola de Firebase crea la Realtime Database (parte C de la guía) y vuelve a copiar la config — debe incluir la línea databaseURL."); return false; }
+const OWNER_EMAIL = "josnier.azuaje@gmail.com";
+
+function initFirebaseApp(cfg){
+if(typeof firebase==="undefined") return false;
+if(!cfg || !cfg.apiKey || !cfg.databaseURL) return false;
 if(!firebase.apps.length) firebase.initializeApp(cfg);
 FB.db = firebase.database();
+return true;
+}
+
+function startFirebaseSync(onStatus, onRemote){
+if(FB.ready) return;
 onStatus("connecting");
-firebase.auth().signInAnonymously().then(()=>{
 FB.ready = true; onStatus("on");
 Object.keys(SYNC_KEYS).forEach(k=>{
 const ref = FB.db.ref(fbPath(k));
@@ -240,10 +244,16 @@ onRemote(k, remote);
 });
 });
 });
-}).catch(e=>{
-onStatus("error");
-alert("No se pudo iniciar sesión anónima en Firebase: "+e.message+"\n\nActiva el proveedor 'Anónimo' en Authentication (parte B de la guía).");
-});
+}
+
+function initFirebase(cfg, onStatus, onRemote){
+try{
+if(typeof firebase==="undefined"){ onStatus("error"); alert("No se pudieron cargar las librerías de Firebase. Revisa tu conexión a internet."); return false; }
+if(!cfg || !cfg.apiKey){ onStatus("error"); alert("Configuración inválida. Pega el bloque firebaseConfig completo."); return false; }
+if(!cfg.databaseURL){ onStatus("error"); alert("A tu configuración le falta databaseURL.\n\nEn la consola de Firebase crea la Realtime Database (parte C de la guía) y vuelve a copiar la config — debe incluir la línea databaseURL."); return false; }
+if(!initFirebaseApp(cfg)){ onStatus("error"); return false; }
+if(firebase.auth().currentUser) startFirebaseSync(onStatus, onRemote);
+else onStatus("off");
 return true;
 }catch(e){ onStatus("error"); alert("Error al conectar con Firebase: "+e.message); return false; }
 }
@@ -1214,6 +1224,52 @@ style={subView===s.k?{background:"rgba(220,38,38,0.25)",color:"white",borderBott
 </div>
 );
 }
+// PANTALLA DE INICIO DE SESIÓN
+// ============================================
+function LoginScreen(){
+const [email,setEmail]=useState("");
+const [pass,setPass]=useState("");
+const [err,setErr]=useState("");
+const [loading,setLoading]=useState(false);
+const [resetSent,setResetSent]=useState(false);
+
+function submit(e){
+e.preventDefault();
+setErr(""); setResetSent(false); setLoading(true);
+firebase.auth().signInWithEmailAndPassword(email.trim(), pass).catch(e=>{
+const msg=(e.code==="auth/invalid-credential"||e.code==="auth/wrong-password"||e.code==="auth/user-not-found")?"Correo o contraseña incorrectos.":"Error: "+e.message;
+setErr(msg);
+}).finally(()=>setLoading(false));
+}
+function resetPw(){
+setErr(""); setResetSent(false);
+if(!email.trim()){ setErr("Escribe tu correo arriba y toca de nuevo este enlace."); return; }
+firebase.auth().sendPasswordResetEmail(email.trim()).then(()=>setResetSent(true)).catch(e=>setErr("Error: "+e.message));
+}
+
+return (
+<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+<form onSubmit={submit} className="w-full max-w-sm bg-boxing-panel border border-boxing-line p-6 space-y-4">
+<div className="text-center mb-2">
+<div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"30px",letterSpacing:"0.05em",color:"#e8ddd0"}}>SANGRE NUEVA</div>
+<div style={{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"14px",color:"#c8a04a",letterSpacing:"0.1em"}}>La Velada</div>
+<div className="mt-3 text-[10px] font-semibold text-boxing-muted tracking-[0.3em] uppercase">Acceso privado</div>
+</div>
+<div><label className="block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Correo</label>
+<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-base"/></div>
+<div><label className="block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Contraseña</label>
+<input type="password" value={pass} onChange={e=>setPass(e.target.value)} required autoComplete="current-password" className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-base"/></div>
+{err&&<p className="text-red-400 text-xs">{err}</p>}
+{resetSent&&<p className="text-green-400 text-xs">Te enviamos un correo para restablecer tu contraseña.</p>}
+<button type="submit" disabled={loading} className="w-full bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream py-3.5 transition-colors active:scale-[0.98] disabled:opacity-60" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"20px",letterSpacing:"0.1em"}}>
+{loading?"Entrando...":"Iniciar Sesión"}
+</button>
+<button type="button" onClick={resetPw} className="w-full text-center text-boxing-muted text-xs tracking-wide hover:text-boxing-goldFight transition-colors">¿Olvidaste tu contraseña?</button>
+</form>
+</div>
+);
+}
+
 // APP PRINCIPAL
 // ============================================
 function App() {
@@ -1227,6 +1283,9 @@ const [editF,setEditF]=useState(null);
 const [eventLabel,setEventLabel]=useState(()=>load("bm_event_label","La Velada — próxima fecha por definir"));
 const [sync,setSync]=useState(()=>(localStorage.getItem("bm_fb_config")||!localStorage.getItem("bm_fb_disabled"))?"connecting":"off");
 const [menuOpen,setMenuOpen]=useState(false);
+const [authUser,setAuthUser]=useState(undefined);
+const isOwner = !!(authUser && authUser.email===OWNER_EMAIL);
+function logout(){ firebase.auth().signOut(); }
 
 function applyRemote(k,val){
 if(k==="bm_fighters_v4") setFighters(val);
@@ -1273,7 +1332,17 @@ setTicketsNew(loadTicketsV4());
 const raw=localStorage.getItem("bm_fb_config");
 const disabled=localStorage.getItem("bm_fb_disabled");
 const cfgToUse=raw?JSON.parse(raw):(disabled?null:DEFAULT_FB_CONFIG);
-if(cfgToUse){ try{ initFirebase(cfgToUse, setSync, applyRemote); }catch(e){ setSync("error"); } }
+if(cfgToUse && initFirebaseApp(cfgToUse)){
+try{
+firebase.auth().onAuthStateChanged(user=>{
+setAuthUser(user);
+if(user) startFirebaseSync(setSync, applyRemote);
+else setSync("off");
+});
+}catch(e){ setAuthUser(null); setSync("error"); }
+} else {
+setAuthUser(null);
+}
 },[]);
 
 function addFighter(f){let u;if(editF){u=fighters.map(x=>x.id===f.id?f:x);setEditF(null);}else{u=[...fighters,f];}setFighters(u);save("bm_fighters_v4",u);setView("list");}
@@ -1287,6 +1356,9 @@ function resetDemo(){if(!confirm("¿Restaurar los 43 atletas originales y borrar
 
 const nav=(active)=>"flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors "+(active?"text-boxing-goldFight":"text-boxing-muted active:text-gray-300");
 
+if(authUser===undefined) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#6b5f6e",fontFamily:"'Bebas Neue',sans-serif",fontSize:"18px",letterSpacing:"0.1em"}}>Cargando…</div>;
+if(authUser===null) return <LoginScreen/>;
+
 return (
 <div className="app-root" style={{maxWidth:"512px",margin:"0 auto",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 <header style={{flexShrink:0,borderBottom:"1px solid #2a1f2e",zIndex:10,position:"relative",overflow:"hidden"}}>
@@ -1296,7 +1368,7 @@ return (
 <button onClick={toggleSync} className={"text-[10px] px-2 py-0.5 border font-semibold tracking-widest uppercase transition-colors "+(sync==="on"?"text-green-400 border-green-500/40":sync==="connecting"?"text-yellow-400 border-yellow-500/40":sync==="error"?"text-red-400 border-red-500/40":"text-gray-500 border-gray-600 hover:text-boxing-goldFight hover:border-boxing-goldDim")}>
 {sync==="on"?"☁ Sincronizado":sync==="connecting"?"☁ Conectando…":sync==="error"?"☁ Error":"☁ Nube"}
 </button>
-<div className="relative">
+{isOwner?<div className="relative">
 <button onClick={()=>setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-boxing-goldFight hover:bg-white/5 w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
 {menuOpen&&<>
 <div className="fixed inset-0 z-10" onClick={()=>setMenuOpen(false)}/>
@@ -1305,9 +1377,12 @@ return (
 <button onClick={()=>{setMenuOpen(false);handleImport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
 <button onClick={()=>{setMenuOpen(false);handleExport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
 <button onClick={()=>{setMenuOpen(false);pasteCustomFbConfig();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Firebase manual</button>
+<div className="border-t border-boxing-line my-1"/>
+<button onClick={()=>{setMenuOpen(false);logout();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Cerrar sesión</button>
 </div>
 </>}
-</div>
+</div>:
+<button onClick={logout} className="text-[10px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
 </div>
 </div>
 <div className="flex flex-col items-center pb-4 pt-2 gap-1" style={{position:"relative"}}>
