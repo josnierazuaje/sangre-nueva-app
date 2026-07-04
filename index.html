@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Playfair+Display:ital@1&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -107,6 +107,11 @@ function getCategoryInfo(k) { return WEIGHT_CATEGORIES.find(c=>c.key===k); }
 function getExperienceInfo(k) { return EXPERIENCE_LEVELS.find(e=>e.key===k); }
 function genId() { return Date.now().toString(36)+Math.random().toString(36).substr(2,9); }
 function getInitials(name) { return (name||"").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase(); }
+function extractTicketCode(text){
+try{ const u=new URL(text); const t=u.searchParams.get("ticket"); if(t) return t; }catch(e){}
+try{ const p=JSON.parse(text); if(p&&p.id) return p.id; }catch(e){}
+return text;
+}
 function fmt$(n) { return "$" + n.toLocaleString("es-CL"); }
 
 // ============================================
@@ -986,8 +991,92 @@ return <div ref={ref} style={{width:size,height:size}}/>;
 
 function TicketPreview({ticket}){
 const tt=TICKET_TYPES_V2.find(t=>t.key===ticket.ticketType)||TICKET_TYPES_V2[0];
-const qrData=JSON.stringify({id:ticket.id,n:ticket.attendeeName,t:ticket.ticketType,ev:"SangreNueva"});
+const qrData=location.origin+location.pathname+"?ticket="+encodeURIComponent(ticket.id);
+const qrWrapRef=useRef(null);
+const busyRef=useRef(false);
+const [sharing,setSharing]=useState(false);
+const shareText="🥊 Sangre Nueva — La Velada\nEntrada: "+tt.label+"\nBoleta: #"+ticket.id+"\nA nombre de: "+ticket.attendeeName+"\n\nPresenta este código QR en la entrada.";
+
+async function buildTicketCanvas(){
+if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+const scale=2, W=960, H=440;
+const canvas=document.createElement("canvas");
+canvas.width=W*scale; canvas.height=H*scale;
+const ctx=canvas.getContext("2d");
+ctx.scale(scale,scale);
+const grad=ctx.createLinearGradient(0,0,W,H);
+grad.addColorStop(0,"#0a0000"); grad.addColorStop(1,"#180505");
+ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+ctx.strokeStyle=tt.color+"80"; ctx.lineWidth=2; ctx.strokeRect(1,1,W-2,H-2);
+ctx.strokeStyle=tt.color+"30"; ctx.beginPath(); ctx.moveTo(28,96); ctx.lineTo(W-28,96); ctx.stroke();
+ctx.strokeStyle=tt.color+"20"; ctx.beginPath(); ctx.moveTo(28,H-56); ctx.lineTo(W-28,H-56); ctx.stroke();
+
+ctx.textBaseline="alphabetic";
+ctx.fillStyle=tt.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
+ctx.fillText("🥊 SANGRE NUEVA · LA VELADA", 32, 38);
+ctx.fillStyle="#e8ddd0"; ctx.font="400 46px 'Bebas Neue', sans-serif";
+ctx.fillText(ticket.attendeeName.toUpperCase(), 32, 78);
+
+ctx.textAlign="right"; ctx.font="400 32px sans-serif";
+ctx.fillText(tt.icon, W-32, 44);
+ctx.fillStyle=tt.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
+ctx.fillText(tt.label.toUpperCase(), W-32, 76);
+ctx.textAlign="left";
+
+const qrCanvas=qrWrapRef.current?.querySelector("canvas");
+const qrSize=220, qrX=32, qrY=126;
+ctx.fillStyle="#fff"; ctx.beginPath();
+ctx.roundRect?ctx.roundRect(qrX-8,qrY-8,qrSize+16,qrSize+16,12):ctx.rect(qrX-8,qrY-8,qrSize+16,qrSize+16);
+ctx.fill();
+if(qrCanvas) ctx.drawImage(qrCanvas,qrX,qrY,qrSize,qrSize);
+
+const rows=[["Boleta","#"+ticket.id],["Precio",fmt$(ticket.price)],["Pago",ticket.paymentMethod],["Estado",ticket.status==="ingresado"?"✓ Ingresado":"● Activo"]];
+let ry=150;
+rows.forEach(([label,value])=>{
+ctx.fillStyle="#9CA3AF"; ctx.font="400 15px 'Barlow Condensed', sans-serif";
+ctx.fillText(label, qrX+qrSize+40, ry);
+ctx.fillStyle=label==="Boleta"?"#e8ddd0":(label==="Precio"?tt.color:(label==="Estado"?(ticket.status==="ingresado"?"#4ADE80":"#FCD34D"):"#e8ddd0"));
+ctx.font=label==="Boleta"?"400 26px 'Bebas Neue', sans-serif":"700 17px 'Barlow Condensed', sans-serif";
+ctx.fillText(value, qrX+qrSize+40, ry+26);
+ry+=62;
+});
+
+ctx.fillStyle="#6B7280"; ctx.font="700 12px 'Barlow Condensed', sans-serif";
+ctx.fillText("SANGRE NUEVA", 32, H-24);
+ctx.textAlign="right"; ctx.fillText("#"+ticket.id, W-32, H-24); ctx.textAlign="left";
+return canvas;
+}
+
+async function shareTicket(){
+if(busyRef.current) return;
+busyRef.current=true;
+setSharing(true);
+try{
+const canvas=await buildTicketCanvas();
+if(navigator.canShare && navigator.share){
+const blob=await new Promise(res=>canvas.toBlob(res,"image/png"));
+const file=new File([blob],"entrada-"+ticket.id+".png",{type:"image/png"});
+if(navigator.canShare({files:[file]})){
+await navigator.share({files:[file],title:"Entrada Sangre Nueva"});
+return;
+}
+}
+const a=document.createElement("a");
+a.href=canvas.toDataURL("image/png");
+a.download="entrada-"+ticket.id+".png";
+a.click();
+return;
+}catch(e){
+if(e&&e.name==="AbortError")return;
+window.open("https://wa.me/?text="+encodeURIComponent(shareText),"_blank");
+return;
+}finally{
+setSharing(false);
+busyRef.current=false;
+}
+}
 return(
+<div className="space-y-3">
 <div className="rounded-2xl overflow-hidden scale-in" style={{border:"1px solid "+tt.color+"50",background:"linear-gradient(135deg,#0a0000,#180505)"}}>
 <div className="px-4 pt-3 pb-2 flex items-center justify-between" style={{borderBottom:"1px solid "+tt.color+"25"}}>
 <div>
@@ -997,7 +1086,7 @@ return(
 <div className="text-right"><span className="text-2xl">{tt.icon}</span><p className="text-[10px] font-bold" style={{color:tt.color}}>{tt.label}</p></div>
 </div>
 <div className="flex items-center gap-4 px-4 py-3">
-<div className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96}/></div>
+<div ref={qrWrapRef} className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96}/></div>
 <div className="flex-1 space-y-2">
 <div className="flex justify-between"><span className="text-gray-400 text-xs">Boleta</span><span className="font-black text-white text-base" style={{fontFamily:"'Bebas Neue',Impact,sans-serif",letterSpacing:"1px"}}>#{ticket.id}</span></div>
 <div className="flex justify-between"><span className="text-gray-400 text-xs">Precio</span><span className="font-bold text-sm" style={{color:tt.color}}>{fmt$(ticket.price)}</span></div>
@@ -1011,6 +1100,8 @@ return(
 <span className="text-[9px] text-gray-600 uppercase tracking-widest">Sangre Nueva</span>
 <span className="text-[9px] text-gray-600">#{ticket.id}</span>
 </div>
+</div>
+<button onClick={shareTicket} type="button" disabled={sharing} className="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60" style={{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.4)"}}>{sharing?"Preparando imagen...":"📤 Compartir voucher"}</button>
 </div>
 );
 }
@@ -1062,10 +1153,12 @@ style={{background:"linear-gradient(135deg,#DC2626,#991B1B)",fontFamily:"'Bebas 
 );
 }
 
-function HistoryView({tickets}){
+function HistoryView({tickets,onDelete}){
 const [q,setQ]=useState("");
 const [ft,setFt]=useState("all");
 const [fs,setFs]=useState("all");
+const [cd,setCd]=useState(null);
+function del(id){if(cd===id){onDelete(id);setCd(null);}else{setCd(id);setTimeout(()=>setCd(null),3000);}}
 const filtered=useMemo(()=>{
 let r=[...tickets].reverse();
 if(q.trim()){const s=q.toLowerCase();r=r.filter(t=>t.attendeeName.toLowerCase().includes(s)||t.id.toLowerCase().includes(s));}
@@ -1104,6 +1197,9 @@ return(
 <p className="text-xs font-bold" style={{color:tt.color}}>{fmt$(t.price)}</p>
 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={t.status==="ingresado"?{background:"rgba(34,197,94,0.1)",color:"#4ADE80"}:{background:"rgba(245,158,11,0.1)",color:"#FCD34D"}}>{t.status==="ingresado"?"✓ In":"● Act"}</span>
 </div>
+<button onClick={()=>del(t.id)} className={"p-1.5 rounded-lg flex-shrink-0 transition-colors "+(cd===t.id?"text-red-400 bg-red-500/10":"text-gray-500 hover:text-red-400")} title="Eliminar entrada">
+<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+</button>
 </div>
 );
 })}
@@ -1112,11 +1208,59 @@ return(
 );
 }
 
-function CheckInView({tickets,onCheckIn}){
-const [input,setInput]=useState("");
+function CheckInView({tickets,onCheckIn,initialCode}){
+const [input,setInput]=useState(initialCode?initialCode.toUpperCase():"");
 const [result,setResult]=useState(null);
-function search(e){e.preventDefault();const f=tickets.find(t=>t.id.toUpperCase()===input.trim().toUpperCase());setResult(f||"notfound");}
+const [scanning,setScanning]=useState(false);
+const [scanErr,setScanErr]=useState("");
+const videoRef=useRef(null);
+const canvasRef=useRef(null);
+const streamRef=useRef(null);
+const rafRef=useRef(null);
+
+function lookup(code){
+const f=tickets.find(t=>t.id.toUpperCase()===String(code).trim().toUpperCase());
+setResult(f||"notfound");
+}
+function search(e){e.preventDefault();lookup(input);}
 function doIn(){if(result&&result!=="notfound"&&result.status==="activo"){onCheckIn(result.id);setResult({...result,status:"ingresado"});}}
+
+function stopScan(){
+setScanning(false);
+if(rafRef.current){cancelAnimationFrame(rafRef.current);rafRef.current=null;}
+if(streamRef.current){streamRef.current.getTracks().forEach(tr=>tr.stop());streamRef.current=null;}
+}
+function tick(){
+const v=videoRef.current;
+if(!v||v.readyState!==v.HAVE_ENOUGH_DATA){rafRef.current=requestAnimationFrame(tick);return;}
+const canvas=canvasRef.current;
+canvas.width=v.videoWidth; canvas.height=v.videoHeight;
+const ctx=canvas.getContext("2d");
+ctx.drawImage(v,0,0,canvas.width,canvas.height);
+const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+const code=window.jsQR?window.jsQR(imageData.data,imageData.width,imageData.height):null;
+if(code&&code.data){
+const ticketId=extractTicketCode(code.data);
+setInput(ticketId.toUpperCase());
+lookup(ticketId);
+stopScan();
+return;
+}
+rafRef.current=requestAnimationFrame(tick);
+}
+function startScan(){
+setScanErr(""); setResult(null);
+navigator.mediaDevices?.getUserMedia({video:{facingMode:"environment"}}).then(stream=>{
+streamRef.current=stream;
+setScanning(true);
+setTimeout(()=>{
+if(videoRef.current){videoRef.current.srcObject=stream;videoRef.current.play();rafRef.current=requestAnimationFrame(tick);}
+},0);
+}).catch(e=>{setScanErr("No se pudo acceder a la cámara: "+e.message);});
+}
+useEffect(()=>()=>stopScan(),[]);
+useEffect(()=>{if(initialCode)lookup(initialCode);},[]);
+
 const checked=tickets.filter(t=>t.status==="ingresado");
 const pending=tickets.filter(t=>t.status==="activo");
 const iS={background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px"};
@@ -1132,8 +1276,17 @@ return(
 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pendientes</p>
 </div>
 </div>
+{scanning&&<div className="rounded-xl overflow-hidden relative scale-in" style={{border:"1px solid rgba(220,38,38,0.4)"}}>
+<video ref={videoRef} playsInline muted className="w-full" style={{maxHeight:"260px",objectFit:"cover",background:"#000"}}/>
+<canvas ref={canvasRef} style={{display:"none"}}/>
+<div style={{position:"absolute",inset:0,border:"2px solid rgba(220,38,38,0.6)",pointerEvents:"none",margin:"14%"}}/>
+<button onClick={stopScan} type="button" className="absolute top-2 right-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"rgba(0,0,0,0.6)"}}>Cancelar</button>
+<p className="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/80">Apunta al código QR de la entrada</p>
+</div>}
+{!scanning&&<button onClick={startScan} type="button" className="w-full py-3.5 rounded-xl font-black text-white flex items-center justify-center gap-2 transition-all active:scale-95" style={{background:"linear-gradient(135deg,#DC2626,#991B1B)",fontFamily:"'Bebas Neue',Impact,sans-serif",fontSize:"18px",letterSpacing:"2px"}}>📷 Escanear QR</button>}
+{scanErr&&<p className="text-red-400 text-xs text-center">{scanErr}</p>}
 <form onSubmit={search} className="rounded-xl p-4 space-y-3" style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.07)"}}>
-<h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar Entrada</h3>
+<h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar manualmente</h3>
 <div className="flex gap-2">
 <input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} placeholder="PRE-0001 / PUE-0003..." className="flex-1 px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS}/>
 <button type="submit" className="px-4 py-2.5 rounded-xl text-white text-sm font-bold" style={{background:"rgba(220,38,38,0.35)",border:"1px solid rgba(220,38,38,0.45)"}}>Buscar</button>
@@ -1165,8 +1318,8 @@ return<div key={t.id} className="flex items-center justify-between px-3 py-2 rou
 );
 }
 
-function TicketsManager({tickets,setTickets}){
-const [subView,setSubView]=useState("sell");
+function TicketsManager({tickets,setTickets,initialTicketCode}){
+const [subView,setSubView]=useState(initialTicketCode?"checkin":"sell");
 const kpis=useMemo(()=>{
 const byType={},byPayment={};
 tickets.forEach(t=>{byType[t.ticketType]=(byType[t.ticketType]||0)+1;byPayment[t.paymentMethod]=(byPayment[t.paymentMethod]||0)+t.price;});
@@ -1186,6 +1339,10 @@ return newT;
 }
 function checkIn(id){
 const updated=tickets.map(t=>t.id===id?{...t,status:"ingresado",checkedInAt:new Date().toISOString()}:t);
+setTickets(updated);saveTicketsV4(updated);
+}
+function deleteTicket(id){
+const updated=tickets.filter(t=>t.id!==id);
 setTickets(updated);saveTicketsV4(updated);
 }
 const tabs=[{k:"sell",label:"Vender",e:"🎫"},{k:"history",label:"Historial",e:"📋"},{k:"checkin",label:"Check-in",e:"✅"}];
@@ -1219,11 +1376,35 @@ return(
 style={subView===s.k?{background:"rgba(220,38,38,0.25)",color:"white",borderBottom:"2px solid #DC2626"}:{color:"#4B5563"}}>{s.e} {s.label}</button>)}
 </div>
 {subView==="sell" &&<SellView onAdd={addTicket}/>}
-{subView==="history" &&<HistoryView tickets={tickets}/>}
-{subView==="checkin" &&<CheckInView tickets={tickets} onCheckIn={checkIn}/>}
+{subView==="history" &&<HistoryView tickets={tickets} onDelete={deleteTicket}/>}
+{subView==="checkin" &&<CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode}/>}
 </div>
 );
 }
+// ERROR BOUNDARY
+// Atrapa errores de renderizado de cualquier componente hijo para evitar
+// que un fallo puntual (ej: un dato inesperado) tumbe toda la app y deje
+// pantalla negra. Los datos ya guardados no se pierden (viven en
+// localStorage/Firebase, no en este estado de React).
+// ============================================
+class ErrorBoundary extends React.Component{
+constructor(props){super(props);this.state={hasError:false};}
+static getDerivedStateFromError(error){return {hasError:true};}
+componentDidCatch(error,info){console.error("Error capturado por ErrorBoundary:",error,info);}
+render(){
+if(this.state.hasError){
+return (
+<div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",textAlign:"center",background:"#080608",color:"#e8ddd0"}}>
+<div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"30px",letterSpacing:"0.05em",color:"#c42438",marginBottom:"14px"}}>Algo salió mal</div>
+<p style={{color:"#9CA3AF",fontSize:"14px",maxWidth:"320px",marginBottom:"22px",lineHeight:1.5}}>La app tuvo un error inesperado al mostrar esta pantalla. Tus datos están a salvo (se guardan en la nube), no se perdió nada. Recarga para continuar.</p>
+<button onClick={()=>location.reload()} style={{background:"#9b1a2a",color:"#e8ddd0",padding:"12px 32px",border:"none",fontFamily:"'Bebas Neue',sans-serif",fontSize:"18px",letterSpacing:"0.1em",cursor:"pointer"}}>Recargar</button>
+</div>
+);
+}
+return this.props.children;
+}
+}
+
 // PANTALLA DE INICIO DE SESIÓN
 // ============================================
 function LoginScreen(){
@@ -1278,7 +1459,8 @@ const [matchups,setMatchups]=useState([]);
 const [expenses,setExpenses]=useState([]);
 const [tickets,setTickets]=useState([]);
 const [ticketsNew,setTicketsNew]=useState([]);
-const [view,setView]=useState("list");
+const urlTicketCode=useMemo(()=>new URLSearchParams(location.search).get("ticket"),[]);
+const [view,setView]=useState(()=>urlTicketCode?"finance":"list");
 const [editF,setEditF]=useState(null);
 const [eventLabel,setEventLabel]=useState(()=>load("bm_event_label","La Velada — próxima fecha por definir"));
 const [sync,setSync]=useState(()=>(localStorage.getItem("bm_fb_config")||!localStorage.getItem("bm_fb_disabled"))?"connecting":"off");
@@ -1405,7 +1587,7 @@ return (
 {view==="register"&&<FighterForm onSubmit={addFighter} editingFighter={editF} onCancel={editF?cancel:undefined}/>}
 {view==="vs"&&<MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups}/>}
 {view==="card"&&<FightCardView matchups={matchups} fighters={fighters}/>}
-{view==="finance"&&<TicketsManager tickets={ticketsNew} setTickets={setTicketsNew}/>}
+{view==="finance"&&<TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode}/>}
 </main>
 
 {/* Event Dates Bar (editable: tocar para cambiar) */}
@@ -1444,7 +1626,7 @@ return (
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(<ErrorBoundary><App /></ErrorBoundary>);
 </script>
 <script>
 // Registra el service worker solo si la página corre en https o localhost.
