@@ -961,12 +961,12 @@ return (
 // TICKETS SYSTEM — GESTIÓN DE ENTRADAS
 // ============================================
 const TICKET_TYPES_V2=[
-{key:"general", label:"General", price:10000,color:"#6B7280",icon:"🎫",capacity:200},
-{key:"ringside", label:"Ringside", price:20000,color:"#F59E0B",icon:"⭐",capacity:50},
-{key:"vip", label:"VIP", price:35000,color:"#EF4444",icon:"👑",capacity:20},
+{key:"inscripcion", label:"Inscripción", price:5000,color:"#3B82F6",icon:"🥊",capacity:50},
+{key:"preventa", label:"Preventa", price:7000,color:"#A855F7",icon:"🎟️",capacity:150},
+{key:"puerta", label:"Puerta", price:10000,color:"#F97316",icon:"🎫",capacity:120},
 ];
 const PAYMENT_METHODS_V2=["Efectivo","Transferencia","Otro"];
-const MAX_CAP=270;
+const MAX_CAP=320;
 function loadTicketsV4(){return load("bm_tickets_v4",[]);}
 function saveTicketsV4(t){save("bm_tickets_v4",t);}
 function loadCountersV4(){return load("bm_tc_v4",{general:0,ringside:0,vip:0});}
@@ -1018,7 +1018,7 @@ return(
 function SellView({onAdd}){
 const [name,setName]=useState("");
 const [phone,setPhone]=useState("");
-const [type,setType]=useState("general");
+const [type,setType]=useState("preventa");
 const [method,setMethod]=useState("Efectivo");
 const [last,setLast]=useState(null);
 const tt=TICKET_TYPES_V2.find(t=>t.key===type);
@@ -1135,7 +1135,7 @@ return(
 <form onSubmit={search} className="rounded-xl p-4 space-y-3" style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.07)"}}>
 <h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar Entrada</h3>
 <div className="flex gap-2">
-<input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} placeholder="GEN-0001 / VIP-0003..." className="flex-1 px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS}/>
+<input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} placeholder="PRE-0001 / PUE-0003..." className="flex-1 px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS}/>
 <button type="submit" className="px-4 py-2.5 rounded-xl text-white text-sm font-bold" style={{background:"rgba(220,38,38,0.35)",border:"1px solid rgba(220,38,38,0.45)"}}>Buscar</button>
 </div>
 </form>
