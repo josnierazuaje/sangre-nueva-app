@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="manifest" href="manifest.json" />
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -32,8 +32,8 @@ window.addEventListener('resize',setAppHeight);
 window.addEventListener('orientationchange',function(){setTimeout(setAppHeight,300);});
 </script>
 <style>
-html { background: linear-gradient(160deg,#000000 0%,#0a0703 45%,#241703 100%); min-height:100%; }
-body { background: transparent; margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+html { background: linear-gradient(160deg,#000000 0%,#0a0703 45%,#1a1206 100%); min-height:100%; }
+body { background: transparent; margin:0; font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
 /* Tarjetas semitransparentes */
 .bg-gray-800\/60 { background-color: rgba(10,0,0,0.55) !important; }
 .bg-gray-800\/50 { background-color: rgba(10,0,0,0.45) !important; }
@@ -423,21 +423,21 @@ return (
 <span className="text-[9px] mt-0.5" style={{color:e.color}}>{e.label}</span>
 </button>;})}
 </div>
-<input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 text-sm"/>
+<input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 text-sm transition-colors"/>
 <div className="flex gap-2">
-<select value={fc} onChange={e=>setFc(e.target.value)} className="flex-1 px-2 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
-<select value={sb} onChange={e=>setSb(e.target.value)} className="px-2 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
+<select value={fc} onChange={e=>setFc(e.target.value)} className="flex-1 px-2 py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
+<select value={sb} onChange={e=>setSb(e.target.value)} className="px-2 py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg text-white text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
 </div>
 <div className="space-y-2">
 {!filtered.length?<p className="text-gray-500 text-center py-8 text-sm">Sin resultados</p>:filtered.map(f=>{
 const cat=getCategoryInfo(f.weightCategory);const exp=getExperienceInfo(f.experienceLevel);
-return(<div key={f.id} className="bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 fade-in" style={{borderLeft:"3px solid "+(exp?.color||"#4B5563")}}>
+return(<div key={f.id} className="bg-white/[0.04] backdrop-blur-sm border border-white/10 rounded-lg p-3 space-y-2 fade-in transition-colors hover:bg-white/[0.06]" style={{borderLeft:"2px solid "+(exp?.color||"#4B5563")+"B3"}}>
 <div className="flex items-start justify-between">
 <div className="flex items-center gap-2.5 min-w-0 flex-1">
 <div className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold" style={{backgroundColor:(cat?.color||"#6B7280")+"25",color:cat?.color||"#9CA3AF"}}>{getInitials(f.fullName)}</div>
-<div className="min-w-0 flex-1"><h3 className="text-white font-semibold text-base leading-tight truncate">{f.fullName}</h3><p className="text-gray-400 text-xs mt-0.5 truncate">{f.gym}</p></div>
+<div className="min-w-0 flex-1"><h3 className="text-white font-medium text-base leading-tight truncate">{f.fullName}</h3><p className="text-gray-400 text-xs mt-0.5 truncate">{f.gym}</p></div>
 </div>
-<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 text-gray-400 hover:text-yellow-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 transition-colors "+(cd===f.id?"text-red-400":"text-gray-400 hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
+<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 rounded-full text-gray-400 hover:text-yellow-500 hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 rounded-full transition-colors hover:bg-white/5 "+(cd===f.id?"text-red-400":"text-gray-400 hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
 <div className="flex flex-wrap gap-1.5 pl-11"><span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{backgroundColor:(cat?.color||"#F59E0B")+"20",color:cat?.color||"#F59E0B"}}>{"⚖️"} {f.weightKg}kg · {cat?.label}</span><span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{backgroundColor:exp?.color+"20",color:exp?.color}}>{"\u{1F94A}"} {f.fightCount}p · {exp?.label}</span><span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">{f.age}a{f.age<18?" · Jr":""}</span><span className={"text-xs px-2 py-0.5 rounded-full font-medium "+((f.sexo||"M")==="F"?"bg-pink-900/40 text-pink-300":"bg-blue-900/40 text-blue-300")}>{(f.sexo||"M")==="F"?"F":"M"}</span></div>
 {f.phone&&<div className="text-xs text-gray-500 pl-11"><a href={"https://wa.me/"+f.phone.replace("+","")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
 {cd===f.id&&<p className="text-red-400 text-xs fade-in pl-11">{"⚠️"} Toca de nuevo para eliminar</p>}
@@ -1175,6 +1175,7 @@ const [view,setView]=useState("list");
 const [editF,setEditF]=useState(null);
 const [eventLabel,setEventLabel]=useState(()=>load("bm_event_label","La Velada — próxima fecha por definir"));
 const [sync,setSync]=useState(()=>localStorage.getItem("bm_fb_config")?"connecting":"off");
+const [menuOpen,setMenuOpen]=useState(false);
 
 function applyRemote(k,val){
 if(k==="bm_fighters_v4") setFighters(val);
@@ -1233,9 +1234,17 @@ return (
 <button onClick={toggleSync} className={"text-[10px] px-2 py-0.5 rounded-full transition-colors font-semibold "+(sync==="on"?"text-green-400 bg-green-500/10":sync==="connecting"?"text-yellow-400 bg-yellow-500/10":sync==="error"?"text-red-400 bg-red-500/10":"text-gray-500 bg-gray-500/10 hover:text-yellow-500")}>
 {sync==="on"?"☁ Sincronizado":sync==="connecting"?"☁ Conectando…":sync==="error"?"☁ Error":"☁ Nube"}
 </button>
-<button onClick={resetDemo} className="text-[10px] text-gray-600 hover:text-red-400 px-1.5 py-0.5 transition-colors">Restaurar</button>
-<button onClick={handleImport} className="text-[10px] text-gray-600 hover:text-red-400 px-1.5 py-0.5 transition-colors">Importar</button>
-<button onClick={handleExport} className="text-[10px] text-gray-600 hover:text-red-400 px-1.5 py-0.5 transition-colors">Exportar</button>
+<div className="relative">
+<button onClick={()=>setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-yellow-500 hover:bg-white/5 rounded-full w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
+{menuOpen&&<>
+<div className="fixed inset-0 z-10" onClick={()=>setMenuOpen(false)}/>
+<div className="absolute right-0 top-7 z-20 bg-gray-900/95 backdrop-blur border border-white/10 rounded-lg py-1 min-w-[110px] shadow-lg">
+<button onClick={()=>{setMenuOpen(false);resetDemo();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Restaurar</button>
+<button onClick={()=>{setMenuOpen(false);handleImport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
+<button onClick={()=>{setMenuOpen(false);handleExport();}} className="block w-full text-left text-[11px] text-gray-400 hover:text-yellow-500 hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
+</div>
+</>}
+</div>
 </div>
 </div>
 <div className="flex flex-col items-center pb-3 pt-1 gap-2">
