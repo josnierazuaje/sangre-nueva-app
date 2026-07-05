@@ -190,7 +190,7 @@ const SYNC_KEYS = {
 "bm_expenses_v3": [],
 "bm_tickets_v3": [],
 "bm_tickets_v4": [],
-"bm_tc_v4": {general:0,ringside:0,vip:0},
+"bm_tc_v4": {inscripcion:0,preventa:0,puerta:0},
 "bm_event_label": "La Velada — próxima fecha por definir",
 };
 const FB = { db:null, ready:false };
@@ -378,30 +378,57 @@ return matchups;
 }
 
 // ============================================
+// BADGE — etiqueta reutilizable de color dinámico
+// (categoría de peso, nivel de experiencia, estado de entrada, etc.)
+// variant "outline" = solo borde y texto del color.
+// variant "filled"  = fondo tenue del color y texto sólido, en píldora.
+// ============================================
+function Badge({color,variant="outline",size="sm",children}){
+const c=color||"#9CA3AF";
+const sizeClass=size==="xs"?"text-[9px] px-1.5 py-0.5":"text-[10px] px-2 py-0.5";
+if(variant==="filled"){
+return <span className={sizeClass+" font-bold rounded-full tracking-widest uppercase"} style={{backgroundColor:c+"20",color:c}}>{children}</span>;
+}
+return <span className={sizeClass+" font-bold border tracking-widest uppercase"} style={{borderColor:c+"50",color:c}}>{children}</span>;
+}
+
+// ============================================
 // COMPONENTE: FORMULARIO PELEADOR
 // ============================================
 function FighterForm({onSubmit,editingFighter,onCancel}) {
-const [fn,setFn]=useState(editingFighter?.fullName||"");
-const [cc,setCc]=useState(editingFighter?.phone?.match(/^\+\d+/)?.[0]||"+56");
-const [ph,setPh]=useState(editingFighter?.phone?.replace(/^\+\d+/,"")||"");
-const [gy,setGy]=useState(editingFighter?.gym||"");
-const [ag,setAg]=useState(editingFighter?.age?.toString()||"");
-const [wt,setWt]=useState(editingFighter?.weightKg?.toString()||"");
-const [fc,setFc]=useState(editingFighter?.fightCount?.toString()||"0");
-const [nt,setNt]=useState(editingFighter?.notes||"");
-const [sx,setSx]=useState(editingFighter?.sexo||"M");
-const [er,setEr]=useState({});
+const [fullName,setFullName]=useState(editingFighter?.fullName||"");
+const [countryCode,setCountryCode]=useState(editingFighter?.phone?.match(/^\+\d+/)?.[0]||"+56");
+const [phoneNumber,setPhoneNumber]=useState(editingFighter?.phone?.replace(/^\+\d+/,"")||"");
+const [gym,setGym]=useState(editingFighter?.gym||"");
+const [ageStr,setAgeStr]=useState(editingFighter?.age?.toString()||"");
+const [weightStr,setWeightStr]=useState(editingFighter?.weightKg?.toString()||"");
+const [fightCountStr,setFightCountStr]=useState(editingFighter?.fightCount?.toString()||"0");
+const [notes,setNotes]=useState(editingFighter?.notes||"");
+const [sexo,setSexo]=useState(editingFighter?.sexo||"M");
+const [errors,setErrors]=useState({});
 
-useEffect(()=>{if(editingFighter){setFn(editingFighter.fullName||"");setCc(editingFighter.phone?.match(/^\+\d+/)?.[0]||"+56");setPh(editingFighter.phone?.replace(/^\+\d+/,"")||"");setGy(editingFighter.gym||"");setAg(editingFighter.age?.toString()||"");setWt(editingFighter.weightKg?.toString()||"");setFc(editingFighter.fightCount?.toString()||"0");setNt(editingFighter.notes||"");setSx(editingFighter.sexo||"M");setEr({});}},[editingFighter]);
+useEffect(()=>{if(editingFighter){setFullName(editingFighter.fullName||"");setCountryCode(editingFighter.phone?.match(/^\+\d+/)?.[0]||"+56");setPhoneNumber(editingFighter.phone?.replace(/^\+\d+/,"")||"");setGym(editingFighter.gym||"");setAgeStr(editingFighter.age?.toString()||"");setWeightStr(editingFighter.weightKg?.toString()||"");setFightCountStr(editingFighter.fightCount?.toString()||"0");setNotes(editingFighter.notes||"");setSexo(editingFighter.sexo||"M");setErrors({});}},[editingFighter]);
 
-const pw=parseFloat(wt); const wc=!isNaN(pw)&&pw>0?getWeightCategory(pw):null; const ci=wc?getCategoryInfo(wc):null;
-const pf=parseInt(fc)||0; const el=getExperienceLevel(pf); const ei=getExperienceInfo(el);
+const parsedWeight=parseFloat(weightStr); const weightCategory=!isNaN(parsedWeight)&&parsedWeight>0?getWeightCategory(parsedWeight):null; const categoryInfo=weightCategory?getCategoryInfo(weightCategory):null;
+const parsedFightCount=parseInt(fightCountStr)||0; const experienceLevel=getExperienceLevel(parsedFightCount); const experienceInfo=getExperienceInfo(experienceLevel);
 
-function validate(){const e={};if(!fn.trim())e.fn="Requerido";if(!gy.trim())e.gy="Requerido";const a=parseInt(ag);if(!ag||isNaN(a)||a<8||a>65)e.ag="8-65";if(!wt||isNaN(pw)||pw<30||pw>150)e.wt="30-150kg";setEr(e);return !Object.keys(e).length;}
+function validate(){
+const newErrors={};
+const trimmedName=fullName.trim();
+if(!trimmedName)newErrors.fullName="Requerido";
+else if(trimmedName.length<2)newErrors.fullName="Muy corto";
+else if(trimmedName.length>60)newErrors.fullName="Máximo 60 caracteres";
+if(!gym.trim())newErrors.gym="Requerido";
+else if(gym.trim().length>60)newErrors.gym="Máximo 60 caracteres";
+const parsedAge=parseInt(ageStr);if(!ageStr||isNaN(parsedAge)||parsedAge<8||parsedAge>65)newErrors.ageStr="8-65";
+if(!weightStr||isNaN(parsedWeight)||parsedWeight<30||parsedWeight>150)newErrors.weightStr="30-150kg";
+setErrors(newErrors);
+return !Object.keys(newErrors).length;
+}
 
 function submit(e){e.preventDefault();if(!validate())return;
-onSubmit({id:editingFighter?.id||genId(),fullName:fn.trim(),phone:ph.trim()?cc+ph.trim():"",sexo:sx,gym:gy.trim(),age:parseInt(ag),weightKg:pw,weightCategory:wc,experienceLevel:el,fightCount:pf,createdAt:editingFighter?.createdAt||new Date().toISOString(),notes:nt.trim()||undefined});
-if(!editingFighter){setFn("");setPh("");setGy("");setAg("");setWt("");setFc("0");setNt("");setEr({});}
+onSubmit({id:editingFighter?.id||genId(),fullName:fullName.trim().replace(/\s+/g," "),phone:phoneNumber.trim()?countryCode+phoneNumber.trim():"",sexo,gym:gym.trim().replace(/\s+/g," "),age:parseInt(ageStr),weightKg:parsedWeight,weightCategory,experienceLevel,fightCount:parsedFightCount,createdAt:editingFighter?.createdAt||new Date().toISOString(),notes:notes.trim()||undefined});
+if(!editingFighter){setFullName("");setPhoneNumber("");setGym("");setAgeStr("");setWeightStr("");setFightCountStr("0");setNotes("");setErrors({});}
 }
 
 const ic="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim focus:bg-boxing-raised text-base transition-colors";
@@ -412,21 +439,21 @@ return (
 <span style={{width:"4px",height:"26px",background:"#c42438",display:"block",flexShrink:0}}/>
 {editingFighter?"Editar":"Agregar"} Peleador
 </h2>
-<div><label className={lbl}>Nombre</label><input type="text" value={fn} onChange={e=>setFn(e.target.value)} placeholder="Juan Pérez" className={ic}/>{er.fn&&<p className="text-red-400 text-xs mt-1">{er.fn}</p>}</div>
+<div><label className={lbl}>Nombre</label><input type="text" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Juan Pérez" maxLength={60} className={ic}/>{errors.fullName&&<p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
 <div><label className={lbl}>Sexo</label><div className="flex gap-2">
-<button type="button" onClick={()=>setSx("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sx==="M"?"bg-blue-600/15 border-blue-500 text-blue-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>
-<button type="button" onClick={()=>setSx("F")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sx==="F"?"bg-pink-600/15 border-pink-500 text-pink-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Femenino</button>
+<button type="button" onClick={()=>setSexo("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sexo==="M"?"bg-blue-600/15 border-blue-500 text-blue-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>
+<button type="button" onClick={()=>setSexo("F")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors "+(sexo==="F"?"bg-pink-600/15 border-pink-500 text-pink-300":"bg-black border-boxing-lineBright text-boxing-muted")}>Femenino</button>
 </div></div>
-<div><label className={lbl}>Teléfono <span className="normal-case text-boxing-muted/70 font-normal tracking-normal">(opcional)</span></label><div className="flex gap-2"><select value={cc} onChange={e=>setCc(e.target.value)} className="w-28 px-2 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm">{COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select><input type="tel" value={ph} onChange={e=>setPh(e.target.value.replace(/\D/g,""))} placeholder="912345678" className="flex-1 px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim"/></div>{er.ph&&<p className="text-red-400 text-xs mt-1">{er.ph}</p>}</div>
-<div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gy} onChange={e=>setGy(e.target.value)} placeholder="Barrio Franklin" className={ic}/>{er.gy&&<p className="text-red-400 text-xs mt-1">{er.gy}</p>}</div>
+<div><label className={lbl}>Teléfono <span className="normal-case text-boxing-muted/70 font-normal tracking-normal">(opcional)</span></label><div className="flex gap-2"><select value={countryCode} onChange={e=>setCountryCode(e.target.value)} className="w-28 px-2 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm">{COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}</select><input type="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value.replace(/\D/g,""))} placeholder="912345678" className="flex-1 px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim"/></div>{errors.phoneNumber&&<p className="text-red-400 text-xs mt-1">{errors.phoneNumber}</p>}</div>
+<div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gym} onChange={e=>setGym(e.target.value)} placeholder="Barrio Franklin" maxLength={60} className={ic}/>{errors.gym&&<p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
 <div className="grid grid-cols-2 gap-3">
-<div><label className={lbl}>Edad</label><input type="number" value={ag} onChange={e=>setAg(e.target.value)} placeholder="25" className={ic}/>{er.ag&&<p className="text-red-400 text-xs mt-1">{er.ag}</p>}</div>
-<div><label className={lbl}>Peso (kg)</label><input type="number" value={wt} onChange={e=>setWt(e.target.value)} placeholder="68.5" step="0.1" className={ic}/>{er.wt&&<p className="text-red-400 text-xs mt-1">{er.wt}</p>}</div>
+<div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e=>setAgeStr(e.target.value)} placeholder="25" className={ic}/>{errors.ageStr&&<p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
+<div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e=>setWeightStr(e.target.value)} placeholder="68.5" step="0.1" className={ic}/>{errors.weightStr&&<p className="text-red-400 text-xs mt-1">{errors.weightStr}</p>}</div>
 </div>
-{ci&&<div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría: </span><span className="text-boxing-goldFight font-semibold">{ci.label}</span></div>}
-<div><label className={lbl}>Nº peleas</label><input type="number" value={fc} onChange={e=>setFc(e.target.value)} placeholder="0" min="0" className={ic}/></div>
-{ei&&<div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Nivel: </span><span className="text-xs font-bold px-2 py-0.5 tracking-widest uppercase border" style={{borderColor:ei.color+"60",color:ei.color}}>{ei.label}</span></div>}
-<div><label className={lbl}>Notas</label><textarea value={nt} onChange={e=>setNt(e.target.value)} placeholder="Zurdo, buen juego de pies..." rows={2} className={ic+" resize-none"}/></div>
+{categoryInfo&&<div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría: </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label}</span></div>}
+<div><label className={lbl}>Nº peleas</label><input type="number" value={fightCountStr} onChange={e=>setFightCountStr(e.target.value)} placeholder="0" min="0" className={ic}/></div>
+{experienceInfo&&<div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Nivel: </span><Badge color={experienceInfo.color}>{experienceInfo.label}</Badge></div>}
+<div><label className={lbl}>Notas</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Zurdo, buen juego de pies..." rows={2} className={ic+" resize-none"}/></div>
 <div className="flex gap-3 pt-2"><button type="submit" className="flex-1 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream py-3.5 transition-colors active:scale-[0.98]" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"20px",letterSpacing:"0.1em"}}>{editingFighter?"Guardar":"+ Añadir al Cartel"}</button>{editingFighter&&onCancel&&<button type="button" onClick={onCancel} className="px-4 py-3.5 bg-black border border-boxing-lineBright text-boxing-muted tracking-widest uppercase text-sm">Cancelar</button>}</div>
 </form>
 );
@@ -436,17 +463,17 @@ return (
 // COMPONENTE: LISTA PELEADORES
 // ============================================
 function FighterList({fighters,onEdit,onDelete}) {
-const [q,setQ]=useState(""); const [fc,setFc]=useState("all"); const [fe,setFe]=useState("all"); const [sb,setSb]=useState("recent"); const [cd,setCd]=useState(null);
+const [searchQuery,setSearchQuery]=useState(""); const [categoryFilter,setCategoryFilter]=useState("all"); const [experienceFilter,setExperienceFilter]=useState("all"); const [sortBy,setSortBy]=useState("recent"); const [confirmDeleteId,setConfirmDeleteId]=useState(null);
 const filtered=useMemo(()=>{
 let r=[...fighters];
-if(q.trim()){const s=q.toLowerCase();r=r.filter(f=>f.fullName.toLowerCase().includes(s)||f.gym.toLowerCase().includes(s));}
-if(fc!=="all")r=r.filter(f=>f.weightCategory===fc);
-if(fe!=="all")r=r.filter(f=>f.experienceLevel===fe);
-switch(sb){case"name":r.sort((a,b)=>a.fullName.localeCompare(b.fullName));break;case"weight":r.sort((a,b)=>a.weightKg-b.weightKg);break;case"experience":r.sort((a,b)=>b.fightCount-a.fightCount);break;default:r.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));}
+if(searchQuery.trim()){const s=searchQuery.toLowerCase();r=r.filter(f=>f.fullName.toLowerCase().includes(s)||f.gym.toLowerCase().includes(s));}
+if(categoryFilter!=="all")r=r.filter(f=>f.weightCategory===categoryFilter);
+if(experienceFilter!=="all")r=r.filter(f=>f.experienceLevel===experienceFilter);
+switch(sortBy){case"name":r.sort((a,b)=>a.fullName.localeCompare(b.fullName));break;case"weight":r.sort((a,b)=>a.weightKg-b.weightKg);break;case"experience":r.sort((a,b)=>b.fightCount-a.fightCount);break;default:r.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));}
 return r;
-},[fighters,q,fc,fe,sb]);
+},[fighters,searchQuery,categoryFilter,experienceFilter,sortBy]);
 const stats=useMemo(()=>{const e={};fighters.forEach(f=>{e[f.experienceLevel]=(e[f.experienceLevel]||0)+1;});return e;},[fighters]);
-function del(id){if(cd===id){onDelete(id);setCd(null);}else{setCd(id);setTimeout(()=>setCd(null),3000);}}
+function del(id){if(confirmDeleteId===id){onDelete(id);setConfirmDeleteId(null);}else{setConfirmDeleteId(id);setTimeout(()=>setConfirmDeleteId(null),3000);}}
 
 if(!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"22px",letterSpacing:"0.08em"}}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
 return (
@@ -456,15 +483,15 @@ return (
 Peleadores <span className="text-boxing-goldFight">({fighters.length})</span>
 </h2>
 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-{EXPERIENCE_LEVELS.map(e=>{const c=stats[e.key]||0;if(!c)return null;return <button key={e.key} onClick={()=>setFe(fe===e.key?"all":e.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{borderColor:fe===e.key?e.color:e.color+"40"}}>
+{EXPERIENCE_LEVELS.map(e=>{const c=stats[e.key]||0;if(!c)return null;return <button key={e.key} onClick={()=>setExperienceFilter(experienceFilter===e.key?"all":e.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{borderColor:experienceFilter===e.key?e.color:e.color+"40"}}>
 <span className="text-sm font-bold leading-none" style={{color:e.color}}>{c}</span>
 <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{color:e.color}}>{e.label}</span>
 </button>;})}
 </div>
-<input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors"/>
+<input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors"/>
 <div className="flex gap-2">
-<select value={fc} onChange={e=>setFc(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
-<select value={sb} onChange={e=>setSb(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
+<select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
+<select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
 </div>
 <div className="space-y-2">
 {!filtered.length?<p className="text-boxing-muted text-center py-8 text-sm">Sin resultados</p>:filtered.map(f=>{
@@ -475,10 +502,15 @@ return(<div key={f.id} className="bg-boxing-panel border border-boxing-line p-3 
 <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-xs font-bold border" style={{borderColor:(cat?.color||"#9CA3AF")+"60",color:cat?.color||"#9CA3AF"}}>{getInitials(f.fullName)}</div>
 <div className="min-w-0 flex-1"><h3 className="text-boxing-cream font-medium text-base leading-tight truncate">{f.fullName}</h3><p className="text-boxing-muted text-xs mt-0.5 truncate tracking-wide uppercase">{f.gym}</p></div>
 </div>
-<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 text-boxing-muted hover:text-boxing-goldFight hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 transition-colors hover:bg-white/5 "+(cd===f.id?"text-red-400":"text-boxing-muted hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
-<div className="flex flex-wrap gap-1.5 pl-11"><span className="text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase" style={{borderColor:(cat?.color||"#F59E0B")+"50",color:cat?.color||"#F59E0B"}}>{f.weightKg}kg · {cat?.label}</span><span className="text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase" style={{borderColor:(exp?.color||"#9CA3AF")+"50",color:exp?.color}}>{f.fightCount}p · {exp?.label}</span><span className="text-[10px] px-2 py-0.5 border border-boxing-lineBright text-boxing-muted tracking-widest uppercase">{f.age}a{f.age<18?" · Jr":""}</span><span className={"text-[10px] font-bold px-2 py-0.5 border tracking-widest uppercase "+((f.sexo||"M")==="F"?"border-pink-500/50 text-pink-300":"border-blue-500/50 text-blue-300")}>{(f.sexo||"M")==="F"?"F":"M"}</span></div>
+<div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={()=>onEdit(f)} className="p-2 text-boxing-muted hover:text-boxing-goldFight hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><button onClick={()=>del(f.id)} className={"p-2 transition-colors hover:bg-white/5 "+(confirmDeleteId===f.id?"text-red-400":"text-boxing-muted hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>
+<div className="flex flex-wrap gap-1.5 pl-11">
+<Badge color={cat?.color||"#F59E0B"}>{f.weightKg}kg · {cat?.label}</Badge>
+<Badge color={exp?.color}>{f.fightCount}p · {exp?.label}</Badge>
+<span className="text-[10px] px-2 py-0.5 border border-boxing-lineBright text-boxing-muted tracking-widest uppercase">{f.age}a{f.age<18?" · Jr":""}</span>
+<Badge color={(f.sexo||"M")==="F"?"#EC4899":"#3B82F6"}>{(f.sexo||"M")==="F"?"F":"M"}</Badge>
+</div>
 {f.phone&&<div className="text-xs text-boxing-muted pl-11"><a href={"https://wa.me/"+f.phone.replace("+","")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
-{cd===f.id&&<p className="text-red-400 text-xs fade-in pl-11">{"⚠️"} Toca de nuevo para eliminar</p>}
+{confirmDeleteId===f.id&&<p className="text-red-400 text-xs fade-in pl-11">{"⚠️"} Toca de nuevo para eliminar</p>}
 </div>);})}
 </div>
 </div>
@@ -596,7 +628,7 @@ Auto VS
 {!matchups.length&&!sorting&&<div className="border border-dashed border-boxing-lineBright p-4 text-center"><p className="text-boxing-muted text-sm">Usa <span className="text-red-400 font-bold">SORTEO</span> para emparejamientos aleatorios<br/>o <span className="text-boxing-cream font-semibold">Auto VS</span> para emparejamiento inteligente</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría · nivel · escuela</p></div>}
 <div className="space-y-3">{matchups.map((m,i)=><VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM}/>)}</div>
 {unmatched.length>0&&matchups.length>0&&<div><button onClick={()=>setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform "+(showUn?"rotate-90":"")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>Sin pelea ({unmatched.length})</button>
-{showUn&&<div className="mt-2 space-y-1.5">{unmatched.map(f=>{const c=getCategoryInfo(f.weightCategory);const e=getExperienceInfo(f.experienceLevel);return <div key={f.id} className="bg-boxing-panel border border-boxing-line px-3 py-2 flex items-center justify-between fade-in"><div><span className="text-boxing-cream text-sm">{f.fullName}</span><span className="text-boxing-muted text-xs ml-2">{c?.label} · {f.weightKg}kg</span></div><span className="text-[10px] font-bold px-1.5 py-0.5 border tracking-widest uppercase" style={{borderColor:e?.color+"50",color:e?.color}}>{e?.label}</span></div>;})}</div>}</div>}
+{showUn&&<div className="mt-2 space-y-1.5">{unmatched.map(f=>{const c=getCategoryInfo(f.weightCategory);const e=getExperienceInfo(f.experienceLevel);return <div key={f.id} className="bg-boxing-panel border border-boxing-line px-3 py-2 flex items-center justify-between fade-in"><div><span className="text-boxing-cream text-sm">{f.fullName}</span><span className="text-boxing-muted text-xs ml-2">{c?.label} · {f.weightKg}kg</span></div><Badge color={e?.color}>{e?.label}</Badge></div>;})}</div>}</div>}
 </div>
 );
 }
@@ -974,7 +1006,7 @@ const PAYMENT_METHODS_V2=["Efectivo","Transferencia","Otro"];
 const MAX_CAP=320;
 function loadTicketsV4(){return load("bm_tickets_v4",[]);}
 function saveTicketsV4(t){save("bm_tickets_v4",t);}
-function loadCountersV4(){return load("bm_tc_v4",{general:0,ringside:0,vip:0});}
+function loadCountersV4(){return load("bm_tc_v4",{inscripcion:0,preventa:0,puerta:0});}
 function saveCountersV4(c){save("bm_tc_v4",c);}
 function padN(n){return String(n).padStart(4,"0");}
 
@@ -990,12 +1022,12 @@ return <div ref={ref} style={{width:size,height:size}}/>;
 }
 
 function TicketPreview({ticket}){
-const tt=TICKET_TYPES_V2.find(t=>t.key===ticket.ticketType)||TICKET_TYPES_V2[0];
+const ticketTypeInfo=TICKET_TYPES_V2.find(t=>t.key===ticket.ticketType)||TICKET_TYPES_V2[0];
 const qrData=location.origin+location.pathname+"?ticket="+encodeURIComponent(ticket.id);
 const qrWrapRef=useRef(null);
 const busyRef=useRef(false);
 const [sharing,setSharing]=useState(false);
-const shareText="🥊 Sangre Nueva — La Velada\nEntrada: "+tt.label+"\nBoleta: #"+ticket.id+"\nA nombre de: "+ticket.attendeeName+"\n\nPresenta este código QR en la entrada.";
+const shareText="🥊 Sangre Nueva — La Velada\nEntrada: "+ticketTypeInfo.label+"\nBoleta: #"+ticket.id+"\nA nombre de: "+ticket.attendeeName+"\n\nPresenta este código QR en la entrada.";
 
 async function buildTicketCanvas(){
 if(document.fonts&&document.fonts.ready) await document.fonts.ready;
@@ -1007,20 +1039,20 @@ ctx.scale(scale,scale);
 const grad=ctx.createLinearGradient(0,0,W,H);
 grad.addColorStop(0,"#0a0000"); grad.addColorStop(1,"#180505");
 ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-ctx.strokeStyle=tt.color+"80"; ctx.lineWidth=2; ctx.strokeRect(1,1,W-2,H-2);
-ctx.strokeStyle=tt.color+"30"; ctx.beginPath(); ctx.moveTo(28,96); ctx.lineTo(W-28,96); ctx.stroke();
-ctx.strokeStyle=tt.color+"20"; ctx.beginPath(); ctx.moveTo(28,H-56); ctx.lineTo(W-28,H-56); ctx.stroke();
+ctx.strokeStyle=ticketTypeInfo.color+"80"; ctx.lineWidth=2; ctx.strokeRect(1,1,W-2,H-2);
+ctx.strokeStyle=ticketTypeInfo.color+"30"; ctx.beginPath(); ctx.moveTo(28,96); ctx.lineTo(W-28,96); ctx.stroke();
+ctx.strokeStyle=ticketTypeInfo.color+"20"; ctx.beginPath(); ctx.moveTo(28,H-56); ctx.lineTo(W-28,H-56); ctx.stroke();
 
 ctx.textBaseline="alphabetic";
-ctx.fillStyle=tt.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
+ctx.fillStyle=ticketTypeInfo.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
 ctx.fillText("🥊 SANGRE NUEVA · LA VELADA", 32, 38);
 ctx.fillStyle="#e8ddd0"; ctx.font="400 46px 'Bebas Neue', sans-serif";
 ctx.fillText(ticket.attendeeName.toUpperCase(), 32, 78);
 
 ctx.textAlign="right"; ctx.font="400 32px sans-serif";
-ctx.fillText(tt.icon, W-32, 44);
-ctx.fillStyle=tt.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
-ctx.fillText(tt.label.toUpperCase(), W-32, 76);
+ctx.fillText(ticketTypeInfo.icon, W-32, 44);
+ctx.fillStyle=ticketTypeInfo.color; ctx.font="700 15px 'Barlow Condensed', sans-serif";
+ctx.fillText(ticketTypeInfo.label.toUpperCase(), W-32, 76);
 ctx.textAlign="left";
 
 const qrCanvas=qrWrapRef.current?.querySelector("canvas");
@@ -1035,7 +1067,7 @@ let ry=150;
 rows.forEach(([label,value])=>{
 ctx.fillStyle="#9CA3AF"; ctx.font="400 15px 'Barlow Condensed', sans-serif";
 ctx.fillText(label, qrX+qrSize+40, ry);
-ctx.fillStyle=label==="Boleta"?"#e8ddd0":(label==="Precio"?tt.color:(label==="Estado"?(ticket.status==="ingresado"?"#4ADE80":"#FCD34D"):"#e8ddd0"));
+ctx.fillStyle=label==="Boleta"?"#e8ddd0":(label==="Precio"?ticketTypeInfo.color:(label==="Estado"?(ticket.status==="ingresado"?"#4ADE80":"#FCD34D"):"#e8ddd0"));
 ctx.font=label==="Boleta"?"400 26px 'Bebas Neue', sans-serif":"700 17px 'Barlow Condensed', sans-serif";
 ctx.fillText(value, qrX+qrSize+40, ry+26);
 ry+=62;
@@ -1077,26 +1109,26 @@ busyRef.current=false;
 }
 return(
 <div className="space-y-3">
-<div className="rounded-2xl overflow-hidden scale-in" style={{border:"1px solid "+tt.color+"50",background:"linear-gradient(135deg,#0a0000,#180505)"}}>
-<div className="px-4 pt-3 pb-2 flex items-center justify-between" style={{borderBottom:"1px solid "+tt.color+"25"}}>
+<div className="rounded-2xl overflow-hidden scale-in" style={{border:"1px solid "+ticketTypeInfo.color+"50",background:"linear-gradient(135deg,#0a0000,#180505)"}}>
+<div className="px-4 pt-3 pb-2 flex items-center justify-between" style={{borderBottom:"1px solid "+ticketTypeInfo.color+"25"}}>
 <div>
-<p className="text-[9px] font-bold uppercase tracking-widest" style={{color:tt.color}}>🥊 Sangre Nueva · La Velada</p>
+<p className="text-[9px] font-bold uppercase tracking-widest" style={{color:ticketTypeInfo.color}}>🥊 Sangre Nueva · La Velada</p>
 <p className="text-white font-black text-lg leading-tight" style={{fontFamily:"'Bebas Neue',Impact,sans-serif",letterSpacing:"2px"}}>{ticket.attendeeName}</p>
 </div>
-<div className="text-right"><span className="text-2xl">{tt.icon}</span><p className="text-[10px] font-bold" style={{color:tt.color}}>{tt.label}</p></div>
+<div className="text-right"><span className="text-2xl">{ticketTypeInfo.icon}</span><p className="text-[10px] font-bold" style={{color:ticketTypeInfo.color}}>{ticketTypeInfo.label}</p></div>
 </div>
 <div className="flex items-center gap-4 px-4 py-3">
 <div ref={qrWrapRef} className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96}/></div>
 <div className="flex-1 space-y-2">
 <div className="flex justify-between"><span className="text-gray-400 text-xs">Boleta</span><span className="font-black text-white text-base" style={{fontFamily:"'Bebas Neue',Impact,sans-serif",letterSpacing:"1px"}}>#{ticket.id}</span></div>
-<div className="flex justify-between"><span className="text-gray-400 text-xs">Precio</span><span className="font-bold text-sm" style={{color:tt.color}}>{fmt$(ticket.price)}</span></div>
+<div className="flex justify-between"><span className="text-gray-400 text-xs">Precio</span><span className="font-bold text-sm" style={{color:ticketTypeInfo.color}}>{fmt$(ticket.price)}</span></div>
 <div className="flex justify-between"><span className="text-gray-400 text-xs">Pago</span><span className="text-white text-xs">{ticket.paymentMethod}</span></div>
 <div className="flex justify-between"><span className="text-gray-400 text-xs">Estado</span>
-<span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={ticket.status==="ingresado"?{background:"rgba(34,197,94,0.15)",color:"#4ADE80"}:{background:"rgba(245,158,11,0.15)",color:"#FCD34D"}}>{ticket.status==="ingresado"?"✓ Ingresado":"● Activo"}</span>
+<Badge variant="filled" color={ticket.status==="ingresado"?"#4ADE80":"#FCD34D"}>{ticket.status==="ingresado"?"✓ Ingresado":"● Activo"}</Badge>
 </div>
 </div>
 </div>
-<div className="px-4 pb-2 flex justify-between" style={{borderTop:"1px solid "+tt.color+"15"}}>
+<div className="px-4 pb-2 flex justify-between" style={{borderTop:"1px solid "+ticketTypeInfo.color+"15"}}>
 <span className="text-[9px] text-gray-600 uppercase tracking-widest">Sangre Nueva</span>
 <span className="text-[9px] text-gray-600">#{ticket.id}</span>
 </div>
@@ -1108,19 +1140,30 @@ return(
 
 function SellView({onAdd}){
 const [name,setName]=useState("");
+const [nameError,setNameError]=useState("");
 const [phone,setPhone]=useState("");
 const [type,setType]=useState("preventa");
 const [method,setMethod]=useState("Efectivo");
 const [last,setLast]=useState(null);
-const tt=TICKET_TYPES_V2.find(t=>t.key===type);
-function submit(e){e.preventDefault();if(!name.trim())return;const t=onAdd({attendeeName:name.trim(),phone:phone.trim(),ticketType:type,paymentMethod:method});setLast(t);setName("");setPhone("");}
+const ticketTypeInfo=TICKET_TYPES_V2.find(t=>t.key===type);
+function submit(e){
+e.preventDefault();
+const trimmedName=name.trim().replace(/\s+/g," ");
+if(!trimmedName){ setNameError("Escribe el nombre del asistente"); return; }
+if(trimmedName.length<2){ setNameError("El nombre es muy corto"); return; }
+if(trimmedName.length>60){ setNameError("Máximo 60 caracteres"); return; }
+setNameError("");
+const t=onAdd({attendeeName:trimmedName,phone:phone.trim(),ticketType:type,paymentMethod:method});
+setLast(t);setName("");setPhone("");
+}
 const iS={background:"rgba(0,0,0,0.45)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px"};
 return(
 <div className="space-y-4">
 <form onSubmit={submit} className="rounded-xl p-4 space-y-3" style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.07)"}}>
 <h3 className="text-xs font-bold text-white uppercase tracking-widest">Nueva Entrada</h3>
 <div><label className="text-[11px] text-gray-400 mb-1 block">Nombre del asistente</label>
-<input value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre completo" required className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none" style={iS}/></div>
+<input value={name} onChange={e=>{setName(e.target.value);if(nameError)setNameError("");}} placeholder="Nombre completo" required maxLength={60} className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none" style={iS}/>
+{nameError&&<p className="text-red-400 text-xs mt-1">{nameError}</p>}</div>
 <div><label className="text-[11px] text-gray-400 mb-1 block">Teléfono (opcional)</label>
 <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+56 9..." className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none" style={iS}/></div>
 <div><label className="text-[11px] text-gray-400 mb-2 block">Tipo de Entrada</label>
@@ -1145,7 +1188,7 @@ style={method===m?{background:"rgba(220,38,38,0.2)",border:"1px solid rgba(220,3
 </div>
 <button type="submit" className="w-full py-3.5 rounded-xl font-black text-white transition-all active:scale-95"
 style={{background:"linear-gradient(135deg,#DC2626,#991B1B)",fontFamily:"'Bebas Neue',Impact,sans-serif",fontSize:"17px",letterSpacing:"3px"}}>
-🎫 EMITIR — {fmt$(tt.price)}
+🎫 EMITIR — {fmt$(ticketTypeInfo.price)}
 </button>
 </form>
 {last&&<div className="space-y-2 fade-in"><p className="text-[11px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview ticket={last}/></div>}
@@ -1154,29 +1197,29 @@ style={{background:"linear-gradient(135deg,#DC2626,#991B1B)",fontFamily:"'Bebas 
 }
 
 function HistoryView({tickets,onDelete}){
-const [q,setQ]=useState("");
-const [ft,setFt]=useState("all");
-const [fs,setFs]=useState("all");
-const [cd,setCd]=useState(null);
-function del(id){if(cd===id){onDelete(id);setCd(null);}else{setCd(id);setTimeout(()=>setCd(null),3000);}}
+const [searchQuery,setSearchQuery]=useState("");
+const [typeFilter,setTypeFilter]=useState("all");
+const [statusFilter,setStatusFilter]=useState("all");
+const [confirmDeleteId,setConfirmDeleteId]=useState(null);
+function del(id){if(confirmDeleteId===id){onDelete(id);setConfirmDeleteId(null);}else{setConfirmDeleteId(id);setTimeout(()=>setConfirmDeleteId(null),3000);}}
 const filtered=useMemo(()=>{
 let r=[...tickets].reverse();
-if(q.trim()){const s=q.toLowerCase();r=r.filter(t=>t.attendeeName.toLowerCase().includes(s)||t.id.toLowerCase().includes(s));}
-if(ft!=="all")r=r.filter(t=>t.ticketType===ft);
-if(fs!=="all")r=r.filter(t=>t.status===fs);
+if(searchQuery.trim()){const s=searchQuery.toLowerCase();r=r.filter(t=>t.attendeeName.toLowerCase().includes(s)||t.id.toLowerCase().includes(s));}
+if(typeFilter!=="all")r=r.filter(t=>t.ticketType===typeFilter);
+if(statusFilter!=="all")r=r.filter(t=>t.status===statusFilter);
 return r;
-},[tickets,q,ft,fs]);
+},[tickets,searchQuery,typeFilter,statusFilter]);
 const iS={background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px"};
 if(!tickets.length)return<div className="text-center py-12"><div className="text-5xl mb-3">🎫</div><p className="text-gray-400 text-sm">No hay entradas emitidas aún</p></div>;
 return(
 <div className="space-y-3">
-<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar nombre o #boleta..." className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS}/>
+<input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Buscar nombre o #boleta..." className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS}/>
 <div className="flex gap-2">
-<select value={ft} onChange={e=>setFt(e.target.value)} className="flex-1 px-2 py-2 text-white text-xs focus:outline-none" style={iS}>
+<select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} className="flex-1 px-2 py-2 text-white text-xs focus:outline-none" style={iS}>
 <option value="all">Todos los tipos</option>
 {TICKET_TYPES_V2.map(t=><option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}
 </select>
-<select value={fs} onChange={e=>setFs(e.target.value)} className="flex-1 px-2 py-2 text-white text-xs focus:outline-none" style={iS}>
+<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="flex-1 px-2 py-2 text-white text-xs focus:outline-none" style={iS}>
 <option value="all">Todos los estados</option>
 <option value="activo">● Activo</option>
 <option value="ingresado">✓ Ingresado</option>
@@ -1185,19 +1228,19 @@ return(
 <p className="text-[11px] text-gray-500">{filtered.length} entrada{filtered.length!==1?"s":""}</p>
 <div className="space-y-2">
 {filtered.map(t=>{
-const tt=TICKET_TYPES_V2.find(x=>x.key===t.ticketType)||TICKET_TYPES_V2[0];
+const ticketTypeInfo=TICKET_TYPES_V2.find(x=>x.key===t.ticketType)||TICKET_TYPES_V2[0];
 return(
 <div key={t.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{background:"rgba(0,0,0,0.35)",border:"1px solid rgba(255,255,255,0.06)"}}>
-<div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{background:tt.color+"18"}}>{tt.icon}</div>
+<div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{background:ticketTypeInfo.color+"18"}}>{ticketTypeInfo.icon}</div>
 <div className="flex-1 min-w-0">
 <p className="text-white text-sm font-semibold truncate">{t.attendeeName}</p>
 <p className="text-gray-500 text-[10px]">#{t.id} · {t.paymentMethod}</p>
 </div>
 <div className="text-right flex-shrink-0">
-<p className="text-xs font-bold" style={{color:tt.color}}>{fmt$(t.price)}</p>
-<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={t.status==="ingresado"?{background:"rgba(34,197,94,0.1)",color:"#4ADE80"}:{background:"rgba(245,158,11,0.1)",color:"#FCD34D"}}>{t.status==="ingresado"?"✓ In":"● Act"}</span>
+<p className="text-xs font-bold" style={{color:ticketTypeInfo.color}}>{fmt$(t.price)}</p>
+<Badge variant="filled" size="xs" color={t.status==="ingresado"?"#4ADE80":"#FCD34D"}>{t.status==="ingresado"?"✓ In":"● Act"}</Badge>
 </div>
-<button onClick={()=>del(t.id)} className={"p-1.5 rounded-lg flex-shrink-0 transition-colors "+(cd===t.id?"text-red-400 bg-red-500/10":"text-gray-500 hover:text-red-400")} title="Eliminar entrada">
+<button onClick={()=>del(t.id)} className={"p-1.5 rounded-lg flex-shrink-0 transition-colors "+(confirmDeleteId===t.id?"text-red-400 bg-red-500/10":"text-gray-500 hover:text-red-400")} title="Eliminar entrada">
 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
 </button>
 </div>
@@ -1306,12 +1349,12 @@ return(
 </div>
 </form>
 {result&&result!=="notfound"&&(()=>{
-const tt=TICKET_TYPES_V2.find(t=>t.key===result.ticketType)||TICKET_TYPES_V2[0];
+const ticketTypeInfo=TICKET_TYPES_V2.find(t=>t.key===result.ticketType)||TICKET_TYPES_V2[0];
 return(
 <div className="rounded-xl p-4 space-y-3 scale-in" style={{background:"rgba(0,0,0,0.4)",border:"1px solid "+(result.status==="ingresado"?"rgba(34,197,94,0.4)":"rgba(245,158,11,0.35)")}}>
 <div className="flex items-center gap-3">
 <span className="text-3xl">{result.status==="ingresado"?"✅":"🎫"}</span>
-<div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-xs text-gray-400">#{result.id} · <span style={{color:tt.color}}>{tt.label}</span></p></div>
+<div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-xs text-gray-400">#{result.id} · <span style={{color:ticketTypeInfo.color}}>{ticketTypeInfo.label}</span></p></div>
 </div>
 {result.status==="ingresado"
 ?<p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{background:"rgba(34,197,94,0.1)"}}>✓ Ya registrado como ingresado</p>
@@ -1323,8 +1366,8 @@ return(
 {result==="notfound"&&<div className="text-center py-4 rounded-xl scale-in" style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)"}}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-xs mt-1">Verifica el número ingresado</p></div>}
 {checked.length>0&&<div><p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Últimos ingresos</p>
 <div className="space-y-1.5">{[...checked].reverse().slice(0,5).map(t=>{
-const tt=TICKET_TYPES_V2.find(x=>x.key===t.ticketType)||TICKET_TYPES_V2[0];
-return<div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.12)"}}><div className="flex items-center gap-2"><span style={{color:tt.color}}>{tt.icon}</span><span className="text-white text-sm">{t.attendeeName}</span></div><span className="text-[10px] text-green-400">#{t.id}</span></div>;
+const ticketTypeInfo=TICKET_TYPES_V2.find(x=>x.key===t.ticketType)||TICKET_TYPES_V2[0];
+return<div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.12)"}}><div className="flex items-center gap-2"><span style={{color:ticketTypeInfo.color}}>{ticketTypeInfo.icon}</span><span className="text-white text-sm">{t.attendeeName}</span></div><span className="text-[10px] text-green-400">#{t.id}</span></div>;
 })}</div>
 </div>}
 </div>
@@ -1342,9 +1385,9 @@ return{total:tickets.length,revenue:tickets.reduce((s,t)=>s+t.price,0),byType,by
 function addTicket(data){
 const cur=loadCountersV4();
 const nc={...cur,[data.ticketType]:(cur[data.ticketType]||0)+1};
-const tt=TICKET_TYPES_V2.find(x=>x.key===data.ticketType);
-const prefix=tt.label.substring(0,3).toUpperCase();
-const newT={...data,id:prefix+"-"+padN(nc[data.ticketType]),price:tt.price,status:"activo",createdAt:new Date().toISOString(),checkedInAt:null};
+const ticketTypeInfo=TICKET_TYPES_V2.find(x=>x.key===data.ticketType);
+const prefix=ticketTypeInfo.label.substring(0,3).toUpperCase();
+const newT={...data,id:prefix+"-"+padN(nc[data.ticketType]),price:ticketTypeInfo.price,status:"activo",createdAt:new Date().toISOString(),checkedInAt:null};
 const updated=[...tickets,newT];
 setTickets(updated);saveTicketsV4(updated);
 saveCountersV4(nc);
@@ -1547,7 +1590,7 @@ function cancel(){setEditF(null);setView("list");}
 
 function handleExport(){const d={fighters,matchups,expenses,tickets};const b=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="evento_"+new Date().toISOString().split("T")[0]+".json";a.click();URL.revokeObjectURL(u);}
 function handleImport(){const i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.fighters){setFighters(d.fighters);save("bm_fighters_v4",d.fighters);}if(d.matchups){setMatchups(d.matchups);save("bm_matchups_v3",d.matchups);}if(d.expenses){setExpenses(d.expenses);save("bm_expenses_v3",d.expenses);}if(d.tickets){setTickets(d.tickets);save("bm_tickets_v3",d.tickets);}}catch{alert("JSON inválido");}};r.readAsText(f);};i.click();}
-function resetDemo(){if(!confirm("¿Restaurar los 43 atletas originales y borrar peleas, gastos y ventas?"))return;setFighters([...SN_FIGHTERS]);save("bm_fighters_v4",SN_FIGHTERS);setMatchups([]);save("bm_matchups_v3",[]);setExpenses([]);save("bm_expenses_v3",[]);setTickets([]);save("bm_tickets_v3",[]);setTicketsNew([]);saveTicketsV4([]);saveCountersV4({general:0,ringside:0,vip:0});}
+function resetDemo(){if(!confirm("¿Restaurar los 43 atletas originales y borrar peleas, gastos y ventas?"))return;setFighters([...SN_FIGHTERS]);save("bm_fighters_v4",SN_FIGHTERS);setMatchups([]);save("bm_matchups_v3",[]);setExpenses([]);save("bm_expenses_v3",[]);setTickets([]);save("bm_tickets_v3",[]);setTicketsNew([]);saveTicketsV4([]);saveCountersV4({inscripcion:0,preventa:0,puerta:0});}
 
 const nav=(active)=>"flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors "+(active?"text-boxing-goldFight":"text-boxing-muted active:text-gray-300");
 
