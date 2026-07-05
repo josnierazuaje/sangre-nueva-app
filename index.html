@@ -237,7 +237,7 @@ ref.once("value").then(snap=>{
 // Primera conexion: si la nube esta vacia y aqui hay datos, subimos los locales
 if(snap.val()===null){
 const localRaw = localStorage.getItem(k);
-if(localRaw){ try{ ref.set(JSON.parse(localRaw)); }catch(e){} }
+if(localRaw){ try{ ref.set(JSON.parse(localRaw)); }catch(e){ console.error("No se pudo subir "+k+" a Firebase en la primera conexión:",e); } }
 }
 ref.on("value", s=>{
 const val = s.val();
@@ -266,7 +266,7 @@ return true;
 function save(k,v) {
 localStorage.setItem(k, JSON.stringify(v));
 if(FB.ready && Object.prototype.hasOwnProperty.call(SYNC_KEYS,k)){
-try{ FB.db.ref(fbPath(k)).set(JSON.parse(JSON.stringify(v))); }catch(e){}
+try{ FB.db.ref(fbPath(k)).set(JSON.parse(JSON.stringify(v))); }catch(e){ console.error("No se pudo sincronizar "+k+" con Firebase (el cambio sí quedó guardado localmente):",e); }
 }
 }
 
@@ -983,7 +983,7 @@ const ref=useRef(null);
 useEffect(()=>{
 if(ref.current&&window.QRCode){
 ref.current.innerHTML="";
-try{new window.QRCode(ref.current,{text:data||" ",width:size,height:size,colorDark:"#000",colorLight:"#fff"});}catch(e){}
+try{new window.QRCode(ref.current,{text:data||" ",width:size,height:size,colorDark:"#000",colorLight:"#fff"});}catch(e){ console.error("No se pudo generar el código QR:",e); }
 }
 },[data,size]);
 return <div ref={ref} style={{width:size,height:size}}/>;
@@ -1217,6 +1217,11 @@ const videoRef=useRef(null);
 const canvasRef=useRef(null);
 const streamRef=useRef(null);
 const rafRef=useRef(null);
+// Identifica cada intento de startScan(); si stopScan() se llama mientras
+// getUserMedia todavía está pidiendo permiso, este valor cambia y así
+// evitamos activar una cámara que el usuario ya canceló (o que quedó
+// esperando en un componente ya desmontado).
+const scanRequestRef=useRef(null);
 
 function lookup(code){
 const f=tickets.find(t=>t.id.toUpperCase()===String(code).trim().toUpperCase());
@@ -1226,6 +1231,7 @@ function search(e){e.preventDefault();lookup(input);}
 function doIn(){if(result&&result!=="notfound"&&result.status==="activo"){onCheckIn(result.id);setResult({...result,status:"ingresado"});}}
 
 function stopScan(){
+scanRequestRef.current=null;
 setScanning(false);
 if(rafRef.current){cancelAnimationFrame(rafRef.current);rafRef.current=null;}
 if(streamRef.current){streamRef.current.getTracks().forEach(tr=>tr.stop());streamRef.current=null;}
@@ -1250,13 +1256,20 @@ rafRef.current=requestAnimationFrame(tick);
 }
 function startScan(){
 setScanErr(""); setResult(null);
+const requestId={};
+scanRequestRef.current=requestId;
 navigator.mediaDevices?.getUserMedia({video:{facingMode:"environment"}}).then(stream=>{
+if(scanRequestRef.current!==requestId){
+// Se canceló o se desmontó mientras el navegador pedía permiso: no dejar la cámara prendida.
+stream.getTracks().forEach(tr=>tr.stop());
+return;
+}
 streamRef.current=stream;
 setScanning(true);
 setTimeout(()=>{
 if(videoRef.current){videoRef.current.srcObject=stream;videoRef.current.play();rafRef.current=requestAnimationFrame(tick);}
 },0);
-}).catch(e=>{setScanErr("No se pudo acceder a la cámara: "+e.message);});
+}).catch(e=>{if(scanRequestRef.current===requestId)setScanErr("No se pudo acceder a la cámara: "+e.message);});
 }
 useEffect(()=>()=>stopScan(),[]);
 useEffect(()=>{if(initialCode)lookup(initialCode);},[]);
