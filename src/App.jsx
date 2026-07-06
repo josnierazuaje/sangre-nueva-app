@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets } from "./lib/storage.js";
+import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
@@ -98,17 +98,48 @@ export default function App() {
   function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); save("bm_fighters_v4", u); }
   function cancel() { setEditF(null); setView("list"); }
 
-  function handleExport() { const d = { fighters, matchups, expenses, tickets }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
+  // Incluye ticketsNew (boletas reales v4) además de fighters/matchups/
+  // expenses/tickets(v3 legado) — antes de la Fase 5 el export manual no
+  // incluía las boletas reales, con lo cual no servía como respaldo de
+  // ellas.
+  function handleExport() { const d = { fighters, matchups, expenses, tickets, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
   function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { setFighters(d.fighters); save("bm_fighters_v4", d.fighters); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (d.expenses) { setExpenses(d.expenses); save("bm_expenses_v3", d.expenses); } if (d.tickets) { setTickets(d.tickets); save("bm_tickets_v3", d.tickets); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
-  // NOTA (Fase 2): ya no restaura atletas de demostración (se eliminaron del
-  // código público). Este flujo de "Restaurar" se rediseña por completo en
-  // la Fase 5 (respaldo automático + doble confirmación antes de borrar).
-  // NOTA (Fase 3): ya no toca las boletas reales (bm_tickets_v4/nodos
-  // sangre_nueva/tickets) — borrarlas de verdad implicaría eliminar cada
-  // nodo en Firebase sin respaldo ni doble confirmación, algo que se
-  // implementa recién en la Fase 5 ("Reiniciar evento"). Hasta entonces,
-  // "Restaurar" solo limpia peleadores/peleas/gastos/boletas v3 (legado).
-  function resetDemo() { if (!confirm("¿Borrar peleadores, peleas y gastos de este evento? (las entradas vendidas no se tocan)")) return; setFighters([]); save("bm_fighters_v4", []); setMatchups([]); save("bm_matchups_v3", []); setExpenses([]); save("bm_expenses_v3", []); setTickets([]); save("bm_tickets_v3", []); }
+
+  // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
+  // de demostración (se quitaron del código en la Fase 2) — el evento queda
+  // vacío para cargar peleadores reales desde cero. Antes de borrar nada:
+  // (a) descarga un respaldo JSON local (incluye boletas v4 reales) y
+  // (b) guarda una copia completa en sangre_nueva_backups/ en Firebase,
+  // protegida por reglas para que solo el dueño la pueda leer (Fase 2).
+  // Requiere doble confirmación: un confirm() explicando qué se borra, y
+  // escribir la palabra BORRAR en un prompt.
+  async function resetEvent() {
+    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas, gastos y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.";
+    if (!confirm(detalle)) return;
+    const palabra = prompt("Para confirmar, escribe la palabra BORRAR (en mayúsculas):");
+    if (palabra === null) return;
+    if (palabra !== "BORRAR") { alert("No escribiste BORRAR exactamente. Se canceló el reinicio — no se borró nada."); return; }
+
+    handleExport();
+
+    if (FB.ready) {
+      try {
+        await backupEventToCloud({ fighters, matchups, expenses, tickets, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
+      } catch (e) {
+        alert("No se pudo guardar el respaldo en la nube. El reinicio se canceló para no perder datos.\n\nError: " + e.message);
+        return;
+      }
+    }
+
+    setFighters([]); save("bm_fighters_v4", []);
+    setMatchups([]); save("bm_matchups_v3", []);
+    setExpenses([]); save("bm_expenses_v3", []);
+    setTickets([]); save("bm_tickets_v3", []);
+    setTicketsNew([]); clearTicketsCache();
+    try { await clearAllTicketsData(); } catch (e) { console.error("No se pudieron borrar las boletas en Firebase:", e); }
+
+    alert("Evento reiniciado. El respaldo se descargó" + (FB.ready ? " y también quedó guardado en la nube." : "."));
+  }
 
   const nav = (active) => "flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors " + (active ? "text-boxing-goldFight" : "text-boxing-muted active:text-gray-300");
 
@@ -129,7 +160,7 @@ export default function App() {
               {menuOpen && <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-7 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[110px] shadow-lg">
-                  <button onClick={() => { setMenuOpen(false); resetDemo(); }} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Restaurar</button>
+                  <button onClick={() => { setMenuOpen(false); resetEvent(); }} className="block w-full text-left text-[11px] text-gray-400 hover:text-red-400 hover:bg-white/5 px-3 py-1.5 transition-colors">Reiniciar evento</button>
                   <button onClick={() => { setMenuOpen(false); handleImport(); }} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Importar</button>
                   <button onClick={() => { setMenuOpen(false); handleExport(); }} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Exportar</button>
                   <button onClick={() => { setMenuOpen(false); pasteCustomFbConfig(); }} className="block w-full text-left text-[11px] text-gray-400 hover:text-boxing-goldFight hover:bg-white/5 px-3 py-1.5 transition-colors">Firebase manual</button>

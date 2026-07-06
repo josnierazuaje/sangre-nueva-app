@@ -138,3 +138,33 @@ export async function migrateTicketsIfNeeded() {
     console.error("No se pudo migrar las boletas a nodos individuales:", e);
   }
 }
+
+export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); }
+
+// ============================================
+// REINICIAR EVENTO (Fase 5) — respaldo antes de borrar
+// ============================================
+// Guarda una copia completa del evento en sangre_nueva_backups/{fecha}.
+// Ese nodo está protegido en database.rules.json para que solo el dueño
+// (por email) pueda leerlo o escribirlo — la Fase 2 ya deja esa regla lista.
+export async function backupEventToCloud(data) {
+  if (!FB.ready) return null;
+  const key = new Date().toISOString().replace(/[.:]/g, "-");
+  // Firebase rechaza valores undefined (ej. notes de un peleador sin notas);
+  // el round-trip por JSON los omite igual que ya hace save().
+  await dbSet(ref(FB.db, "sangre_nueva_backups/" + key), JSON.parse(JSON.stringify(data)));
+  return key;
+}
+
+// Borra las boletas reales por completo: los nodos individuales, los
+// contadores, y el arreglo viejo bm_tickets_v4 (si no se borra este último,
+// la migración en caliente lo confundiría con datos pendientes de migrar y
+// resucitaría las boletas ya borradas en el próximo inicio).
+export async function clearAllTicketsData() {
+  if (!FB.ready) return;
+  await Promise.all([
+    dbRemove(ref(FB.db, fbPath("tickets"))),
+    dbRemove(ref(FB.db, fbPath("counters"))),
+    dbRemove(ref(FB.db, fbPath("bm_tickets_v4"))),
+  ]);
+}
