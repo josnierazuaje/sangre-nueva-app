@@ -14,8 +14,6 @@ import LoginScreen from "./components/LoginScreen.jsx";
 export default function App() {
   const [fighters, setFighters] = useState([]);
   const [matchups, setMatchups] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [tickets, setTickets] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
@@ -30,8 +28,6 @@ export default function App() {
   function applyRemote(k, val) {
     if (k === "bm_fighters_v4") setFighters(val);
     else if (k === "bm_matchups_v3") setMatchups(val);
-    else if (k === "bm_expenses_v3") setExpenses(val);
-    else if (k === "bm_tickets_v3") setTickets(val);
     else if (k === "bm_event_label") setEventLabel(val);
     // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
     // individual, ver migrateTicketsIfNeeded/watchTickets más abajo.
@@ -74,8 +70,6 @@ export default function App() {
   useEffect(() => {
     setFighters(loadFighters());
     setMatchups(load("bm_matchups_v3", []));
-    setExpenses(load("bm_expenses_v3", []));
-    setTickets(load("bm_tickets_v3", []));
     setTicketsNew(loadTicketsV4());
     const raw = localStorage.getItem("bm_fb_config");
     const disabled = localStorage.getItem("bm_fb_disabled");
@@ -98,12 +92,11 @@ export default function App() {
   function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); save("bm_fighters_v4", u); }
   function cancel() { setEditF(null); setView("list"); }
 
-  // Incluye ticketsNew (boletas reales v4) además de fighters/matchups/
-  // expenses/tickets(v3 legado) — antes de la Fase 5 el export manual no
-  // incluía las boletas reales, con lo cual no servía como respaldo de
-  // ellas.
-  function handleExport() { const d = { fighters, matchups, expenses, tickets, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { setFighters(d.fighters); save("bm_fighters_v4", d.fighters); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (d.expenses) { setExpenses(d.expenses); save("bm_expenses_v3", d.expenses); } if (d.tickets) { setTickets(d.tickets); save("bm_tickets_v3", d.tickets); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  // Incluye ticketsNew (boletas reales v4) además de fighters/matchups —
+  // antes de la Fase 5 el export manual no incluía las boletas reales, con
+  // lo cual no servía como respaldo de ellas.
+  function handleExport() { const d = { fighters, matchups, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { setFighters(d.fighters); save("bm_fighters_v4", d.fighters); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
@@ -114,7 +107,7 @@ export default function App() {
   // Requiere doble confirmación: un confirm() explicando qué se borra, y
   // escribir la palabra BORRAR en un prompt.
   async function resetEvent() {
-    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas, gastos y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.";
+    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.";
     if (!confirm(detalle)) return;
     const palabra = prompt("Para confirmar, escribe la palabra BORRAR (en mayúsculas):");
     if (palabra === null) return;
@@ -124,7 +117,7 @@ export default function App() {
 
     if (FB.ready) {
       try {
-        await backupEventToCloud({ fighters, matchups, expenses, tickets, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
+        await backupEventToCloud({ fighters, matchups, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
       } catch (e) {
         alert("No se pudo guardar el respaldo en la nube. El reinicio se canceló para no perder datos.\n\nError: " + e.message);
         return;
@@ -133,8 +126,6 @@ export default function App() {
 
     setFighters([]); save("bm_fighters_v4", []);
     setMatchups([]); save("bm_matchups_v3", []);
-    setExpenses([]); save("bm_expenses_v3", []);
-    setTickets([]); save("bm_tickets_v3", []);
     setTicketsNew([]); clearTicketsCache();
     try { await clearAllTicketsData(); } catch (e) { console.error("No se pudieron borrar las boletas en Firebase:", e); }
 

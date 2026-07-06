@@ -24,9 +24,6 @@ export const COUNTRY_CODES = [
   { code: "+52", flag: "\u{1F1F2}\u{1F1FD}" }, { code: "+57", flag: "\u{1F1E8}\u{1F1F4}" }, { code: "+51", flag: "\u{1F1F5}\u{1F1EA}" },
   { code: "+1", flag: "\u{1F1FA}\u{1F1F8}" }, { code: "+34", flag: "\u{1F1EA}\u{1F1F8}" },
 ];
-export const PAYMENT_METHODS = ["Efectivo", "Transferencia"];
-export const TICKET_PRICES = { preventa: 10000, puerta: 15000 };
-
 // Claves sincronizadas entre localStorage y Firebase como un solo "blob"
 // (con su valor por defecto cuando no existe aún ni local ni remotamente).
 // Las boletas (bm_tickets_v4/bm_tc_v4) ya NO están acá: desde la Fase 3
@@ -36,8 +33,6 @@ export const TICKET_PRICES = { preventa: 10000, puerta: 15000 };
 export const SYNC_KEYS = {
   "bm_fighters_v4": [],
   "bm_matchups_v3": [],
-  "bm_expenses_v3": [],
-  "bm_tickets_v3": [],
   "bm_event_label": "La Velada — próxima fecha por definir",
 };
 

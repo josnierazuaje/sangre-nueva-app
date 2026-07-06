@@ -1,20 +1,38 @@
 {
   "name": "Sangre Nueva — La Velada",
   "short_name": "Sangre Nueva",
+  "description": "Gestión en vivo del evento de boxeo Sangre Nueva — La Velada: peleadores, emparejamientos, cartelera y venta/check-in de entradas.",
+  "id": "/",
+  "start_url": ".",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
-  "start_url": ".",
+  "lang": "es",
   "icons": [
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
