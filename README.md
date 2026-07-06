@@ -35,8 +35,10 @@ Cada push a la rama conectada dispara un nuevo deploy automáticamente.
 
 ## Firebase Realtime Database — reglas de seguridad
 
-**Pendiente de publicar manualmente (ver Fase 2).** Las reglas viven en
-`database.rules.json` en la raíz del repo. Para publicarlas:
+**Estas reglas todavía no están publicadas — hazlo tú manualmente.** Por
+seguridad, no las publico yo mismo (es un cambio de permisos de acceso sobre
+una base de datos en producción). Las reglas viven en `database.rules.json`
+en la raíz del repo. Para publicarlas:
 
 - Opción A — Consola: Firebase Console → proyecto `velada-sangre-nueva-22fb0`
   → Realtime Database → pestaña **Reglas** → pega el contenido de

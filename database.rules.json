@@ -1,0 +1,14 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "sangre_nueva": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sangre_nueva_backups": {
+      ".read": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
+      ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'"
+    }
+  }
+}

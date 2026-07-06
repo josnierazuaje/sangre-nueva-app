@@ -20,11 +20,24 @@ export const DEFAULT_FB_CONFIG = {
   appId: "1:41697069846:web:a7726fe384e8730b2e1e37",
 };
 
+// Acepta el bloque firebaseConfig pegado desde la consola de Firebase, que no
+// siempre es JSON estricto (claves sin comillas). Antes se evaluaba con
+// `new Function(...)`, lo que ejecutaba cualquier código pegado por el
+// usuario — ahora solo se acepta JSON estricto o, si eso falla, se extraen
+// los pares clave: "valor" manualmente, sin ejecutar nada.
 export function parseFbConfig(t) {
   t = (t || "").trim();
   const m = t.match(/\{[\s\S]*\}/); if (m) t = m[0];
   try { return JSON.parse(t); } catch (e) {}
-  try { return (new Function("return (" + t + ")"))(); } catch (e) { return null; }
+  return parseFbConfigKeyValue(t);
+}
+
+function parseFbConfigKeyValue(t) {
+  const cfg = {};
+  const re = /["']?([A-Za-z0-9_]+)["']?\s*:\s*["']([^"']*)["']/g;
+  let match, found = false;
+  while ((match = re.exec(t))) { cfg[match[1]] = match[2]; found = true; }
+  return found ? cfg : null;
 }
 
 export const OWNER_EMAIL = "josnier.azuaje@gmail.com";

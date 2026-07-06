@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, loadTicketsV4, saveTicketsV4, loadCountersV4, saveCountersV4, DEMO_FIGHTERS } from "./lib/storage.js";
+import { load, save, loadFighters, loadTicketsV4, saveTicketsV4, loadCountersV4, saveCountersV4 } from "./lib/storage.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
@@ -92,7 +92,10 @@ export default function App() {
 
   function handleExport() { const d = { fighters, matchups, expenses, tickets }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
   function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { setFighters(d.fighters); save("bm_fighters_v4", d.fighters); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (d.expenses) { setExpenses(d.expenses); save("bm_expenses_v3", d.expenses); } if (d.tickets) { setTickets(d.tickets); save("bm_tickets_v3", d.tickets); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
-  function resetDemo() { if (!confirm("¿Restaurar los 43 atletas originales y borrar peleas, gastos y ventas?")) return; setFighters([...DEMO_FIGHTERS]); save("bm_fighters_v4", DEMO_FIGHTERS); setMatchups([]); save("bm_matchups_v3", []); setExpenses([]); save("bm_expenses_v3", []); setTickets([]); save("bm_tickets_v3", []); setTicketsNew([]); saveTicketsV4([]); saveCountersV4({ inscripcion: 0, preventa: 0, puerta: 0 }); }
+  // NOTA (Fase 2): ya no restaura atletas de demostración (se eliminaron del
+  // código público). Este flujo de "Restaurar" se rediseña por completo en
+  // la Fase 5 (respaldo automático + doble confirmación antes de borrar).
+  function resetDemo() { if (!confirm("¿Borrar peleadores, peleas, gastos y ventas de este evento?")) return; setFighters([]); save("bm_fighters_v4", []); setMatchups([]); save("bm_matchups_v3", []); setExpenses([]); save("bm_expenses_v3", []); setTickets([]); save("bm_tickets_v3", []); setTicketsNew([]); saveTicketsV4([]); saveCountersV4({ inscripcion: 0, preventa: 0, puerta: 0 }); }
 
   const nav = (active) => "flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors " + (active ? "text-boxing-goldFight" : "text-boxing-muted active:text-gray-300");
 
