@@ -1,0 +1,142 @@
+import { useState, useRef, useEffect, useMemo } from "react";
+import jsQR from "jsqr";
+import { TICKET_TYPES_V2, extractTicketCode } from "../constants.js";
+import CheckInWelcome from "./CheckInWelcome.jsx";
+
+export default function CheckInView({ tickets, onCheckIn, initialCode }) {
+  const [input, setInput] = useState(initialCode ? initialCode.toUpperCase() : "");
+  const [result, setResult] = useState(null);
+  const [justCheckedIn, setJustCheckedIn] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanErr, setScanErr] = useState("");
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafRef = useRef(null);
+  // Identifica cada intento de startScan(); si stopScan() se llama mientras
+  // getUserMedia todavía está pidiendo permiso, este valor cambia y así
+  // evitamos activar una cámara que el usuario ya canceló (o que quedó
+  // esperando en un componente ya desmontado).
+  const scanRequestRef = useRef(null);
+
+  function lookup(code) {
+    const f = tickets.find(t => t.id.toUpperCase() === String(code).trim().toUpperCase());
+    setResult(f || "notfound");
+  }
+  function search(e) { e.preventDefault(); lookup(input); }
+  function doIn() { if (result && result !== "notfound" && result.status === "activo") { onCheckIn(result.id); const updated = { ...result, status: "ingresado", checkedInAt: new Date().toISOString() }; setResult(updated); setJustCheckedIn(updated); } }
+  function closeWelcome() { setJustCheckedIn(null); setResult(null); setInput(""); }
+
+  function stopScan() {
+    scanRequestRef.current = null;
+    setScanning(false);
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(tr => tr.stop()); streamRef.current = null; }
+  }
+  function tick() {
+    const v = videoRef.current;
+    if (!v || v.readyState !== v.HAVE_ENOUGH_DATA) { rafRef.current = requestAnimationFrame(tick); return; }
+    const canvas = canvasRef.current;
+    canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if (code && code.data) {
+      const ticketId = extractTicketCode(code.data);
+      setInput(ticketId.toUpperCase());
+      lookup(ticketId);
+      stopScan();
+      return;
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }
+  function startScan() {
+    setScanErr(""); setResult(null);
+    const requestId = {};
+    scanRequestRef.current = requestId;
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
+      if (scanRequestRef.current !== requestId) {
+        // Se canceló o se desmontó mientras el navegador pedía permiso: no dejar la cámara prendida.
+        stream.getTracks().forEach(tr => tr.stop());
+        return;
+      }
+      streamRef.current = stream;
+      setScanning(true);
+    }).catch(e => { if (scanRequestRef.current === requestId) setScanErr("No se pudo acceder a la cámara: " + e.message); });
+  }
+  // Espera a que React realmente monte el <video> (cuando scanning pasa a true)
+  // antes de asignarle la cámara — hacerlo antes causaba pantalla negra en
+  // algunos celulares porque el elemento todavía no existía en el DOM.
+  useEffect(() => {
+    if (scanning && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(e => console.error("No se pudo reproducir el video de la cámara:", e));
+      rafRef.current = requestAnimationFrame(tick);
+    }
+  }, [scanning]);
+  useEffect(() => () => stopScan(), []);
+  useEffect(() => { if (initialCode) lookup(initialCode); }, []);
+
+  const checked = tickets.filter(t => t.status === "ingresado");
+  const pending = tickets.filter(t => t.status === "activo");
+  const checkedInLog = useMemo(() => [...checked].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)), [checked]);
+  const iS = { background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px" };
+  if (justCheckedIn) {
+    const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === justCheckedIn.ticketType) || TICKET_TYPES_V2[0];
+    return <CheckInWelcome ticket={justCheckedIn} ticketTypeInfo={ticketTypeInfo} onClose={closeWelcome} />;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+          <p className="text-2xl font-black text-green-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{checked.length}</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Ingresados</p>
+        </div>
+        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+          <p className="text-2xl font-black text-yellow-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{pending.length}</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pendientes</p>
+        </div>
+      </div>
+      {scanning && <div className="rounded-xl overflow-hidden relative scale-in" style={{ border: "1px solid rgba(220,38,38,0.4)" }}>
+        <video ref={videoRef} playsInline muted className="w-full" style={{ maxHeight: "260px", objectFit: "cover", background: "#000" }} />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
+        <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(220,38,38,0.6)", pointerEvents: "none", margin: "14%" }} />
+        <button onClick={stopScan} type="button" className="absolute top-2 right-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "rgba(0,0,0,0.6)" }}>Cancelar</button>
+        <p className="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/80">Apunta al código QR de la entrada</p>
+      </div>}
+      {!scanning && <button onClick={startScan} type="button" className="w-full py-3.5 rounded-xl font-black text-white flex items-center justify-center gap-2 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#DC2626,#991B1B)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
+      {scanErr && <p className="text-red-400 text-xs text-center">{scanErr}</p>}
+      <form onSubmit={search} className="rounded-xl p-4 space-y-3" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar manualmente</h3>
+        <div className="flex gap-2">
+          <input value={input} onChange={e => setInput(e.target.value.toUpperCase())} placeholder="PRE-0001 / PUE-0003..." className="flex-1 px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS} />
+          <button type="submit" className="px-4 py-2.5 rounded-xl text-white text-sm font-bold" style={{ background: "rgba(220,38,38,0.35)", border: "1px solid rgba(220,38,38,0.45)" }}>Buscar</button>
+        </div>
+      </form>
+      {result && result !== "notfound" && (() => {
+        const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === result.ticketType) || TICKET_TYPES_V2[0];
+        return (
+          <div className="rounded-xl p-4 space-y-3 scale-in" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid " + (result.status === "ingresado" ? "rgba(34,197,94,0.4)" : "rgba(245,158,11,0.35)") }}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{result.status === "ingresado" ? "✅" : "🎫"}</span>
+              <div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-xs text-gray-400">#{result.id} · <span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</span></p></div>
+            </div>
+            {result.status === "ingresado"
+              ? <p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.1)" }}>✓ Ya registrado como ingresado</p>
+              : <button onClick={doIn} className="w-full py-3 rounded-xl font-black text-white" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>✅ MARCAR INGRESO</button>
+            }
+          </div>
+        );
+      })()}
+      {result === "notfound" && <div className="text-center py-4 rounded-xl scale-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-xs mt-1">Verifica el número ingresado</p></div>}
+      {checkedInLog.length > 0 && <div><p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Registro de ingresos ({checkedInLog.length})</p>
+        <div className="space-y-1.5">{checkedInLog.map(t => {
+          const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
+          const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+          return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span></div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[10px] text-gray-500">{time}</span><span className="text-[10px] text-green-400">#{t.id}</span></div></div>;
+        })}</div>
+      </div>}
+    </div>
+  );
+}

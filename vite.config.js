@@ -13,7 +13,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       manifest: false,
       workbox: {
-        globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico}"],
+        globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,json}"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === "navigate",
