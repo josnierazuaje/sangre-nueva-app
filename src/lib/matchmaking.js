@@ -57,7 +57,13 @@ export function autoMatchAll(fighters) {
   const rem = fighters.filter(f => !used.has(f.id)).sort((a, b) => a.weightKg - b.weightKg);
   for (let i = 0; i < rem.length; i++) {
     if (used.has(rem[i].id)) continue; let best = null, bs = -1;
-    for (let j = i + 1; j < rem.length; j++) { if (used.has(rem[j].id)) continue; const sc = getScore(rem[i], rem[j]); if (sc > bs) { bs = sc; best = rem[j]; } }
+    for (let j = i + 1; j < rem.length; j++) {
+      if (used.has(rem[j].id)) continue;
+      // Filtro duro: nunca emparejar menor con adulto ni sexos distintos, sin excepción de puntaje.
+      if ((rem[i].age < 18) !== (rem[j].age < 18)) continue;
+      if ((rem[i].sexo || "M") !== (rem[j].sexo || "M")) continue;
+      const sc = getScore(rem[i], rem[j]); if (sc > bs) { bs = sc; best = rem[j]; }
+    }
     if (best && bs >= 30) {
       used.add(rem[i].id); used.add(best.id);
       matchups.push({ id: genId(), fighterRedId: rem[i].id, fighterBlueId: best.id, roundNumber: matchups.length + 1, warnings: analyzeMatch(rem[i], best), createdAt: new Date().toISOString() });
@@ -93,6 +99,9 @@ export function sorteoMatch(fighters) {
   const rem = shuffle(fighters.filter(f => !used.has(f.id)));
   for (let i = 0; i < rem.length - 1; i += 2) {
     if (used.has(rem[i].id) || used.has(rem[i + 1].id)) continue;
+    // Filtro duro: nunca emparejar menor con adulto ni sexos distintos, sin excepción de puntaje.
+    if ((rem[i].age < 18) !== (rem[i + 1].age < 18)) continue;
+    if ((rem[i].sexo || "M") !== (rem[i + 1].sexo || "M")) continue;
     const sc = getScore(rem[i], rem[i + 1]);
     if (sc >= 20) {
       used.add(rem[i].id); used.add(rem[i + 1].id);
