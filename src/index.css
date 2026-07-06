@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-boxing-red: #DC2626;
+  --color-boxing-blue: #2563EB;
+  --color-boxing-gold: #F59E0B;
+  --color-boxing-dark: #111827;
+  --color-boxing-card: #1F2937;
+  --color-boxing-crimson: #9b1a2a;
+  --color-boxing-crimsonLight: #c42438;
+  --color-boxing-goldFight: #c8a04a;
+  --color-boxing-goldDim: #8a6d2f;
+  --color-boxing-cream: #e8ddd0;
+  --color-boxing-muted: #6b5f6e;
+  --color-boxing-line: #2a1f2e;
+  --color-boxing-lineBright: #3d2d42;
+  --color-boxing-raised: #16111a;
+  --color-boxing-panel: #100d10;
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/bebas-neue-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/oswald-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-italic-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/playfair-display-italic-400.woff2') format('woff2');
+}
+
+html { background: #080608; min-height:100%; }
+body { background: transparent; margin:0; font-family:'Barlow Condensed',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; position:relative; }
+body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:1000; opacity:0.6; }
+/* Tarjetas semitransparentes */
+.bg-gray-800\/60 { background-color: rgba(16,13,16,0.75) !important; }
+.bg-gray-800\/50 { background-color: rgba(16,13,16,0.6) !important; }
+.bg-gray-800\/40 { background-color: rgba(16,13,16,0.5) !important; }
+.bg-gray-900\/80 { background-color: rgba(8,6,8,0.85) !important; }
+header { background: transparent !important; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:#080608; }
+::-webkit-scrollbar-thumb { background:#3d2d42; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+input[type="number"] { -moz-appearance:textfield; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation:fadeIn .25s ease-out; }
+@keyframes vsFlash { 0%,100%{opacity:1} 50%{opacity:.6} }
+.vs-pulse { animation:vsFlash 1.5s ease-in-out infinite; }
+@keyframes scaleIn { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.scale-in { animation:scaleIn .3s ease-out; }
+.no-scrollbar::-webkit-scrollbar { display:none; }
+.no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+/* Mobile viewport fix */
+:root { --app-h: 100vh; }
+.app-root { height: var(--app-h); }
+/* Prevent iOS input zoom */
+input, select, textarea { font-size: 16px !important; }
+/* Safe area for notched phones */
+.nav-safe { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
