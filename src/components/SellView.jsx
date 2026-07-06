@@ -9,16 +9,23 @@ export default function SellView({ onAdd }) {
   const [type, setType] = useState("preventa");
   const [method, setMethod] = useState("Efectivo");
   const [last, setLast] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === type);
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
+    if (submitting) return;
     const trimmedName = name.trim().replace(/\s+/g, " ");
     if (!trimmedName) { setNameError("Escribe el nombre del asistente"); return; }
     if (trimmedName.length < 2) { setNameError("El nombre es muy corto"); return; }
     if (trimmedName.length > 60) { setNameError("Máximo 60 caracteres"); return; }
     setNameError("");
-    const t = onAdd({ attendeeName: trimmedName, phone: phone.trim(), ticketType: type, paymentMethod: method });
-    setLast(t); setName(""); setPhone("");
+    setSubmitting(true);
+    try {
+      const t = await onAdd({ attendeeName: trimmedName, phone: phone.trim(), ticketType: type, paymentMethod: method });
+      setLast(t); setName(""); setPhone("");
+    } finally {
+      setSubmitting(false);
+    }
   }
   const iS = { background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px" };
   return (
@@ -50,9 +57,9 @@ export default function SellView({ onAdd }) {
             ))}
           </div>
         </div>
-        <button type="submit" className="w-full py-3.5 rounded-xl font-black text-white transition-all active:scale-95"
+        <button type="submit" disabled={submitting} className="w-full py-3.5 rounded-xl font-black text-white transition-all active:scale-95 disabled:opacity-60"
           style={{ background: "linear-gradient(135deg,#DC2626,#991B1B)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px" }}>
-          🎫 EMITIR — {fmt$(ticketTypeInfo.price)}
+          {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
         </button>
       </form>
       {last && <div className="space-y-2 fade-in"><p className="text-[11px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview ticket={last} /></div>}

@@ -27,15 +27,17 @@ export const COUNTRY_CODES = [
 export const PAYMENT_METHODS = ["Efectivo", "Transferencia"];
 export const TICKET_PRICES = { preventa: 10000, puerta: 15000 };
 
-// Claves sincronizadas entre localStorage y Firebase (con su valor por
-// defecto cuando no existe aún ni local ni remotamente).
+// Claves sincronizadas entre localStorage y Firebase como un solo "blob"
+// (con su valor por defecto cuando no existe aún ni local ni remotamente).
+// Las boletas (bm_tickets_v4/bm_tc_v4) ya NO están acá: desde la Fase 3
+// viven en nodos individuales (sangre_nueva/tickets/{id} y
+// sangre_nueva/counters/{tipo}, ver src/lib/storage.js) para que varios
+// dispositivos puedan vender al mismo tiempo sin pisarse entre sí.
 export const SYNC_KEYS = {
   "bm_fighters_v4": [],
   "bm_matchups_v3": [],
   "bm_expenses_v3": [],
   "bm_tickets_v3": [],
-  "bm_tickets_v4": [],
-  "bm_tc_v4": { inscripcion: 0, preventa: 0, puerta: 0 },
   "bm_event_label": "La Velada — próxima fecha por definir",
 };
 

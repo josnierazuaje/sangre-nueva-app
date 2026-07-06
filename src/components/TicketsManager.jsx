@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { TICKET_TYPES_V2, MAX_CAP, fmt$ } from "../constants.js";
-import { loadCountersV4, saveCountersV4, saveTicketsV4, padN } from "../lib/storage.js";
+import { nextTicketId, addTicketNode, updateTicketNode, removeTicketNode } from "../lib/storage.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
@@ -13,24 +13,27 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode 
     return { total: tickets.length, revenue: tickets.reduce((s, t) => s + t.price, 0), byType, byPayment, checkedIn: tickets.filter(t => t.status === "ingresado").length };
   }, [tickets]);
 
-  function addTicket(data) {
-    const cur = loadCountersV4();
-    const nc = { ...cur, [data.ticketType]: (cur[data.ticketType] || 0) + 1 };
+  // El id se genera con un contador transaccional en Firebase (atómico entre
+  // dispositivos) para que dos celulares vendiendo al mismo tiempo nunca
+  // generen el mismo correlativo; cada boleta se guarda en su propio nodo
+  // en vez de reescribir el arreglo completo (ver src/lib/storage.js).
+  async function addTicket(data) {
     const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === data.ticketType);
     const prefix = ticketTypeInfo.label.substring(0, 3).toUpperCase();
-    const newT = { ...data, id: prefix + "-" + padN(nc[data.ticketType]), price: ticketTypeInfo.price, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
-    const updated = [...tickets, newT];
-    setTickets(updated); saveTicketsV4(updated);
-    saveCountersV4(nc);
+    const id = await nextTicketId(data.ticketType, prefix, tickets);
+    const newT = { ...data, id, price: ticketTypeInfo.price, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
+    setTickets([...tickets, newT]);
+    addTicketNode(newT);
     return newT;
   }
   function checkIn(id) {
-    const updated = tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt: new Date().toISOString() } : t);
-    setTickets(updated); saveTicketsV4(updated);
+    const checkedInAt = new Date().toISOString();
+    setTickets(tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t));
+    updateTicketNode(id, { status: "ingresado", checkedInAt });
   }
   function deleteTicket(id) {
-    const updated = tickets.filter(t => t.id !== id);
-    setTickets(updated); saveTicketsV4(updated);
+    setTickets(tickets.filter(t => t.id !== id));
+    removeTicketNode(id);
   }
   const tabs = [{ k: "sell", label: "Vender", e: "🎫" }, { k: "history", label: "Historial", e: "📋" }, { k: "checkin", label: "Check-in", e: "✅" }];
   return (

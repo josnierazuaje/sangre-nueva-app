@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, loadTicketsV4, saveTicketsV4, loadCountersV4, saveCountersV4 } from "./lib/storage.js";
+import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets } from "./lib/storage.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
@@ -32,9 +32,16 @@ export default function App() {
     else if (k === "bm_matchups_v3") setMatchups(val);
     else if (k === "bm_expenses_v3") setExpenses(val);
     else if (k === "bm_tickets_v3") setTickets(val);
-    else if (k === "bm_tickets_v4") setTicketsNew(val);
     else if (k === "bm_event_label") setEventLabel(val);
-    // bm_tc_v4 se lee directo de localStorage al emitir boletas
+    // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
+    // individual, ver migrateTicketsIfNeeded/watchTickets más abajo.
+  }
+
+  // Deja de escuchar el nodo viejo de bm_tickets_v4 vía el sync genérico y,
+  // en su lugar, migra (si hace falta) y escucha los nodos individuales de
+  // boletas para que varios dispositivos vendiendo a la vez no se pisen.
+  function startTicketsSync() {
+    migrateTicketsIfNeeded().then(() => watchTickets(setTicketsNew));
   }
 
   function toggleSync() {
@@ -60,6 +67,7 @@ export default function App() {
     if (initFirebase(cfg, setSync, applyRemote)) {
       localStorage.setItem("bm_fb_config", JSON.stringify(cfg));
       localStorage.removeItem("bm_fb_disabled");
+      startTicketsSync();
     }
   }
 
@@ -76,7 +84,7 @@ export default function App() {
       try {
         onAuthStateChanged(FB.auth, user => {
           setAuthUser(user);
-          if (user) startFirebaseSync(setSync, applyRemote);
+          if (user) { startFirebaseSync(setSync, applyRemote); startTicketsSync(); }
           else setSync("off");
         });
       } catch (e) { setAuthUser(null); setSync("error"); }
@@ -95,7 +103,12 @@ export default function App() {
   // NOTA (Fase 2): ya no restaura atletas de demostración (se eliminaron del
   // código público). Este flujo de "Restaurar" se rediseña por completo en
   // la Fase 5 (respaldo automático + doble confirmación antes de borrar).
-  function resetDemo() { if (!confirm("¿Borrar peleadores, peleas, gastos y ventas de este evento?")) return; setFighters([]); save("bm_fighters_v4", []); setMatchups([]); save("bm_matchups_v3", []); setExpenses([]); save("bm_expenses_v3", []); setTickets([]); save("bm_tickets_v3", []); setTicketsNew([]); saveTicketsV4([]); saveCountersV4({ inscripcion: 0, preventa: 0, puerta: 0 }); }
+  // NOTA (Fase 3): ya no toca las boletas reales (bm_tickets_v4/nodos
+  // sangre_nueva/tickets) — borrarlas de verdad implicaría eliminar cada
+  // nodo en Firebase sin respaldo ni doble confirmación, algo que se
+  // implementa recién en la Fase 5 ("Reiniciar evento"). Hasta entonces,
+  // "Restaurar" solo limpia peleadores/peleas/gastos/boletas v3 (legado).
+  function resetDemo() { if (!confirm("¿Borrar peleadores, peleas y gastos de este evento? (las entradas vendidas no se tocan)")) return; setFighters([]); save("bm_fighters_v4", []); setMatchups([]); save("bm_matchups_v3", []); setExpenses([]); save("bm_expenses_v3", []); setTickets([]); save("bm_tickets_v3", []); }
 
   const nav = (active) => "flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors " + (active ? "text-boxing-goldFight" : "text-boxing-muted active:text-gray-300");
 

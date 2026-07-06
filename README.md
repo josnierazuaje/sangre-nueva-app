@@ -60,6 +60,26 @@ fuentes, íconos) para que la app instalada funcione sin conexión. Las
 fuentes de Google Fonts están auto-hospedadas en `public/fonts/` (no hay
 dependencia de una CDN externa en tiempo de ejecución).
 
+## Sincronización multi-dispositivo (boletas)
+
+Las boletas (`Entradas`) viven en Firebase como nodos individuales
+(`sangre_nueva/tickets/{id}`), no como un arreglo único, para que varios
+dispositivos puedan vender/hacer check-in al mismo tiempo el día del evento
+sin pisarse entre sí. El correlativo de cada boleta (`PRE-0007`, etc.) se
+genera con un contador transaccional (`sangre_nueva/counters/{tipo}`),
+atómico entre dispositivos; si un dispositivo está sin conexión, genera un
+id de emergencia único (marcado con `-X`) en vez de arriesgar un duplicado.
+
+Al conectarse, la app migra automáticamente (una sola vez, de forma
+idempotente) las boletas del arreglo viejo (`bm_tickets_v4`) a esta
+estructura si todavía no se había hecho. El arreglo viejo no se borra —
+queda en Firebase como respaldo de solo lectura.
+
+Peleadores, emparejamientos y el nombre del evento siguen sincronizados
+como un solo bloque (todo el arreglo se sobrescribe en cada cambio). Se
+acepta el riesgo de que dos ediciones simultáneas se pisen porque en la
+práctica los edita una sola persona a la vez.
+
 ## Estructura
 
 ```
