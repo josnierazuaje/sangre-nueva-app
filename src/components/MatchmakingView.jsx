@@ -5,6 +5,10 @@ import { autoMatchAll, sorteoMatch } from "../lib/matchmaking.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
 
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // ============================================
 // MATCHMAKING VIEW
 // ============================================
@@ -17,6 +21,54 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
   function autoM() { const m = autoMatchAll(fighters); setMatchups(m); save("bm_matchups_v3", m); }
   function rmM(id) { const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
   function clearAll() { setMatchups([]); save("bm_matchups_v3", []); }
+  // Abre una ventana con una tabla imprimible (N°/Escuela/Atleta/VS/Atleta/
+  // Escuela/Peso/Nota) y dispara el diálogo de impresión del navegador —
+  // desde ahí se puede imprimir directo o guardar como PDF. La columna
+  // "Nota" queda en blanco para anotar a mano (formato/duración de la
+  // pelea), ya que la app no guarda ese dato hoy.
+  function printSheet() {
+    const rows = matchups.map(m => {
+      const r = fighters.find(f => f.id === m.fighterRedId);
+      const b = fighters.find(f => f.id === m.fighterBlueId);
+      if (!r || !b) return "";
+      return `<tr>
+        <td>${m.roundNumber}</td>
+        <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
+        <td class="atleta atleta-rojo">${escapeHtml(r.fullName)}</td>
+        <td class="vs">-</td>
+        <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
+        <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
+        <td>${r.weightKg}kg / ${b.weightKg}kg</td>
+        <td></td>
+      </tr>`;
+    }).join("");
+    const win = window.open("", "_blank");
+    if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Planilla de peleadores — Sangre Nueva</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;}
+  .header{background:#000;color:#FDE047;text-align:center;padding:16px 0;font-size:24px;font-weight:bold;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border:1px solid #000;padding:6px 8px;text-align:center;}
+  thead th{background:#BFDBFE;}
+  th.roja{background:#FCA5A5;}
+  th.azul{background:#60A5FA;}
+  td.atleta-rojo{background:#FCA5A5;font-weight:bold;}
+  td.atleta-azul{background:#60A5FA;font-weight:bold;}
+  td.esc{font-weight:bold;}
+  @page{size:landscape;margin:12mm;}
+</style></head>
+<body>
+<div class="header">Sangre Nueva — La Velada</div>
+<table>
+<thead><tr><th>N°</th><th>Escuela</th><th class="roja">Atleta</th><th>VS</th><th class="azul">Atleta</th><th>Escuela</th><th>Peso</th><th>Nota</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  }
   function runSorteo() {
     setSorting(true);
     setMatchups([]);
@@ -66,6 +118,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           Auto VS
         </button>
+        {matchups.length > 0 && <button onClick={printSheet} disabled={sorting} className="px-4 py-2.5 bg-black border border-boxing-goldDim text-boxing-goldFight text-sm tracking-widest uppercase">🖨️ Imprimir</button>}
         {matchups.length > 0 && <button onClick={clearAll} disabled={sorting} className="px-4 py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar</button>}
       </div>
 
