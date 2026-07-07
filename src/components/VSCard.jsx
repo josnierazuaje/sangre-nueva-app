@@ -3,7 +3,7 @@ import { getCategoryInfo, getExperienceInfo } from "../constants.js";
 // ============================================
 // VS CARD
 // ============================================
-export default function VSCard({ matchup, fighters, index, onRemove }) {
+export default function VSCard({ matchup, fighters, index, onRemove, onNotaChange }) {
   const r = fighters.find(f => f.id === matchup.fighterRedId); const b = fighters.find(f => f.id === matchup.fighterBlueId);
   if (!r || !b) return null;
   const rc = getCategoryInfo(r.weightCategory); const re = getExperienceInfo(r.experienceLevel); const be = getExperienceInfo(b.experienceLevel);
@@ -40,6 +40,9 @@ export default function VSCard({ matchup, fighters, index, onRemove }) {
         </div>
       </div>
       {warnings.length > 0 && <div className="border-t border-boxing-line px-4 py-2 space-y-1 bg-black/20">{warnings.map((w, i) => <div key={i} className="flex items-center gap-1.5 text-[11px]"><span>{w.severity === "high" ? "\u{1F534}" : w.severity === "medium" ? "\u{1F7E1}" : "\u{1F7E2}"}</span><span className={w.severity === "high" ? "text-red-400" : w.severity === "medium" ? "text-boxing-goldFight" : "text-boxing-muted"}>{w.message}</span></div>)}</div>}
+      {onNotaChange && <div className="border-t border-boxing-line px-4 py-2">
+        <input type="text" value={matchup.nota || ""} onChange={e => onNotaChange(matchup.id, e.target.value)} placeholder="Nota (ej: Super 4, 5 peleas, exhibición...)" maxLength={40} className="w-full bg-transparent text-boxing-cream placeholder-boxing-muted text-xs focus:outline-none" />
+      </div>}
     </div>
   );
 }
