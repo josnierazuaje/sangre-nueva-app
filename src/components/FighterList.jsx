@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { WEIGHT_CATEGORIES, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getInitials } from "../constants.js";
+import { WEIGHT_CATEGORIES, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getAgeCategory, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -49,7 +49,7 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
             <div className="flex flex-wrap gap-1.5 pl-11">
               <Badge color={cat?.color || "#F59E0B"}>{f.weightKg}kg · {cat?.label}</Badge>
               <Badge color={exp?.color}>{f.fightCount}p · {exp?.label}</Badge>
-              <span className="text-[10px] px-2 py-0.5 border border-boxing-lineBright text-boxing-muted tracking-widest uppercase">{f.age}a{f.age < 18 ? " · Jr" : ""}</span>
+              <Badge color={getAgeCategory(f.age).color}>{f.age}a · {getAgeCategory(f.age).label.split(" ")[0]}</Badge>
               <Badge color={(f.sexo || "M") === "F" ? "#EC4899" : "#3B82F6"}>{(f.sexo || "M") === "F" ? "F" : "M"}</Badge>
             </div>
             {f.phone && <div className="text-xs text-boxing-muted pl-11"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, genId } from "../constants.js";
+import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, genId } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -22,6 +22,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
   useEffect(() => () => clearTimeout(addedTimerRef.current), []);
 
   const parsedWeight = parseFloat(weightStr); const weightCategory = !isNaN(parsedWeight) && parsedWeight > 0 ? getWeightCategory(parsedWeight) : null; const categoryInfo = weightCategory ? getCategoryInfo(weightCategory) : null;
+  const parsedAge = parseInt(ageStr); const ageCategoryInfo = !isNaN(parsedAge) && parsedAge > 0 ? getAgeCategory(parsedAge) : null;
   const parsedFightCount = parseInt(fightCountStr) || 0; const experienceLevel = getExperienceLevel(parsedFightCount); const experienceInfo = getExperienceInfo(experienceLevel);
 
   function validate() {
@@ -73,6 +74,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
         <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
       </div>
       {categoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría: </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label}</span></div>}
+      {ageCategoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Edad (FECHIBOX): </span><Badge color={ageCategoryInfo.color}>{ageCategoryInfo.label} · {ageCategoryInfo.formato}</Badge></div>}
       <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gym} onChange={e => setGym(e.target.value)} placeholder="Barrio Franklin" maxLength={60} className={ic} />{errors.gym && <p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
       <div><label className={lbl}>Sexo</label><div className="flex gap-2">
         <button type="button" onClick={() => setSexo("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors " + (sexo === "M" ? "bg-blue-600/15 border-blue-500 text-blue-300" : "bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>

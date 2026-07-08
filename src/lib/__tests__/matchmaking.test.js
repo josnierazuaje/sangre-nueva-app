@@ -50,6 +50,20 @@ describe("getScore / analyzeMatch — filtros de seguridad", () => {
     expect(w.severity).toBe("high");
   });
 
+  it("analyzeMatch marca 'high' entre categorías FECHIBOX vecinas (Escolar 14 vs Cadete 15)", () => {
+    const escolar = makeFighter({ id: "e1", age: 14 });
+    const cadete = makeFighter({ id: "c1", age: 15 });
+    const w = analyzeMatch(escolar, cadete).find(x => x.type === "age");
+    expect(w).toBeTruthy();
+    expect(w.severity).toBe("high");
+  });
+
+  it("analyzeMatch NO marca advertencia de edad dentro de la misma categoría FECHIBOX (13 vs 14)", () => {
+    const f1 = makeFighter({ id: "a", age: 13 });
+    const f2 = makeFighter({ id: "b", age: 14 });
+    expect(analyzeMatch(f1, f2).find(x => x.type === "age")).toBeUndefined();
+  });
+
   it("respeta la tolerancia de peso de la categoría (sin advertencia dentro de tolerancia)", () => {
     // "ligero": tolerancia 3kg
     const f1 = makeFighter({ id: "a", weightKg: 60, weightCategory: "ligero" });
@@ -103,6 +117,36 @@ describe("autoMatchAll — filtro duro de edad y sexo", () => {
     });
   });
 
+  it("nunca mezcla categorías FECHIBOX vecinas (Escolar 14 vs Cadete 15), aunque ambos sean menores", () => {
+    // Antes de la regla FECHIBOX este cruce SÍ se permitía (ambos <18):
+    // mismo peso y experiencia, gimnasios distintos → score alto. Ahora el
+    // filtro duro por categoría de edad debe descartarlo por completo.
+    const fighters = [
+      makeFighter({ id: "e1", age: 14, gym: "Gimnasio A" }),
+      makeFighter({ id: "c1", age: 15, gym: "Gimnasio B" }),
+    ];
+    const matchups = autoMatchAll(fighters);
+    expect(matchups.length).toBe(0);
+  });
+
+  it("nunca mezcla Juvenil (18) con Adulto (19), aunque tengan solo un año de diferencia", () => {
+    const fighters = [
+      makeFighter({ id: "j1", age: 18, gym: "Gimnasio A" }),
+      makeFighter({ id: "a1", age: 19, gym: "Gimnasio B" }),
+    ];
+    const matchups = autoMatchAll(fighters);
+    expect(matchups.length).toBe(0);
+  });
+
+  it("sí empareja dentro de la misma categoría FECHIBOX (dos Cadetes 15 y 16)", () => {
+    const fighters = [
+      makeFighter({ id: "c1", age: 15, gym: "Gimnasio A" }),
+      makeFighter({ id: "c2", age: 16, gym: "Gimnasio B" }),
+    ];
+    const matchups = autoMatchAll(fighters);
+    expect(matchups.length).toBe(1);
+  });
+
   it("evita la misma escuela cuando hay una alternativa disponible en el grupo", () => {
     const fighters = [
       makeFighter({ id: "a", weightKg: 60, gym: "Barrio Franklin" }),
@@ -141,6 +185,16 @@ describe("sorteoMatch — filtro duro de edad y sexo", () => {
       allMatchedPairs(fighters, matchups).forEach(([a, b]) => {
         expect((a.sexo || "M")).toBe(b.sexo || "M");
       });
+    }
+  });
+
+  it("nunca mezcla categorías FECHIBOX en el sorteo (Escolar 14 vs Cadete 15, múltiples corridas)", () => {
+    const fighters = [
+      makeFighter({ id: "e1", age: 14, gym: "Gimnasio A" }),
+      makeFighter({ id: "c1", age: 15, gym: "Gimnasio B" }),
+    ];
+    for (let i = 0; i < 20; i++) {
+      expect(sorteoMatch(fighters).length).toBe(0);
     }
   });
 });
