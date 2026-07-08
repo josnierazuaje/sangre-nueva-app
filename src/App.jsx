@@ -87,7 +87,10 @@ export default function App() {
     }
   }, []);
 
-  function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); } else { u = [...fighters, f]; } setFighters(u); save("bm_fighters_v4", u); setView("list"); }
+  // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
+  // registrando atletas de corrido (la confirmación la muestra el propio
+  // formulario); solo al editar uno existente se vuelve a la lista.
+  function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); } else { u = [...fighters, f]; } setFighters(u); save("bm_fighters_v4", u); }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
   function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); save("bm_fighters_v4", u); }
   function cancel() { setEditF(null); setView("list"); }
