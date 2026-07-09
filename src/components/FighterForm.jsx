@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, guessGenderFromName, genId } from "../constants.js";
+import { normName } from "../lib/dedup.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
 // COMPONENTE: FORMULARIO PELEADOR
 // ============================================
-export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
+export default function FighterForm({ onSubmit, editingFighter, existingFighters = [], onCancel }) {
   const [fullName, setFullName] = useState(editingFighter?.fullName || "");
   const [gym, setGym] = useState(editingFighter?.gym || "");
   const [ageStr, setAgeStr] = useState(editingFighter?.age?.toString() || "");
@@ -51,6 +52,13 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
       const elegido = sexo === "M" ? "MASCULINO" : "FEMENINO";
       const probable = guess === "M" ? "masculino" : "femenino";
       if (!confirm(`¿Deseas agregar a "${name}" como ${elegido}?\n\nEl nombre parece ${probable}. Si el sexo es correcto, continúa; si no, cancela y cámbialo antes de guardar.`)) return;
+    }
+    // Previene crear un duplicado: avisa si ya existe otro peleador con el
+    // mismo nombre + sexo + peso (mismo criterio que la deduplicación
+    // automática). Solo al agregar (no al editar el mismo registro).
+    if (!editingFighter) {
+      const yaExiste = existingFighters.some(x => normName(x.fullName) === normName(name) && (x.sexo || "M") === sexo && x.weightKg === parsedWeight);
+      if (yaExiste && !confirm(`Ya existe un peleador "${name}" con el mismo sexo y peso (${parsedWeight}kg).\n\nSi lo agregas, la app lo tomará como duplicado y lo eliminará automáticamente. ¿Agregar de todos modos?`)) return;
     }
     // El campo de teléfono se quitó del formulario; se conserva el valor ya
     // guardado al editar peleadores antiguos que lo tenían.

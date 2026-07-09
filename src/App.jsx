@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
 import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
+import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
@@ -23,8 +24,17 @@ export default function App() {
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [menuOpen, setMenuOpen] = useState(false);
   const [authUser, setAuthUser] = useState(undefined);
+  // Hidratación de la sincronización: null = aún no se decide el modo;
+  // false = modo solo-local (sin nube); en modo nube, un objeto con qué
+  // claves ya recibieron su primer valor desde Firebase en esta sesión.
+  const [cloudMode, setCloudMode] = useState(null);
+  const [hydrated, setHydrated] = useState({ fighters: false, matchups: false });
   const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
   function logout() { signOut(FB.auth); }
+  function keyReady(k) {
+    if (k === "bm_fighters_v4") setHydrated(h => (h.fighters ? h : { ...h, fighters: true }));
+    else if (k === "bm_matchups_v3") setHydrated(h => (h.matchups ? h : { ...h, matchups: true }));
+  }
 
   function applyRemote(k, val) {
     if (k === "bm_fighters_v4") setFighters(normalizeFighters(val));
@@ -61,7 +71,7 @@ export default function App() {
     if (!t) return;
     const cfg = parseFbConfig(t);
     if (!cfg) { alert("No pude leer la configuración. Copia el bloque completo entre llaves { }."); return; }
-    if (initFirebase(cfg, setSync, applyRemote)) {
+    if (initFirebase(cfg, setSync, applyRemote, keyReady)) {
       localStorage.setItem("bm_fb_config", JSON.stringify(cfg));
       localStorage.removeItem("bm_fb_disabled");
       startTicketsSync();
@@ -76,17 +86,38 @@ export default function App() {
     const disabled = localStorage.getItem("bm_fb_disabled");
     const cfgToUse = raw ? JSON.parse(raw) : (disabled ? null : DEFAULT_FB_CONFIG);
     if (cfgToUse && initFirebaseApp(cfgToUse)) {
+      setCloudMode(true);
       try {
         onAuthStateChanged(FB.auth, user => {
           setAuthUser(user);
-          if (user) { startFirebaseSync(setSync, applyRemote); startTicketsSync(); }
+          if (user) { startFirebaseSync(setSync, applyRemote, keyReady); startTicketsSync(); }
           else setSync("off");
         });
       } catch (e) { setAuthUser(null); setSync("error"); }
     } else {
+      setCloudMode(false);
       setAuthUser(null);
     }
   }, []);
+
+  // Reconciliación automática: detecta y elimina peleadores duplicados
+  // (mismo nombre + sexo + peso, registrados dos veces) y peleas inválidas
+  // o repetidas (la misma persona a ambos lados, parejas duplicadas). Es
+  // idempotente: si ya está todo limpio no escribe nada (no genera bucle).
+  //
+  // SOLO corre cuando el estado ya refleja la nube: en modo nube, después
+  // de que peleadores Y peleas recibieron su primer valor de Firebase en
+  // esta sesión (las claves sincronizan por canales separados sin orden
+  // garantizado — reconciliar sobre un estado parcial podría eliminar al
+  // registro equivocado y propagar el error a todos los dispositivos); en
+  // modo solo-local, corre de inmediato porque lo local es toda la verdad.
+  const reconcileEnabled = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups);
+  useEffect(() => {
+    if (!reconcileEnabled || !fighters.length) return;
+    const { dedupedFighters, cleanedMatchups, fightersChanged, matchupsChanged, removedFighters } = reconcileData(fighters, matchups);
+    if (fightersChanged) { setFighters(dedupedFighters); save("bm_fighters_v4", dedupedFighters); console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es)."); }
+    if (matchupsChanged) { setMatchups(cleanedMatchups); save("bm_matchups_v3", cleanedMatchups); }
+  }, [fighters, matchups, reconcileEnabled]);
 
   // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
   // registrando atletas de corrido (la confirmación la muestra el propio
@@ -184,7 +215,7 @@ export default function App() {
 
       <main style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 16px 80px" }}>
         {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
-        {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} onCancel={editF ? cancel : undefined} />}
+        {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
         {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
         {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
         {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} />}

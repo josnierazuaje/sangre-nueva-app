@@ -50,7 +50,12 @@ export function initFirebaseApp(cfg) {
   return true;
 }
 
-export function startFirebaseSync(onStatus, onRemote) {
+// onKeyReady (opcional) se llama UNA vez por clave cuando el primer valor
+// de esa clave llegó de la nube en esta sesión — sirve para saber cuándo el
+// estado local ya refleja la nube (ej. la reconciliación automática de
+// duplicados espera a que peleadores Y peleas estén hidratados, porque las
+// claves sincronizan por canales separados y sin orden garantizado).
+export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
   if (FB.ready) return;
   onStatus("connecting");
   FB.ready = true; onStatus("on");
@@ -62,24 +67,27 @@ export function startFirebaseSync(onStatus, onRemote) {
         const localRaw = localStorage.getItem(k);
         if (localRaw) { try { set(nodeRef, JSON.parse(localRaw)); } catch (e) { console.error("No se pudo subir " + k + " a Firebase en la primera conexión:", e); } }
       }
+      let first = true;
       onValue(nodeRef, s => {
         const val = s.val();
         const remote = (val === null || val === undefined) ? SYNC_KEYS[k] : val;
         const remoteRaw = JSON.stringify(remote);
-        if (localStorage.getItem(k) === remoteRaw) return; // ya estamos al dia (o fue nuestro propio cambio)
-        localStorage.setItem(k, remoteRaw);
-        onRemote(k, remote);
+        if (localStorage.getItem(k) !== remoteRaw) { // distinto: aplica el cambio remoto
+          localStorage.setItem(k, remoteRaw);
+          onRemote(k, remote);
+        }
+        if (first) { first = false; onKeyReady?.(k); }
       });
     });
   });
 }
 
-export function initFirebase(cfg, onStatus, onRemote) {
+export function initFirebase(cfg, onStatus, onRemote, onKeyReady) {
   try {
     if (!cfg || !cfg.apiKey) { onStatus("error"); alert("Configuración inválida. Pega el bloque firebaseConfig completo."); return false; }
     if (!cfg.databaseURL) { onStatus("error"); alert("A tu configuración le falta databaseURL.\n\nEn la consola de Firebase crea la Realtime Database (parte C de la guía) y vuelve a copiar la config — debe incluir la línea databaseURL."); return false; }
     if (!initFirebaseApp(cfg)) { onStatus("error"); return false; }
-    if (FB.auth.currentUser) startFirebaseSync(onStatus, onRemote);
+    if (FB.auth.currentUser) startFirebaseSync(onStatus, onRemote, onKeyReady);
     else onStatus("off");
     return true;
   } catch (e) { onStatus("error"); alert("Error al conectar con Firebase: " + e.message); return false; }
