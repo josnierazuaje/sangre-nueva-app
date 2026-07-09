@@ -17,6 +17,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
   const [addedName, setAddedName] = useState(null);
   const addedTimerRef = useRef(null);
   const formRef = useRef(null);
+  const nameRef = useRef(null);
 
   useEffect(() => { if (editingFighter) { setFullName(editingFighter.fullName || ""); setGym(editingFighter.gym || ""); setAgeStr(editingFighter.age?.toString() || ""); setWeightStr(editingFighter.weightKg?.toString() || ""); setFightCountStr(editingFighter.fightCount?.toString() || "0"); setNotes(editingFighter.notes || ""); setSexo(editingFighter.sexo || "M"); setErrors({}); } }, [editingFighter]);
   useEffect(() => () => clearTimeout(addedTimerRef.current), []);
@@ -53,6 +54,9 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
       // El scroll vive en el <main> de la app (no en window), así que se
       // sube al inicio del formulario para que la confirmación quede visible.
       formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      // Deja el cursor listo en "Nombre" para seguir agregando peleadores
+      // sin tener que tocar el campo de nuevo.
+      nameRef.current?.focus();
     }
   }
 
@@ -68,7 +72,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
         <span className="text-green-400 text-lg">✓</span>
         <span className="text-green-400 text-sm font-semibold">{addedName} fue agregado correctamente a la cartelera</span>
       </div>}
-      <div><label className={lbl}>Nombre</label><input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
+      <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e => setWeightStr(e.target.value)} placeholder="65" step="0.1" className={ic} />{errors.weightStr && <p className="text-red-400 text-xs mt-1">{errors.weightStr}</p>}</div>
         <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
