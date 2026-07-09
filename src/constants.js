@@ -99,6 +99,41 @@ export function getWeightCategory(kg, sexo) {
 export function normalizeFighters(arr) {
   return (arr || []).map(f => ({ ...f, weightCategory: getWeightCategory(f.weightKg, f.sexo) }));
 }
+// Adivina el sexo probable a partir del primer nombre para advertir errores
+// de transcripción (ej. seleccionar Masculino en un nombre femenino).
+// Devuelve "M", "F" o null (desconocido/ambiguo → no se advierte). Es una
+// heurística: listas de excepciones frecuentes en Chile/Latinoamérica + la
+// regla general de terminación (-a femenino, -o masculino).
+const NAME_F = new Set([
+  // Terminan en consonante/e/i/y pero son femeninos (no los pilla la regla -a)
+  "isabel", "raquel", "beatriz", "carmen", "mercedes", "dolores", "soledad",
+  "rocio", "pilar", "ruth", "nieves", "ester", "esther", "nicol", "nicole",
+  "michelle", "michel", "jazmin", "jasmin", "yazmin", "karen", "karin",
+  "ninoska", "abigail", "genesis", "britany", "britney", "estefany", "estefani",
+  "jocelyn", "jaqueline", "jacqueline", "evelyn", "katherine", "kathy", "ashley",
+  "scarlett", "thais", "lilibeth", "elizabeth", "maribel", "marisol", "yolanda",
+  "noemi", "yamilet", "yamileth", "belen", "maylin", "ivon", "yvonne", "leidy",
+  // Terminan en -o pero son femeninos
+  "consuelo", "rosario", "amparo", "socorro",
+]);
+const NAME_M = new Set([
+  // Terminan en -a pero son masculinos (excepciones a la regla)
+  "jhosua", "josua", "joshua", "iosua", "bautista", "luca", "nicola", "elia",
+  "kenia", "aldair", "adonai",
+  // (nombres masculinos frecuentes que igual la regla general no clasifica bien)
+]);
+export function guessGenderFromName(fullName) {
+  const first = (fullName || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .split(/\s+/)[0];
+  if (!first || first.length < 2) return null;
+  if (NAME_F.has(first)) return "F";
+  if (NAME_M.has(first)) return "M";
+  const last = first.slice(-1);
+  if (last === "a") return "F";
+  if (last === "o") return "M";
+  return null;
+}
 export function getExperienceLevel(f) { if (f === 0) return "debutante"; if (f <= 3) return "principiante"; if (f <= 10) return "amateur"; return "profesional"; }
 export function getCategoryInfo(k) { return WEIGHT_CATEGORIES.find(c => c.key === k); }
 export function getExperienceInfo(k) { return EXPERIENCE_LEVELS.find(e => e.key === k); }

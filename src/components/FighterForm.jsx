@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, genId } from "../constants.js";
+import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, guessGenderFromName, genId } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -43,6 +43,15 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
   function submit(e) {
     e.preventDefault(); if (!validate()) return;
     const name = fullName.trim().replace(/\s+/g, " ");
+    // Advierte si el sexo seleccionado no coincide con el que sugiere el
+    // nombre (posible olvido al no cambiar el toggle). Es solo un aviso:
+    // se puede continuar si el sexo es correcto.
+    const guess = guessGenderFromName(name);
+    if (guess && guess !== sexo) {
+      const elegido = sexo === "M" ? "MASCULINO" : "FEMENINO";
+      const probable = guess === "M" ? "masculino" : "femenino";
+      if (!confirm(`¿Deseas agregar a "${name}" como ${elegido}?\n\nEl nombre parece ${probable}. Si el sexo es correcto, continúa; si no, cancela y cámbialo antes de guardar.`)) return;
+    }
     // El campo de teléfono se quitó del formulario; se conserva el valor ya
     // guardado al editar peleadores antiguos que lo tenían.
     onSubmit({ id: editingFighter?.id || genId(), fullName: name, phone: editingFighter?.phone || "", sexo, gym: gym.trim().replace(/\s+/g, " "), age: parseInt(ageStr), weightKg: parsedWeight, weightCategory, experienceLevel, fightCount: parsedFightCount, createdAt: editingFighter?.createdAt || new Date().toISOString(), notes: notes.trim() || undefined });
