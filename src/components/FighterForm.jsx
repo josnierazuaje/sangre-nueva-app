@@ -86,7 +86,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
         <button type="button" onClick={() => setSexo("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors " + (sexo === "M" ? "bg-blue-600/15 border-blue-500 text-blue-300" : "bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>
         <button type="button" onClick={() => setSexo("F")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors " + (sexo === "F" ? "bg-pink-600/15 border-pink-500 text-pink-300" : "bg-black border-boxing-lineBright text-boxing-muted")}>Femenino</button>
       </div></div>
-      <div><label className={lbl}>Notas</label><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Exhibición" rows={2} className={ic + " resize-none"} /></div>
+      <div><label className={lbl}>Notas</label><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Oficial" rows={2} className={ic + " resize-none"} /></div>
       <div className="flex gap-3 pt-2"><button type="submit" className="flex-1 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream py-3.5 transition-colors active:scale-[0.98]" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "20px", letterSpacing: "0.1em" }}>{editingFighter ? "Guardar" : "Añadir a Grilla"}</button>{editingFighter && onCancel && <button type="button" onClick={onCancel} className="px-4 py-3.5 bg-black border border-boxing-lineBright text-boxing-muted tracking-widest uppercase text-sm">Cancelar</button>}</div>
     </form>
   );
