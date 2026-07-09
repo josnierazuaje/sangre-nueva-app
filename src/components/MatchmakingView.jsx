@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { getCategoryInfo, getExperienceInfo } from "../constants.js";
+import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
 import { save } from "../lib/storage.js";
 import { autoMatchAll, sorteoMatch } from "../lib/matchmaking.js";
 import Badge from "./Badge.jsx";
@@ -18,36 +18,68 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
   const [sortCount, setSortCount] = useState(0);
   const matched = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
   const unmatched = fighters.filter(f => !matched.has(f.id));
+  // Los emparejamientos guardados traen sus advertencias congeladas al
+  // momento de crearse; esta verificación se calcula en vivo para detectar
+  // cruces de categorías de edad FECHIBOX en VS armados antes de la regla
+  // (o si a un peleador le editaron la edad después de emparejarlo).
+  const fechiboxViolations = useMemo(() => matchups.map(m => {
+    const r = fighters.find(f => f.id === m.fighterRedId);
+    const b = fighters.find(f => f.id === m.fighterBlueId);
+    if (!r || !b) return null;
+    const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
+    if (c1.key === c2.key) return null;
+    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${c1.label}, ${r.age}a) vs ${b.fullName} (${c2.label}, ${b.age}a)` };
+  }).filter(Boolean), [matchups, fighters]);
   function autoM() { const m = autoMatchAll(fighters); setMatchups(m); save("bm_matchups_v3", m); }
   function rmM(id) { const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
   function clearAll() { setMatchups([]); save("bm_matchups_v3", []); }
   function notaChange(id, nota) { const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
   // Abre una ventana con una tabla imprimible (N°/Escuela/Atleta/VS/Atleta/
   // Escuela/Peso/Nota) y dispara el diálogo de impresión del navegador —
-  // desde ahí se puede imprimir directo o guardar como PDF. Se ordena de
-  // más liviano a más pesado (independiente del orden "Pelea N" en pantalla).
+  // desde ahí se puede imprimir directo o guardar como PDF. Las peleas se
+  // agrupan por categoría de edad FECHIBOX (con su formato de rounds en el
+  // encabezado de cada bloque) y dentro de cada bloque van de más liviano
+  // a más pesado. La numeración se reinicia por bloque, como en la planilla
+  // de Excel que usan los jueces.
   function printSheet() {
-    const sorted = [...matchups].sort((m1, m2) => {
-      const r1 = fighters.find(f => f.id === m1.fighterRedId), b1 = fighters.find(f => f.id === m1.fighterBlueId);
-      const r2 = fighters.find(f => f.id === m2.fighterRedId), b2 = fighters.find(f => f.id === m2.fighterBlueId);
-      const avg1 = r1 && b1 ? (r1.weightKg + b1.weightKg) / 2 : 0;
-      const avg2 = r2 && b2 ? (r2.weightKg + b2.weightKg) / 2 : 0;
-      return avg1 - avg2;
+    const AGE_GROUP_ORDER = ["escolar", "cadete", "juvenil", "adulto", "infantil", "veterano", "mixta"];
+    const withData = matchups
+      .map(m => ({ m, r: fighters.find(f => f.id === m.fighterRedId), b: fighters.find(f => f.id === m.fighterBlueId) }))
+      .filter(x => x.r && x.b);
+    const groups = {};
+    withData.forEach(x => {
+      const c1 = getAgeCategory(x.r.age), c2 = getAgeCategory(x.b.age);
+      // Un cruce de categorías distintas (prohibido por FECHIBOX) se agrupa
+      // aparte y bien visible para que los jueces lo detecten de inmediato.
+      const key = c1.key === c2.key ? c1.key : "mixta";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(x);
     });
-    const rows = sorted.map((m, i) => {
-      const r = fighters.find(f => f.id === m.fighterRedId);
-      const b = fighters.find(f => f.id === m.fighterBlueId);
-      if (!r || !b) return "";
-      return `<tr>
-        <td>${i + 1}</td>
-        <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
-        <td class="atleta atleta-rojo">${escapeHtml(r.fullName)}</td>
-        <td class="vs">-</td>
-        <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
-        <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
-        <td>${r.weightKg}kg / ${b.weightKg}kg</td>
-        <td>${escapeHtml(m.nota || "")}</td>
-      </tr>`;
+    const rows = AGE_GROUP_ORDER.filter(k => groups[k]).map(k => {
+      const list = groups[k].sort((x1, x2) => (x1.r.weightKg + x1.b.weightKg) - (x2.r.weightKg + x2.b.weightKg));
+      const cat = k === "mixta" ? null : getAgeCategory(list[0].r.age);
+      const headerText = cat
+        ? `${cat.label} · ${cat.formato}`.toUpperCase()
+        : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (FECHIBOX NO PERMITE ESTE CRUCE)";
+      const headerRow = `<tr><td colspan="8" class="${k === "mixta" ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
+      const groupRows = list.map((x, i) => {
+        const { m, r, b } = x;
+        const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
+        const pesoDetalle = c1.key === c2.key
+          ? `${c1.label} · ${c1.formato}`
+          : `${c1.label} vs ${c2.label}`;
+        return `<tr>
+          <td>${i + 1}</td>
+          <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
+          <td class="atleta atleta-rojo">${escapeHtml(r.fullName)}</td>
+          <td class="vs">-</td>
+          <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
+          <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
+          <td>${r.weightKg}kg / ${b.weightKg}kg<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
+          <td>${escapeHtml(m.nota || "")}</td>
+        </tr>`;
+      }).join("");
+      return headerRow + groupRows;
     }).join("");
     const win = window.open("", "_blank");
     if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
@@ -63,6 +95,9 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
   td.atleta-rojo{background:#FCA5A5;font-weight:bold;}
   td.atleta-azul{background:#60A5FA;font-weight:bold;}
   td.esc{font-weight:bold;}
+  td.grupo{background:#E5E7EB;font-weight:bold;font-size:14px;padding:8px;letter-spacing:1px;}
+  td.grupo-alerta{background:#FEE2E2;color:#B91C1C;}
+  .peso-detalle{font-size:10px;color:#374151;font-weight:normal;margin-top:2px;}
   @page{size:landscape;margin:12mm;}
 </style></head>
 <body>
@@ -103,6 +138,13 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
         </h2>
         <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>
       </div>
+
+      {/* Aviso de cruces de categoría de edad FECHIBOX en VS ya guardados */}
+      {fechiboxViolations.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
+        <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {fechiboxViolations.length} pelea{fechiboxViolations.length !== 1 ? "s" : ""} mezcla{fechiboxViolations.length !== 1 ? "n" : ""} categorías de edad — FECHIBOX no lo permite</p>
+        <div className="space-y-1">{fechiboxViolations.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
+      </div>}
 
       {/* Botón Sorteo destacado */}
       <button onClick={runSorteo} disabled={sorting} className={"w-full py-4 font-black text-lg tracking-widest flex items-center justify-center gap-3 transition-all " + (sorting ? "bg-boxing-crimson/60 border border-red-500/50 text-red-300 cursor-not-allowed" : "bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream border border-red-500/30 active:scale-95")} style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
