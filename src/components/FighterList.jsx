@@ -2,6 +2,10 @@ import { useState, useMemo } from "react";
 import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
 
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // ============================================
 // COMPONENTE: LISTA PELEADORES
 // ============================================
@@ -25,6 +29,64 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, matchedIds]);
   const stats = useMemo(() => { const e = {}; fighters.forEach(f => { e[f.experienceLevel] = (e[f.experienceLevel] || 0) + 1; }); return e; }, [fighters]);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
+
+  // Imprime exactamente la lista que se está viendo (respeta el filtro de
+  // Faltante, la búsqueda, la categoría, el nivel y el orden activos), con
+  // los datos útiles para buscarle rival a cada uno: división de peso,
+  // categoría de edad FECHIBOX, nivel de experiencia y escuela. El
+  // subtítulo deja claro qué filtro estaba activo al imprimir.
+  function printList() {
+    const filtros = [];
+    if (showFaltantes) filtros.push("FALTANTES (sin rival asignado en el VS)");
+    if (categoryFilter !== "all") { const c = getCategoryInfo(categoryFilter); if (c) filtros.push(`División: ${c.label} ${weightRangeLabel(c)} (${c.genero === "F" ? "Mujeres" : "Hombres"})`); }
+    if (experienceFilter !== "all") { const e = getExperienceInfo(experienceFilter); if (e) filtros.push(`Nivel: ${e.label}`); }
+    if (searchQuery.trim()) filtros.push(`Búsqueda: "${searchQuery.trim()}"`);
+    const subtitulo = (filtros.length ? filtros.join(" · ") : "Todos los peleadores") + ` — ${filtered.length} peleador${filtered.length !== 1 ? "es" : ""}`;
+    const rows = filtered.map((f, i) => {
+      const cat = getCategoryInfo(f.weightCategory);
+      const ac = getAgeCategory(f.age);
+      const exp = getExperienceInfo(f.experienceLevel);
+      return `<tr>
+        <td>${i + 1}</td>
+        <td class="nombre">${escapeHtml(f.fullName)}</td>
+        <td>${(f.sexo || "M") === "F" ? "F" : "M"}</td>
+        <td>${f.weightKg}kg<div class="detalle">${escapeHtml(cat ? cat.label + " · " + weightRangeLabel(cat) : "")}</div></td>
+        <td>${f.age}a<div class="detalle">${escapeHtml(ac.label)}</div></td>
+        <td>${f.fightCount}p<div class="detalle">${escapeHtml(exp ? exp.label : "")}</div></td>
+        <td class="esc">${escapeHtml(f.gym)}</td>
+        <td class="rival"></td>
+      </tr>`;
+    }).join("");
+    const win = window.open("", "_blank");
+    if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Peleadores — Sangre Nueva</title>
+<style>
+  /* Forzar impresión de los colores de fondo (sin esto el PDF sale sin color). */
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;}
+  .header{background:#000;color:#FDE047;text-align:center;padding:14px 0;font-size:22px;font-weight:bold;}
+  .subtitulo{background:#FED7AA;text-align:center;padding:8px;font-size:14px;font-weight:bold;border:1px solid #000;border-top:none;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border:1px solid #000;padding:6px 8px;text-align:center;}
+  thead th{background:#BFDBFE;}
+  td.nombre{font-weight:bold;text-align:left;}
+  td.esc{text-align:left;}
+  td.rival{min-width:130px;}
+  .detalle{font-size:10px;color:#374151;margin-top:2px;}
+  @page{size:landscape;margin:12mm;}
+</style></head>
+<body>
+<div class="header">Sangre Nueva — La Velada · Peleadores</div>
+<div class="subtitulo">${escapeHtml(subtitulo)}</div>
+<table>
+<thead><tr><th>N°</th><th>Nombre</th><th>Sexo</th><th>Peso</th><th>Edad</th><th>Peleas</th><th>Escuela</th><th>Rival propuesto</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  }
 
   if (!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
   return (
@@ -54,6 +116,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
           <optgroup label="Mujeres">{WEIGHT_CATEGORIES_F.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
+        <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="px-3 py-2 bg-black border border-boxing-goldDim text-boxing-goldFight text-sm transition-colors hover:bg-boxing-goldDim/10">🖨️</button>
       </div>
       <div className="space-y-2">
         {!filtered.length ? <p className="text-boxing-muted text-center py-8 text-sm">Sin resultados</p> : filtered.map(f => {
