@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { WEIGHT_CATEGORIES, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getAgeCategory, getInitials } from "../constants.js";
+import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -33,7 +33,11 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
       </div>
       <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors" />
       <div className="flex gap-2">
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="all">Todas categorías</option>{WEIGHT_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors">
+          <option value="all">Todas categorías</option>
+          <optgroup label="Hombres">{WEIGHT_CATEGORIES_M.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
+          <optgroup label="Mujeres">{WEIGHT_CATEGORIES_F.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
+        </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
       </div>
       <div className="space-y-2">

@@ -1,18 +1,40 @@
 // ============================================
 // CONSTANTES
 // ============================================
-export const WEIGHT_CATEGORIES = [
-  { key: "mosca", label: "Mosca", maxWeight: 50.8, tolerance: 2, color: "#10B981" },
-  { key: "gallo", label: "Gallo", maxWeight: 53.5, tolerance: 2, color: "#14B8A6" },
-  { key: "pluma", label: "Pluma", maxWeight: 57.2, tolerance: 2.5, color: "#06B6D4" },
-  { key: "ligero", label: "Ligero", maxWeight: 61.2, tolerance: 3, color: "#3B82F6" },
-  { key: "superligero", label: "Superligero", maxWeight: 63.5, tolerance: 3, color: "#6366F1" },
-  { key: "welter", label: "Wélter", maxWeight: 66.7, tolerance: 3, color: "#8B5CF6" },
-  { key: "supermediano", label: "Supermediano", maxWeight: 72.6, tolerance: 3, color: "#A855F7" },
-  { key: "mediano", label: "Mediano", maxWeight: 76.2, tolerance: 3, color: "#EC4899" },
-  { key: "semipesado", label: "Semipesado", maxWeight: 79.4, tolerance: 3.5, color: "#F97316" },
-  { key: "pesado", label: "Pesado", maxWeight: Infinity, tolerance: 5, color: "#EF4444" },
+// Categorías de peso oficiales World Boxing (competiciones generales,
+// vigentes 2026): 10 divisiones por género, distintas entre hombres y
+// mujeres. Todo atleta cae dentro de una división de su género: por debajo
+// del mínimo oficial se le asigna la más liviana, y las últimas son
+// abiertas hacia arriba (+90 kg hombres, +80 kg mujeres).
+export const WEIGHT_CATEGORIES_M = [
+  { key: "m_mosca", label: "Mosca", minWeight: 47, maxWeight: 50, tolerance: 2, color: "#10B981", genero: "M" },
+  { key: "m_gallo", label: "Gallo", minWeight: 50, maxWeight: 55, tolerance: 2, color: "#14B8A6", genero: "M" },
+  { key: "m_ligero", label: "Ligero", minWeight: 55, maxWeight: 60, tolerance: 3, color: "#06B6D4", genero: "M" },
+  { key: "m_welter", label: "Wélter", minWeight: 60, maxWeight: 65, tolerance: 3, color: "#3B82F6", genero: "M" },
+  { key: "m_superwelter", label: "Superwélter", minWeight: 65, maxWeight: 70, tolerance: 3, color: "#6366F1", genero: "M" },
+  { key: "m_mediano", label: "Mediano", minWeight: 70, maxWeight: 75, tolerance: 3, color: "#8B5CF6", genero: "M" },
+  { key: "m_mediopesado", label: "Mediopesado", minWeight: 75, maxWeight: 80, tolerance: 3.5, color: "#A855F7", genero: "M" },
+  { key: "m_crucero", label: "Crucero", minWeight: 80, maxWeight: 85, tolerance: 4, color: "#EC4899", genero: "M" },
+  { key: "m_pesado", label: "Pesado", minWeight: 85, maxWeight: 90, tolerance: 4, color: "#F97316", genero: "M" },
+  { key: "m_superpesado", label: "Superpesado", minWeight: 90, maxWeight: Infinity, tolerance: 5, color: "#EF4444", genero: "M" },
 ];
+export const WEIGHT_CATEGORIES_F = [
+  { key: "f_minimosca", label: "Minimosca", minWeight: 45, maxWeight: 48, tolerance: 2, color: "#10B981", genero: "F" },
+  { key: "f_mosca", label: "Mosca", minWeight: 48, maxWeight: 51, tolerance: 2, color: "#14B8A6", genero: "F" },
+  { key: "f_gallo", label: "Gallo", minWeight: 51, maxWeight: 54, tolerance: 2, color: "#06B6D4", genero: "F" },
+  { key: "f_pluma", label: "Pluma", minWeight: 54, maxWeight: 57, tolerance: 2.5, color: "#22D3EE", genero: "F" },
+  { key: "f_ligero", label: "Ligero", minWeight: 57, maxWeight: 60, tolerance: 3, color: "#3B82F6", genero: "F" },
+  { key: "f_welter", label: "Wélter", minWeight: 60, maxWeight: 65, tolerance: 3, color: "#6366F1", genero: "F" },
+  { key: "f_superwelter", label: "Superwélter", minWeight: 65, maxWeight: 70, tolerance: 3, color: "#8B5CF6", genero: "F" },
+  { key: "f_mediano", label: "Mediano", minWeight: 70, maxWeight: 75, tolerance: 3, color: "#A855F7", genero: "F" },
+  { key: "f_mediopesado", label: "Mediopesado", minWeight: 75, maxWeight: 80, tolerance: 3.5, color: "#EC4899", genero: "F" },
+  { key: "f_pesado", label: "Pesado", minWeight: 80, maxWeight: Infinity, tolerance: 5, color: "#EF4444", genero: "F" },
+];
+export const WEIGHT_CATEGORIES = [...WEIGHT_CATEGORIES_M, ...WEIGHT_CATEGORIES_F];
+// Rango legible de una división, ej. "60-65kg" o "+90kg".
+export function weightRangeLabel(c) {
+  return c.maxWeight === Infinity ? `+${c.minWeight}kg` : `${c.minWeight}-${c.maxWeight}kg`;
+}
 // Rangos de edad oficiales FECHIBOX (Federación Chilena de Boxeo): las
 // categorías NO se pueden mezclar en competencia. La normativa define la
 // categoría por la edad que se cumple al 31 de diciembre del año en curso;
@@ -65,7 +87,18 @@ export const PAYMENT_METHODS_V2 = ["Efectivo", "Transferencia", "Otro"];
 export const MAX_CAP = 320;
 
 // Helpers
-export function getWeightCategory(kg) { for (const c of WEIGHT_CATEGORIES) { if (kg <= c.maxWeight) return c.key; } return "pesado"; }
+export function getWeightCategory(kg, sexo) {
+  const list = (sexo || "M") === "F" ? WEIGHT_CATEGORIES_F : WEIGHT_CATEGORIES_M;
+  for (const c of list) { if (kg <= c.maxWeight) return c.key; }
+  return list[list.length - 1].key;
+}
+// Recalcula la división oficial de cada peleador a partir de su peso y
+// género. Se aplica al cargar/sincronizar porque los peleadores guardados
+// antes del cambio a las categorías World Boxing traen claves antiguas
+// (ej. "superligero") que ya no existen.
+export function normalizeFighters(arr) {
+  return (arr || []).map(f => ({ ...f, weightCategory: getWeightCategory(f.weightKg, f.sexo) }));
+}
 export function getExperienceLevel(f) { if (f === 0) return "debutante"; if (f <= 3) return "principiante"; if (f <= 10) return "amateur"; return "profesional"; }
 export function getCategoryInfo(k) { return WEIGHT_CATEGORIES.find(c => c.key === k); }
 export function getExperienceInfo(k) { return EXPERIENCE_LEVELS.find(e => e.key === k); }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
 import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
+import { normalizeFighters } from "./constants.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
@@ -26,7 +27,7 @@ export default function App() {
   function logout() { signOut(FB.auth); }
 
   function applyRemote(k, val) {
-    if (k === "bm_fighters_v4") setFighters(val);
+    if (k === "bm_fighters_v4") setFighters(normalizeFighters(val));
     else if (k === "bm_matchups_v3") setMatchups(val);
     else if (k === "bm_event_label") setEventLabel(val);
     // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
@@ -68,7 +69,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    setFighters(loadFighters());
+    setFighters(normalizeFighters(loadFighters()));
     setMatchups(load("bm_matchups_v3", []));
     setTicketsNew(loadTicketsV4());
     const raw = localStorage.getItem("bm_fb_config");
@@ -99,7 +100,7 @@ export default function App() {
   // antes de la Fase 5 el export manual no incluía las boletas reales, con
   // lo cual no servía como respaldo de ellas.
   function handleExport() { const d = { fighters, matchups, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { setFighters(d.fighters); save("bm_fighters_v4", d.fighters); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda

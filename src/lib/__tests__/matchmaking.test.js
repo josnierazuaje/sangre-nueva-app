@@ -1,18 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { analyzeMatch, getScore, autoMatchAll, sorteoMatch } from "../matchmaking.js";
+import { getWeightCategory, getCategoryInfo } from "../../constants.js";
 
 function makeFighter(overrides) {
+  const weightKg = overrides.weightKg ?? 60;
+  const sexo = overrides.sexo || "M";
   return {
     id: overrides.id,
     fullName: overrides.fullName || overrides.id,
     phone: "",
     gym: overrides.gym || "Gimnasio A",
     age: overrides.age ?? 25,
-    weightKg: overrides.weightKg ?? 60,
-    weightCategory: overrides.weightCategory || "ligero",
+    weightKg,
+    weightCategory: getWeightCategory(weightKg, sexo),
     experienceLevel: overrides.experienceLevel || "principiante",
     fightCount: overrides.fightCount ?? 2,
-    sexo: overrides.sexo || "M",
+    sexo,
     createdAt: new Date(2026, 0, 1).toISOString(),
     ...overrides,
   };
@@ -64,26 +67,56 @@ describe("getScore / analyzeMatch — filtros de seguridad", () => {
     expect(analyzeMatch(f1, f2).find(x => x.type === "age")).toBeUndefined();
   });
 
-  it("respeta la tolerancia de peso de la categoría (sin advertencia dentro de tolerancia)", () => {
-    // "ligero": tolerancia 3kg
-    const f1 = makeFighter({ id: "a", weightKg: 60, weightCategory: "ligero" });
-    const f2 = makeFighter({ id: "b", weightKg: 62, weightCategory: "ligero" });
+  it("respeta la tolerancia de peso de la división (sin advertencia dentro de tolerancia)", () => {
+    // Wélter hombres (60-65kg): tolerancia 3kg
+    const f1 = makeFighter({ id: "a", weightKg: 61 });
+    const f2 = makeFighter({ id: "b", weightKg: 63 });
     const warnings = analyzeMatch(f1, f2);
     expect(warnings.find(w => w.type === "weight")).toBeUndefined();
   });
 
   it("marca severidad 'medium' cuando la diferencia de peso supera la tolerancia pero no el doble", () => {
-    const f1 = makeFighter({ id: "a", weightKg: 60, weightCategory: "ligero" });
-    const f2 = makeFighter({ id: "b", weightKg: 64, weightCategory: "ligero" }); // Δ4, tol 3, 2×tol=6
+    const f1 = makeFighter({ id: "a", weightKg: 61 }); // Wélter H (60-65), tol 3
+    const f2 = makeFighter({ id: "b", weightKg: 65 }); // Δ4, 2×tol=6
     const w = analyzeMatch(f1, f2).find(x => x.type === "weight");
     expect(w.severity).toBe("medium");
   });
 
   it("marca severidad 'high' cuando la diferencia de peso excede el doble de la tolerancia", () => {
-    const f1 = makeFighter({ id: "a", weightKg: 60, weightCategory: "ligero" });
-    const f2 = makeFighter({ id: "b", weightKg: 67, weightCategory: "ligero" }); // Δ7 > 2×tol(6)
+    // Superpesado hombres (+90kg, división abierta): tolerancia 5kg
+    const f1 = makeFighter({ id: "a", weightKg: 92 });
+    const f2 = makeFighter({ id: "b", weightKg: 104 }); // Δ12 > 2×tol(10)
     const w = analyzeMatch(f1, f2).find(x => x.type === "weight");
     expect(w.severity).toBe("high");
+  });
+
+  it("marca 'high' cuando los atletas caen en divisiones World Boxing distintas", () => {
+    const f1 = makeFighter({ id: "a", weightKg: 58 }); // Ligero H (55-60)
+    const f2 = makeFighter({ id: "b", weightKg: 62 }); // Wélter H (60-65)
+    const w = analyzeMatch(f1, f2).find(x => x.type === "weight");
+    expect(w.severity).toBe("high");
+    expect(w.message).toContain("Categorías distintas");
+  });
+});
+
+describe("getWeightCategory — divisiones oficiales World Boxing por género", () => {
+  it("asigna divisiones distintas según el género con el mismo peso (83kg)", () => {
+    expect(getCategoryInfo(getWeightCategory(83, "M")).label).toBe("Crucero"); // 80-85 H
+    expect(getCategoryInfo(getWeightCategory(83, "F")).label).toBe("Pesado"); // +80 M
+  });
+
+  it("asigna la división más liviana cuando el peso está bajo el mínimo oficial", () => {
+    expect(getCategoryInfo(getWeightCategory(46, "M")).label).toBe("Mosca"); // mínimo H: 47
+    expect(getCategoryInfo(getWeightCategory(44, "F")).label).toBe("Minimosca"); // mínimo M: 45
+  });
+
+  it("asigna la división abierta por encima del máximo", () => {
+    expect(getCategoryInfo(getWeightCategory(97, "M")).label).toBe("Superpesado"); // +90 H
+    expect(getCategoryInfo(getWeightCategory(85, "F")).label).toBe("Pesado"); // +80 M
+  });
+
+  it("sin sexo definido asume masculino (compatibilidad con datos antiguos)", () => {
+    expect(getWeightCategory(58)).toBe(getWeightCategory(58, "M"));
   });
 });
 
@@ -148,10 +181,11 @@ describe("autoMatchAll — filtro duro de edad y sexo", () => {
   });
 
   it("evita la misma escuela cuando hay una alternativa disponible en el grupo", () => {
+    // Los tres en Wélter hombres (60-65kg) para que compartan grupo.
     const fighters = [
-      makeFighter({ id: "a", weightKg: 60, gym: "Barrio Franklin" }),
-      makeFighter({ id: "b", weightKg: 61, gym: "Barrio Franklin" }),
-      makeFighter({ id: "c", weightKg: 62, gym: "Otro Gimnasio" }),
+      makeFighter({ id: "a", weightKg: 61, gym: "Barrio Franklin" }),
+      makeFighter({ id: "b", weightKg: 62, gym: "Barrio Franklin" }),
+      makeFighter({ id: "c", weightKg: 63, gym: "Otro Gimnasio" }),
     ];
     const matchups = autoMatchAll(fighters);
     expect(matchups.length).toBe(1);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, genId } from "../constants.js";
+import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, genId } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -21,7 +21,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
   useEffect(() => { if (editingFighter) { setFullName(editingFighter.fullName || ""); setGym(editingFighter.gym || ""); setAgeStr(editingFighter.age?.toString() || ""); setWeightStr(editingFighter.weightKg?.toString() || ""); setFightCountStr(editingFighter.fightCount?.toString() || "0"); setNotes(editingFighter.notes || ""); setSexo(editingFighter.sexo || "M"); setErrors({}); } }, [editingFighter]);
   useEffect(() => () => clearTimeout(addedTimerRef.current), []);
 
-  const parsedWeight = parseFloat(weightStr); const weightCategory = !isNaN(parsedWeight) && parsedWeight > 0 ? getWeightCategory(parsedWeight) : null; const categoryInfo = weightCategory ? getCategoryInfo(weightCategory) : null;
+  const parsedWeight = parseFloat(weightStr); const weightCategory = !isNaN(parsedWeight) && parsedWeight > 0 ? getWeightCategory(parsedWeight, sexo) : null; const categoryInfo = weightCategory ? getCategoryInfo(weightCategory) : null;
   const parsedAge = parseInt(ageStr); const ageCategoryInfo = !isNaN(parsedAge) && parsedAge > 0 ? getAgeCategory(parsedAge) : null;
   const parsedFightCount = parseInt(fightCountStr) || 0; const experienceLevel = getExperienceLevel(parsedFightCount); const experienceInfo = getExperienceInfo(experienceLevel);
 
@@ -73,7 +73,7 @@ export default function FighterForm({ onSubmit, editingFighter, onCancel }) {
         <div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e => setWeightStr(e.target.value)} placeholder="68.5" step="0.1" className={ic} />{errors.weightStr && <p className="text-red-400 text-xs mt-1">{errors.weightStr}</p>}</div>
         <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
       </div>
-      {categoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría: </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label}</span></div>}
+      {categoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría (World Boxing): </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label} · {weightRangeLabel(categoryInfo)}</span></div>}
       {ageCategoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Edad (FECHIBOX): </span><Badge color={ageCategoryInfo.color}>{ageCategoryInfo.label} · {ageCategoryInfo.formato}</Badge></div>}
       <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gym} onChange={e => setGym(e.target.value)} placeholder="Barrio Franklin" maxLength={60} className={ic} />{errors.gym && <p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
       <div><label className={lbl}>Sexo</label><div className="flex gap-2">
