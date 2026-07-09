@@ -5,16 +5,24 @@ import Badge from "./Badge.jsx";
 // ============================================
 // COMPONENTE: LISTA PELEADORES
 // ============================================
-export default function FighterList({ fighters, onEdit, onDelete }) {
+export default function FighterList({ fighters, matchups = [], onEdit, onDelete }) {
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [showFaltantes, setShowFaltantes] = useState(false);
+  // "Faltantes": peleadores que no quedaron en ninguna pelea del VS —
+  // el matchmaking nunca empareja cruces que rompan las reglas FECHIBOX
+  // (categoría de edad, sexo), así que quien no tiene rival compatible
+  // queda aquí, con sus datos intactos, a la espera de un rival nuevo.
+  const matchedIds = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
+  const faltantesCount = useMemo(() => fighters.filter(f => !matchedIds.has(f.id)).length, [fighters, matchedIds]);
   const filtered = useMemo(() => {
     let r = [...fighters];
+    if (showFaltantes) r = r.filter(f => !matchedIds.has(f.id));
     if (searchQuery.trim()) { const s = searchQuery.toLowerCase(); r = r.filter(f => f.fullName.toLowerCase().includes(s) || f.gym.toLowerCase().includes(s)); }
     if (categoryFilter !== "all") r = r.filter(f => f.weightCategory === categoryFilter);
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
     switch (sortBy) { case "name": r.sort((a, b) => a.fullName.localeCompare(b.fullName)); break; case "weight": r.sort((a, b) => a.weightKg - b.weightKg); break; case "experience": r.sort((a, b) => b.fightCount - a.fightCount); break; default: r.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
     return r;
-  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy]);
+  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, matchedIds]);
   const stats = useMemo(() => { const e = {}; fighters.forEach(f => { e[f.experienceLevel] = (e[f.experienceLevel] || 0) + 1; }); return e; }, [fighters]);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
 
@@ -30,7 +38,14 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
           <span className="text-sm font-bold leading-none" style={{ color: e.color }}>{c}</span>
           <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: e.color }}>{e.label}</span>
         </button>; })}
+        {faltantesCount > 0 && <button onClick={() => setShowFaltantes(!showFaltantes)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: showFaltantes ? "#F97316" : "#F9731640" }}>
+          <span className="text-sm font-bold leading-none" style={{ color: "#F97316" }}>{faltantesCount}</span>
+          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#F97316" }}>Faltante</span>
+        </button>}
       </div>
+      {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
+        <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad FECHIBOX). Sus datos quedan guardados a la espera de un rival.</p>
+      </div>}
       <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors" />
       <div className="flex gap-2">
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors">

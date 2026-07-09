@@ -183,7 +183,7 @@ export default function App() {
       </header>
 
       <main style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 16px 80px" }}>
-        {view === "list" && <FighterList fighters={fighters} onEdit={editFighter} onDelete={delFighter} />}
+        {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
         {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} onCancel={editF ? cancel : undefined} />}
         {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
         {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
