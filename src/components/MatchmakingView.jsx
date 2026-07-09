@@ -85,19 +85,23 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
     if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Planilla de peleadores — Sangre Nueva</title>
 <style>
+  /* Forzar impresión de los colores de fondo — sin esto, el navegador los
+     quita al "Guardar como PDF" y la planilla sale en blanco y negro. */
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;}
   .header{background:#000;color:#FDE047;text-align:center;padding:16px 0;font-size:24px;font-weight:bold;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th,td{border:1px solid #000;padding:6px 8px;text-align:center;}
   thead th{background:#BFDBFE;}
-  th.roja{background:#FCA5A5;}
-  th.azul{background:#60A5FA;}
+  th.roja{background:#EF4444;color:#fff;}
+  th.azul{background:#2563EB;color:#fff;}
   td.atleta-rojo{background:#FCA5A5;font-weight:bold;}
-  td.atleta-azul{background:#60A5FA;font-weight:bold;}
+  td.atleta-azul{background:#93C5FD;font-weight:bold;}
   td.esc{font-weight:bold;}
   td.grupo{background:#E5E7EB;font-weight:bold;font-size:14px;padding:8px;letter-spacing:1px;}
   td.grupo-alerta{background:#FEE2E2;color:#B91C1C;}
   .peso-detalle{font-size:10px;color:#374151;font-weight:normal;margin-top:2px;}
+  .nota-final{margin-top:14px;text-align:center;font-size:13px;font-weight:bold;font-style:italic;color:#B91C1C;}
   @page{size:landscape;margin:12mm;}
 </style></head>
 <body>
@@ -106,6 +110,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
 <thead><tr><th>N°</th><th>Escuela</th><th class="roja">Atleta</th><th>VS</th><th class="azul">Atleta</th><th>Escuela</th><th>Peso</th><th>Nota</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
+<p class="nota-final">La grilla está sujeta a modificaciones.</p>
 </body></html>`);
     win.document.close();
     win.focus();
