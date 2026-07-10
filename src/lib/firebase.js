@@ -70,7 +70,9 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
       let first = true;
       onValue(nodeRef, s => {
         const val = s.val();
-        const remote = (val === null || val === undefined) ? SYNC_KEYS[k] : val;
+        // "__EMPTY__" es el centinela de "arreglo vaciado a propósito" que
+        // escribe save() (RTDB borra los nodos con []); se traduce de vuelta.
+        const remote = (val === null || val === undefined) ? SYNC_KEYS[k] : (val === "__EMPTY__" ? [] : val);
         const remoteRaw = JSON.stringify(remote);
         if (localStorage.getItem(k) !== remoteRaw) { // distinto: aplica el cambio remoto
           localStorage.setItem(k, remoteRaw);

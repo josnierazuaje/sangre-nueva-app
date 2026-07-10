@@ -75,6 +75,7 @@ export const COUNTRY_CODES = [
 export const SYNC_KEYS = {
   "bm_fighters_v4": [],
   "bm_matchups_v3": [],
+  "bm_super4_v1": [],
   "bm_event_label": "La Velada — próxima fecha por definir",
 };
 

@@ -30,10 +30,13 @@ function dupKey(f) {
 //   { fighters: lista sin duplicados (orden original preservado),
 //     idMap: { idEliminado -> idConservado, idConservado -> idConservado },
 //     removed: cuántos registros se quitaron }
-export function dedupeFighters(fighters, matchups = []) {
+export function dedupeFighters(fighters, matchups = [], super4 = []) {
   const list = Array.isArray(fighters) ? fighters : [];
   const referenced = new Set();
   (matchups || []).forEach(m => { referenced.add(m.fighterRedId); referenced.add(m.fighterBlueId); });
+  // Los ids en llaves del Super 4 también cuentan como "referidos": si se
+  // conservara la otra copia, la llave quedaría apuntando a un eliminado.
+  (super4 || []).forEach(b => (b.semis || []).forEach(s => { referenced.add(s.red); referenced.add(s.blue); }));
 
   const groups = new Map();
   list.forEach(f => {
@@ -86,20 +89,35 @@ export function cleanMatchups(matchups, idMap = {}) {
   return out.map((m, i) => ({ ...m, roundNumber: i + 1 }));
 }
 
+// Reapunta los ids de las llaves del Super 4 cuando la dedup eliminó una
+// copia duplicada (semifinalistas, ganadores y campeón). Nunca elimina ni
+// poda llaves — solo remapea, por la misma razón que cleanMatchups no borra
+// huérfanos: un estado de sync parcial no debe destruir datos.
+export function remapSuper4(brackets, idMap = {}) {
+  const m = id => (id != null && idMap[id]) || id;
+  return (Array.isArray(brackets) ? brackets : []).map(b => ({
+    ...b,
+    semis: (b.semis || []).map(s => ({ ...s, red: m(s.red), blue: m(s.blue), winner: s.winner != null ? m(s.winner) : s.winner })),
+    finalWinner: b.finalWinner != null ? m(b.finalWinner) : b.finalWinner,
+  }));
+}
+
 // Reconciliación combinada e idempotente: dado el estado actual de
-// peleadores y peleas, devuelve las versiones limpias y banderas de si
-// cambió algo (para persistir solo cuando corresponde y evitar bucles).
-// Con la lista de peleadores vacía no se toca nada: ese estado es ambiguo
-// (puede ser una carga parcial de la sincronización) y actuar sobre él
-// podría destruir datos válidos.
-export function reconcileData(fighters, matchups) {
+// peleadores, peleas y llaves Super 4, devuelve las versiones limpias y
+// banderas de si cambió algo (para persistir solo cuando corresponde y
+// evitar bucles). Con la lista de peleadores vacía no se toca nada: ese
+// estado es ambiguo (puede ser una carga parcial de la sincronización) y
+// actuar sobre él podría destruir datos válidos.
+export function reconcileData(fighters, matchups, super4 = []) {
   const list = Array.isArray(fighters) ? fighters : [];
   if (!list.length) {
-    return { dedupedFighters: list, cleanedMatchups: matchups || [], fightersChanged: false, matchupsChanged: false, removedFighters: 0 };
+    return { dedupedFighters: list, cleanedMatchups: matchups || [], cleanedSuper4: super4 || [], fightersChanged: false, matchupsChanged: false, super4Changed: false, removedFighters: 0 };
   }
-  const { fighters: dedupedFighters, idMap, removed } = dedupeFighters(list, matchups);
+  const { fighters: dedupedFighters, idMap, removed } = dedupeFighters(list, matchups, super4);
   const cleanedMatchups = cleanMatchups(matchups, idMap);
+  const cleanedSuper4 = remapSuper4(super4, idMap);
   const fightersChanged = removed > 0;
   const matchupsChanged = JSON.stringify(cleanedMatchups) !== JSON.stringify(matchups || []);
-  return { dedupedFighters, cleanedMatchups, fightersChanged, matchupsChanged, removedFighters: removed };
+  const super4Changed = JSON.stringify(cleanedSuper4) !== JSON.stringify(super4 || []);
+  return { dedupedFighters, cleanedMatchups, cleanedSuper4, fightersChanged, matchupsChanged, super4Changed, removedFighters: removed };
 }

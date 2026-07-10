@@ -160,6 +160,37 @@ describe("reconcileData — idempotencia", () => {
     expect(r.cleanedMatchups).toEqual(matchups);
   });
 
+  it("la dedup prefiere conservar la copia que está en una llave del Super 4 y remapea las llaves", () => {
+    const dup1 = f("viejo", "Gabriela Valencia", { sexo: "F", weightKg: 98, createdAt: new Date(2026, 0, 1).toISOString() });
+    const dup2 = f("nuevo", "Gabriela Valencia", { sexo: "F", weightKg: 98, createdAt: new Date(2026, 5, 1).toISOString() });
+    const rival = f("r1", "Rival", { sexo: "F", weightKg: 97 });
+    // la llave referencia a la copia NUEVA (que sin este fix se eliminaría por ser más reciente)
+    const super4 = [{ id: "b1", catKey: "x", semis: [{ red: "nuevo", blue: "r1", winner: "nuevo" }, { red: "a", blue: "b", winner: null }], finalWinner: "nuevo" }];
+    const r = reconcileData([dup1, dup2, rival], [], super4);
+    expect(r.fightersChanged).toBe(true);
+    // se conservó la copia referida por la llave
+    expect(r.dedupedFighters.some(x => x.id === "nuevo")).toBe(true);
+    expect(r.dedupedFighters.some(x => x.id === "viejo")).toBe(false);
+    // y la llave sigue apuntando a un id vivo (sin cambios necesarios)
+    expect(r.cleanedSuper4[0].semis[0].red).toBe("nuevo");
+    expect(r.cleanedSuper4[0].finalWinner).toBe("nuevo");
+  });
+
+  it("si la copia eliminada estaba en una llave, la llave se remapea al id conservado (incluye ganadores)", () => {
+    const enVS = f("a1", "Pedro Soto", { weightKg: 70, createdAt: new Date(2026, 0, 1).toISOString() });
+    const dup = f("a2", "Pedro Soto", { weightKg: 70, createdAt: new Date(2026, 5, 1).toISOString() });
+    const rival = f("r1", "Rival", { weightKg: 71 });
+    // el VS referencia a a1 y la llave a a2: gana a1 como keeper (está en pelea y es más antiguo)…
+    const matchups = [{ id: "m1", fighterRedId: "a1", fighterBlueId: "r1", roundNumber: 1 }];
+    const super4 = [{ id: "b1", catKey: "x", semis: [{ red: "a2", blue: "r1", winner: "a2" }, { red: "x", blue: "y", winner: null }], finalWinner: "a2" }];
+    const r = reconcileData([enVS, dup, rival], matchups, super4);
+    expect(r.super4Changed).toBe(true);
+    // …y la llave queda reapuntada a a1 en semifinalista, ganador y campeón
+    expect(r.cleanedSuper4[0].semis[0].red).toBe("a1");
+    expect(r.cleanedSuper4[0].semis[0].winner).toBe("a1");
+    expect(r.cleanedSuper4[0].finalWinner).toBe("a1");
+  });
+
   it("las peleas huérfanas sobreviven a la reconciliación completa", () => {
     const fighters = [f("a", "Ana", { sexo: "F", weightKg: 55 }), f("b", "Beto", { weightKg: 70 })];
     const matchups = [

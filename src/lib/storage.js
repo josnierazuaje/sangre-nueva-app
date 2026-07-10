@@ -17,8 +17,30 @@ export function load(k, def) { try { const d = localStorage.getItem(k); return d
 export function save(k, v) {
   localStorage.setItem(k, JSON.stringify(v));
   if (FB.ready && Object.prototype.hasOwnProperty.call(SYNC_KEYS, k)) {
-    try { dbSet(ref(FB.db, fbPath(k)), JSON.parse(JSON.stringify(v))); } catch (e) { console.error("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e); }
+    try {
+      let payload = JSON.parse(JSON.stringify(v));
+      // RTDB no guarda arreglos vacíos: set([]) BORRA el nodo, y un nodo
+      // ausente hace que la próxima conexión de un dispositivo con datos
+      // viejos en localStorage los re-suba ("resucita" lo borrado, ver
+      // startFirebaseSync). El centinela mantiene el nodo vivo con el
+      // significado "vaciado a propósito". Solo se usa en claves nuevas
+      // (bm_super4_v1): los clientes viejos en producción no la conocen y
+      // un centinela en claves compartidas los haría fallar.
+      if (k === "bm_super4_v1" && Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
+      dbSet(ref(FB.db, fbPath(k)), payload);
+    } catch (e) { console.error("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e); }
   }
+}
+
+// Marca ganadores del Super 4 con una escritura dirigida a la llave tocada
+// (update de sus campos) en vez de reescribir el arreglo completo: dos
+// personas marcando llaves DISTINTAS a la vez no se pisan entre sí. La
+// lista completa igual se guarda en localStorage para la UI local.
+export function patchSuper4Bracket(fullList, index, fields) {
+  localStorage.setItem("bm_super4_v1", JSON.stringify(fullList));
+  if (!FB.ready) return;
+  try { dbUpdate(ref(FB.db, fbPath("bm_super4_v1/" + index)), JSON.parse(JSON.stringify(fields))); }
+  catch (e) { console.error("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e); }
 }
 
 export function loadFighters() {

@@ -6,6 +6,7 @@ import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
+import Super4View from "./components/Super4View.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
 import FightCardView from "./components/FightCardView.jsx";
 import TicketsManager from "./components/TicketsManager.jsx";
@@ -16,6 +17,7 @@ import LoginScreen from "./components/LoginScreen.jsx";
 export default function App() {
   const [fighters, setFighters] = useState([]);
   const [matchups, setMatchups] = useState([]);
+  const [super4, setSuper4] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
@@ -28,17 +30,19 @@ export default function App() {
   // false = modo solo-local (sin nube); en modo nube, un objeto con qué
   // claves ya recibieron su primer valor desde Firebase en esta sesión.
   const [cloudMode, setCloudMode] = useState(null);
-  const [hydrated, setHydrated] = useState({ fighters: false, matchups: false });
+  const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
   const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
   function logout() { signOut(FB.auth); }
   function keyReady(k) {
     if (k === "bm_fighters_v4") setHydrated(h => (h.fighters ? h : { ...h, fighters: true }));
     else if (k === "bm_matchups_v3") setHydrated(h => (h.matchups ? h : { ...h, matchups: true }));
+    else if (k === "bm_super4_v1") setHydrated(h => (h.super4 ? h : { ...h, super4: true }));
   }
 
   function applyRemote(k, val) {
     if (k === "bm_fighters_v4") setFighters(normalizeFighters(val));
     else if (k === "bm_matchups_v3") setMatchups(val);
+    else if (k === "bm_super4_v1") setSuper4(val);
     else if (k === "bm_event_label") setEventLabel(val);
     // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
     // individual, ver migrateTicketsIfNeeded/watchTickets más abajo.
@@ -81,6 +85,7 @@ export default function App() {
   useEffect(() => {
     setFighters(normalizeFighters(loadFighters()));
     setMatchups(load("bm_matchups_v3", []));
+    setSuper4(load("bm_super4_v1", []));
     setTicketsNew(loadTicketsV4());
     const raw = localStorage.getItem("bm_fb_config");
     const disabled = localStorage.getItem("bm_fb_disabled");
@@ -111,13 +116,19 @@ export default function App() {
   // garantizado — reconciliar sobre un estado parcial podría eliminar al
   // registro equivocado y propagar el error a todos los dispositivos); en
   // modo solo-local, corre de inmediato porque lo local es toda la verdad.
-  const reconcileEnabled = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups);
+  const reconcileEnabled = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups && hydrated.super4);
   useEffect(() => {
     if (!reconcileEnabled || !fighters.length) return;
-    const { dedupedFighters, cleanedMatchups, fightersChanged, matchupsChanged, removedFighters } = reconcileData(fighters, matchups);
+    const { dedupedFighters, cleanedMatchups, cleanedSuper4, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
     if (fightersChanged) { setFighters(dedupedFighters); save("bm_fighters_v4", dedupedFighters); console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es)."); }
     if (matchupsChanged) { setMatchups(cleanedMatchups); save("bm_matchups_v3", cleanedMatchups); }
-  }, [fighters, matchups, reconcileEnabled]);
+    if (super4Changed) { setSuper4(cleanedSuper4); save("bm_super4_v1", cleanedSuper4); }
+  }, [fighters, matchups, super4, reconcileEnabled]);
+
+  // Escribir en las llaves del Super 4 antes de recibir su primer valor de
+  // la nube podría pisar llaves ya armadas en otro dispositivo (misma
+  // carrera de sincronización que la reconciliación de arriba).
+  const super4Ready = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.super4);
 
   // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
   // registrando atletas de corrido (la confirmación la muestra el propio
@@ -130,8 +141,8 @@ export default function App() {
   // Incluye ticketsNew (boletas reales v4) además de fighters/matchups —
   // antes de la Fase 5 el export manual no incluía las boletas reales, con
   // lo cual no servía como respaldo de ellas.
-  function handleExport() { const d = { fighters, matchups, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  function handleExport() { const d = { fighters, matchups, super4, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { setSuper4(d.super4); save("bm_super4_v1", d.super4); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
@@ -152,7 +163,7 @@ export default function App() {
 
     if (FB.ready) {
       try {
-        await backupEventToCloud({ fighters, matchups, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
+        await backupEventToCloud({ fighters, matchups, super4, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
       } catch (e) {
         alert("No se pudo guardar el respaldo en la nube. El reinicio se canceló para no perder datos.\n\nError: " + e.message);
         return;
@@ -161,6 +172,7 @@ export default function App() {
 
     setFighters([]); save("bm_fighters_v4", []);
     setMatchups([]); save("bm_matchups_v3", []);
+    setSuper4([]); save("bm_super4_v1", []);
     setTicketsNew([]); clearTicketsCache();
     try { await clearAllTicketsData(); } catch (e) { console.error("No se pudieron borrar las boletas en Firebase:", e); }
 
@@ -216,6 +228,7 @@ export default function App() {
       <main style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 16px 80px" }}>
         {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
         {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
+        {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
         {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
         {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
         {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} />}
@@ -237,6 +250,10 @@ export default function App() {
           <button onClick={() => { setEditF(null); setView("register"); }} className={nav(view === "register")}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             <span className="text-[10px]">Agregar</span>
+          </button>
+          <button onClick={() => setView("super4")} className={nav(view === "super4")}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21h8m-4-4v4m-6-9a6 6 0 0012 0V4H6v8zM6 6H3v2a4 4 0 004 4M18 6h3v2a4 4 0 01-4 4" /></svg>
+            <span className="text-[10px]">Super 4</span>
           </button>
           <button onClick={() => setView("vs")} className={nav(view === "vs")}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
