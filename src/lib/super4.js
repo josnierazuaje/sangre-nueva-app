@@ -120,11 +120,13 @@ export function setSemiWinner(brackets, bracketId, semiIndex, fighterId) {
 }
 
 // Marca (o desmarca) al campeón en la final. Solo válido entre los dos
-// ganadores de semifinal.
+// ganadores de semifinal, y solo cuando AMBAS semifinales ya se decidieron
+// (con una sola decidida la final aún no existe — no se puede coronar).
 export function setFinalWinner(brackets, bracketId, fighterId) {
   return (brackets || []).map(b => {
     if (b.id !== bracketId) return b;
     const finalistas = [b.semis[0].winner, b.semis[1].winner];
+    if (!finalistas[0] || !finalistas[1]) return b;
     if (!finalistas.includes(fighterId)) return b;
     return { ...b, finalWinner: b.finalWinner === fighterId ? null : fighterId };
   });

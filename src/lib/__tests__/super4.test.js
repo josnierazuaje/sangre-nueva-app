@@ -118,6 +118,14 @@ describe("progresión de ganadores", () => {
     expect(brackets[0].finalWinner).toBe(null);
   });
 
+  it("NO permite coronar campeón con una sola semifinal decidida", () => {
+    let brackets = bracketBase();
+    const b = brackets[0];
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red); // solo la semi 1
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);   // intenta coronar
+    expect(brackets[0].finalWinner).toBe(null);
+  });
+
   it("no acepta como campeón a alguien que no es finalista", () => {
     let brackets = bracketBase();
     const b = brackets[0];
