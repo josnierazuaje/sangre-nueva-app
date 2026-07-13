@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket } from "../lib/storage.js";
-import { SUPER4_CATEGORIES, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
+import { AGE_CATEGORIES } from "../constants.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
+
+// Categorías de edad (FECHIBOX) que el Super 4 puede armar, con su etiqueta.
+const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
 
 // Opciones del selector "peleadores hasta con:" — tope por número de peleas.
 // "all" = sin tope (todas las experiencias); 0 a 20 = máximo de peleas.
@@ -36,10 +40,24 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     return (oldTier && LEGACY_TIER_TO_FIGHTS[oldTier]) || "all";
   });
   const fightsCeil = maxFightsSel === "all" ? null : Number(maxFightsSel);
-  const resultado = useMemo(() => buildSuper4Brackets(fighters, fightsCeil), [fighters, fightsCeil]);
+  // Categorías de edad que participan (se recuerdan localmente). Por defecto,
+  // todas las que el Super 4 cubre — así el comportamiento no cambia.
+  const [selectedAges, setSelectedAges] = useState(() => {
+    const saved = load("bm_super4_ages", null);
+    return Array.isArray(saved) && saved.length ? saved : SUPER4_AGE_KEYS.slice();
+  });
+  const agesFilter = selectedAges.length ? selectedAges : SUPER4_AGE_KEYS;
+  const resultado = useMemo(() => buildSuper4Brackets(fighters, fightsCeil, agesFilter), [fighters, fightsCeil, agesFilter.join(",")]);
   // Cupo que se está reemplazando vía el botón ✕ (null = ningún modal abierto).
   const [reemplazo, setReemplazo] = useState(null);
   function cambiarMaxFights(v) { setMaxFightsSel(v); save("bm_super4_maxfights", v); }
+  function toggleAge(k) {
+    setSelectedAges(prev => {
+      const next = prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k];
+      save("bm_super4_ages", next);
+      return next;
+    });
+  }
 
   function checkReady() {
     if (ready) return true;
@@ -49,11 +67,15 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   function persist(brackets) { setSuper4(brackets); save("bm_super4_v1", brackets); }
   function generar() {
     if (!checkReady()) return;
-    if (super4.length && !confirm("Ya hay llaves armadas. ¿Generarlas de nuevo?\n\nSe reemplazan las llaves actuales y se pierden los ganadores marcados.")) return;
-    const { brackets, faltantes } = buildSuper4Brackets(fighters, fightsCeil);
+    if (!selectedAges.length) { alert("Elige al menos una categoría de edad para el Super 4."); return; }
+    if (super4.length && !confirm("¿Generar de nuevo las categorías elegidas?\n\nSe rearman solo esas (se pierden sus ganadores marcados); las demás categorías se conservan tal cual. Para quitar categorías usa \"Limpiar llaves\".")) return;
+    const { brackets, faltantes } = buildSuper4Brackets(fighters, fightsCeil, agesFilter);
     const tope = fightsCeil != null ? ` con el tope de ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"}` : "";
-    if (!brackets.length) { alert("No hay suficientes peleadores elegibles" + tope + " para armar ninguna llave todavía."); return; }
-    persist(brackets);
+    if (!brackets.length) { alert("No hay suficientes peleadores elegibles" + tope + " para armar ninguna llave en las categorías elegidas."); return; }
+    // Fusión no destructiva: solo se rearman las categorías elegidas; las de
+    // edades no seleccionadas se conservan (incluidos sus campeones), para no
+    // borrar datos de producción por regenerar un subconjunto.
+    persist(mergeRegenerated(super4, brackets, agesFilter));
     if (faltantes.length) alert("Se armaron " + brackets.length + " llave(s). Quedaron sin armar por falta de atletas elegibles" + tope + ":\n\n" + faltantes.map(f => `• ${f.catLabel}: hay ${f.elegibles}, faltan ${f.faltan}`).join("\n"));
   }
   function limpiar() {
@@ -288,12 +310,28 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </div>
       {fightsCeil != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Solo entran a la llave los peleadores con {fightsCeil} pelea{fightsCeil === 1 ? "" : "s"} como máximo. Toca GENERAR LLAVES para aplicarlo.</p>}
 
+      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+        <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</p>
+        <div className="flex flex-wrap gap-1.5">
+          {AGE_OPTIONS.map(a => {
+            const on = selectedAges.includes(a.key);
+            return (
+              <button key={a.key} type="button" onClick={() => toggleAge(a.key)} className={"flex items-center gap-1.5 px-2.5 py-1.5 border text-sm transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15 text-boxing-cream" : "border-boxing-lineBright text-boxing-muted hover:border-boxing-lineBright/80")}>
+                <span className={"w-3.5 h-3.5 flex items-center justify-center text-[10px] border rounded-sm " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
+                {a.label} <span className="text-[9px] text-boxing-muted">({a.minAge}-{a.maxAge})</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {!selectedAges.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos una categoría de edad.</p>}
+
       {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar llaves</button>}
 
       {!super4.length && <div className="border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
         <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por cinturón:<br />semifinales el <span className="text-boxing-cream font-semibold">sábado 01</span> y la final el <span className="text-boxing-goldFight font-semibold">domingo 02</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
-          {SUPER4_CATEGORIES.map(c => {
+          {SUPER4_CATEGORIES.filter(c => selectedAges.includes(c.ageKey)).map(c => {
             const n = resultado.brackets.some(b => b.catKey === c.key) ? 4 : (resultado.faltantes.find(f => f.catKey === c.key)?.elegibles ?? 0);
             const listo = n >= 4;
             return <p key={c.key}>{listo ? "✅" : "⚠️"} <span className={listo ? "text-boxing-cream" : ""}>{c.label}</span> — {c.regla} · elegibles: {listo ? "4+" : n}</p>;
