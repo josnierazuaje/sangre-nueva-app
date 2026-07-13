@@ -1,5 +1,5 @@
 import { genId, getAgeCategory } from "../constants.js";
-import { normName } from "./dedup.js";
+import { dupKey } from "./dedup.js";
 
 // ============================================
 // TORNEO SUPER 4 — llaves de 4 atletas por cinturón
@@ -67,7 +67,10 @@ const PROCESS_ORDER = ["cadete71", "juvenil81", "adulto60", "adulto67", "adulto9
 export function buildSuper4Brackets(fighters) {
   const usedIds = new Set();
   const usedPersons = new Set();
-  const person = f => normName(f.fullName) + "|" + (f.sexo || "M");
+  // Identidad de persona = la misma clave que usa la deduplicación
+  // (nombre+sexo+peso), para no fusionar por error a dos atletas distintos
+  // que comparten nombre pero pelean en pesos distintos.
+  const person = dupKey;
   const byKey = {};
   const faltantes = [];
   for (const key of PROCESS_ORDER) {
@@ -130,4 +133,44 @@ export function setFinalWinner(brackets, bracketId, fighterId) {
     if (!finalistas.includes(fighterId)) return b;
     return { ...b, finalWinner: b.finalWinner === fighterId ? null : fighterId };
   });
+}
+
+// Reemplaza al peleador de un cupo de semifinal (lado "red" o "blue") por
+// otro (newFid). Como el enfrentamiento cambia, el ganador de esa semi se
+// limpia (nadie ganó todavía el nuevo cruce), y si con eso cambia un
+// finalista, el campeón de la final deja de ser válido y también se limpia.
+export function replaceFighter(brackets, bracketId, semiIndex, lado, newFid) {
+  return (brackets || []).map(b => {
+    if (b.id !== bracketId) return b;
+    const semis = b.semis.map((s, i) => {
+      if (i !== semiIndex) return s;
+      return { ...s, [lado]: newFid, winner: null };
+    });
+    const finalistas = [semis[0].winner, semis[1].winner];
+    const finalWinner = (finalistas[0] && finalistas[1] && finalistas.includes(b.finalWinner)) ? b.finalWinner : null;
+    return { ...b, semis, finalWinner };
+  });
+}
+
+// Atletas que pueden entrar a reemplazar a alguien en una llave: elegibles
+// para esa categoría y que NO están ya en ninguna llave (ni por id ni por
+// persona, para no duplicar a nadie). `catKey` identifica la categoría.
+export function availableReplacements(catKey, fighters, brackets) {
+  const cat = SUPER4_CATEGORIES.find(c => c.key === catKey);
+  if (!cat) return [];
+  const byId = {};
+  (fighters || []).forEach(f => { byId[f.id] = f; });
+  const person = dupKey; // misma identidad que la deduplicación (ver buildSuper4Brackets)
+  const usedIds = new Set();
+  const usedPersons = new Set();
+  (brackets || []).forEach(b => (b.semis || []).forEach(s => {
+    ["red", "blue"].forEach(lado => {
+      const id = s[lado];
+      if (id == null) return;
+      usedIds.add(id);
+      const f = byId[id];
+      if (f) usedPersons.add(person(f));
+    });
+  }));
+  return eligibleForCategory(cat, fighters).filter(f => !usedIds.has(f.id) && !usedPersons.has(person(f)));
 }

@@ -15,7 +15,11 @@ export function normName(s) {
     .replace(/\s+/g, " ");
 }
 
-function dupKey(f) {
+// Clave de identidad de un peleador (misma persona): nombre normalizado +
+// sexo + peso exacto. Es la fuente ÚNICA de "quién es quién" en la app — la
+// usan tanto la deduplicación como el armado de llaves del Super 4, para
+// que ambos coincidan en a quién consideran la misma persona.
+export function dupKey(f) {
   // Un registro sin peso numérico válido nunca se agrupa con nadie (clave
   // única por id): dos homónimos sin peso NO son demostrablemente la misma
   // persona, y fusionarlos borraría a una persona real.
