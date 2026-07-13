@@ -84,7 +84,14 @@ export function pairSemis(four) {
 // completaba la liviana. Devuelve también las categorías que no se pudieron
 // armar por falta de elegibles.
 const PROCESS_ORDER = ["cadete71", "juvenil81", "adulto60", "adulto67", "adulto92"];
-export function buildSuper4Brackets(fighters, maxFights = null) {
+// Categorías de edad (FECHIBOX) que el Super 4 tiene cubiertas con cinturones,
+// en orden. Sirven para el filtro "qué categorías participan".
+export const SUPER4_AGE_KEYS = [...new Set(SUPER4_CATEGORIES.map(c => c.ageKey))];
+
+// ageKeys: lista de categorías de edad que participan (null = todas). Solo se
+// arman llaves de los cinturones cuya edad esté seleccionada; las demás ni se
+// intentan ni se reportan como faltantes.
+export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null) {
   // Tope de peleas: solo entran a la llave los peleadores hasta esa cantidad
   // de peleas (ej. novatos = hasta 3). Se guarda en cada llave para que los
   // reemplazos (botón ✕) respeten el mismo tope.
@@ -99,6 +106,7 @@ export function buildSuper4Brackets(fighters, maxFights = null) {
   const faltantes = [];
   for (const key of PROCESS_ORDER) {
     const cat = SUPER4_CATEGORIES.find(c => c.key === key);
+    if (ageKeys && !ageKeys.includes(cat.ageKey)) continue; // categoría no participa
     const seenPersons = new Set();
     const eligibles = eligibleForCategory(cat, pool).filter(f => {
       if (usedIds.has(f.id) || usedPersons.has(person(f)) || seenPersons.has(person(f))) return false;
@@ -129,6 +137,21 @@ export function buildSuper4Brackets(fighters, maxFights = null) {
   // Las llaves se muestran en el orden del afiche, no en el de procesamiento.
   const brackets = SUPER4_CATEGORIES.filter(c => byKey[c.key]).map(c => byKey[c.key]);
   return { brackets, faltantes };
+}
+
+// Fusiona las llaves recién regeneradas (solo de las categorías que
+// participan) con las que ya existían de categorías que NO participan.
+// Regenerar un subconjunto de categorías así nunca borra ni pisa las demás
+// (ni sus campeones ya coronados). Devuelve en el orden oficial de las
+// categorías. ageKeys = categorías de edad que se están regenerando.
+export function mergeRegenerated(existing, regenerated, ageKeys) {
+  const conservadas = (existing || []).filter(b => {
+    const c = SUPER4_CATEGORIES.find(x => x.key === b.catKey);
+    return c && ageKeys && !ageKeys.includes(c.ageKey);
+  });
+  return SUPER4_CATEGORIES
+    .map(c => (regenerated || []).find(b => b.catKey === c.key) || conservadas.find(b => b.catKey === c.key))
+    .filter(Boolean);
 }
 
 // Marca (o desmarca, si se vuelve a tocar) al ganador de una semifinal.

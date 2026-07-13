@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights } from "../super4.js";
 
 let n = 0;
 function f(over) {
@@ -321,6 +321,58 @@ describe("tope por número de peleas (Peleadores hasta con:)", () => {
     const disp = availableReplacements("cadete71", fighters, brackets, bracketMaxFights(brackets[0])).map(x => x.id);
     expect(disp).toContain("n5");
     expect(disp).not.toContain("exp");
+  });
+
+  it("solo arma llaves de las categorías de edad seleccionadas", () => {
+    const fighters = [
+      // 4 cadetes
+      ...[71, 70, 69, 68].map((w, i) => f({ id: "c" + i, age: 15, weightKg: w })),
+      // 4 adultos ≤67
+      ...[67, 66, 65, 64].map((w, i) => f({ id: "a" + i, age: 25, weightKg: w })),
+    ];
+    // solo Cadete participa → no se arma ninguna de adultos
+    const soloCadete = buildSuper4Brackets(fighters, null, ["cadete"]);
+    expect(soloCadete.brackets.map(b => b.catKey)).toEqual(["cadete71"]);
+    expect(soloCadete.faltantes.some(x => x.catKey.startsWith("adulto"))).toBe(false); // ni se reportan
+    // solo Adulto participa → no se arma la de cadetes
+    const soloAdulto = buildSuper4Brackets(fighters, null, ["adulto"]);
+    expect(soloAdulto.brackets.some(b => b.catKey === "cadete71")).toBe(false);
+    expect(soloAdulto.brackets.some(b => b.catKey.startsWith("adulto"))).toBe(true);
+    // ageKeys null = todas (comportamiento anterior)
+    const todas = buildSuper4Brackets(fighters, null, null);
+    expect(todas.brackets.some(b => b.catKey === "cadete71")).toBe(true);
+    expect(todas.brackets.some(b => b.catKey === "adulto67")).toBe(true);
+  });
+
+  it("SUPER4_AGE_KEYS lista las edades que el Super 4 cubre, sin repetir", () => {
+    expect(SUPER4_AGE_KEYS).toEqual(["cadete", "juvenil", "adulto"]);
+  });
+
+  it("mergeRegenerated CONSERVA las llaves de categorías no regeneradas (no borra campeones)", () => {
+    const existing = [
+      { catKey: "cadete71", finalWinner: null },
+      { catKey: "juvenil81", finalWinner: null },
+      { catKey: "adulto67", finalWinner: "campeon-x" }, // ¡tiene campeón!
+      { catKey: "adulto60", finalWinner: null },
+    ];
+    const regenerated = [
+      { catKey: "cadete71", finalWinner: null, nuevo: true },
+      { catKey: "juvenil81", finalWinner: null, nuevo: true },
+    ];
+    // Se regeneran solo cadete y juvenil; adulto NO participa esta vez
+    const merged = mergeRegenerated(existing, regenerated, ["cadete", "juvenil"]);
+    expect(merged.find(b => b.catKey === "adulto67").finalWinner).toBe("campeon-x"); // campeón intacto
+    expect(merged.find(b => b.catKey === "adulto60")).toBeTruthy();
+    expect(merged.find(b => b.catKey === "cadete71").nuevo).toBe(true); // cadete rearmada
+    expect(merged.map(b => b.catKey)).toEqual(["cadete71", "juvenil81", "adulto67", "adulto60"]); // orden oficial
+  });
+
+  it("mergeRegenerated con todas las edades = solo las regeneradas (sin conservar viejas)", () => {
+    const existing = [{ catKey: "adulto67", finalWinner: "x" }];
+    const regenerated = [{ catKey: "cadete71" }];
+    const merged = mergeRegenerated(existing, regenerated, ["cadete", "juvenil", "adulto"]);
+    // adulto SÍ participa (se regenera) y no vino en regenerated → no se conserva
+    expect(merged.map(b => b.catKey)).toEqual(["cadete71"]);
   });
 
   it("bracketMaxFights lee el número nuevo y convierte el nivel viejo (compat)", () => {
