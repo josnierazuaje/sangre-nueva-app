@@ -1,4 +1,4 @@
-import { genId, getAgeCategory, getExperienceLevel, EXPERIENCE_LEVELS } from "../constants.js";
+import { genId, getAgeCategory } from "../constants.js";
 import { dupKey } from "./dedup.js";
 
 // ============================================
@@ -7,17 +7,24 @@ import { dupKey } from "./dedup.js";
 // disputa salen del afiche oficial del campeonato de novatos.
 // ============================================
 
-// Filtra un grupo de peleadores por experiencia MÁXIMA: deja solo a los que
-// están en maxExpKey o por debajo (ej. "principiante" incluye debutantes y
-// principiantes = 0 a 3 peleas). maxExpKey null/ausente = sin tope (todos).
-// La experiencia se recalcula desde fightCount (no del campo guardado, que
-// podría estar desactualizado).
-export function experienceIndex(key) { return EXPERIENCE_LEVELS.findIndex(e => e.key === key); }
-export function filterByMaxExperience(fighters, maxExpKey) {
-  if (!maxExpKey) return fighters || [];
-  const maxIdx = experienceIndex(maxExpKey);
-  if (maxIdx < 0) return fighters || [];
-  return (fighters || []).filter(f => experienceIndex(getExperienceLevel(Number(f.fightCount) || 0)) <= maxIdx);
+// Filtra un grupo de peleadores por número MÁXIMO de peleas: deja solo a los
+// que tienen esa cantidad o menos (ej. maxFights=3 = hasta 3 peleas).
+// maxFights null/ausente = sin tope (todos).
+export function filterByMaxFights(fighters, maxFights) {
+  if (maxFights == null) return fighters || [];
+  return (fighters || []).filter(f => (Number(f.fightCount) || 0) <= maxFights);
+}
+
+// Devuelve el tope de peleas con que se armó una llave. Las llaves nuevas lo
+// guardan como número (maxFights); las viejas (antes de este cambio) lo
+// guardaban como nivel de experiencia (maxExpKey), que se convierte aquí a
+// su número de peleas máximo para no perder el tope tras actualizar la app.
+const LEGACY_TIER_MAXFIGHTS = { debutante: 0, principiante: 3, amateur: 10, profesional: null };
+export function bracketMaxFights(b) {
+  if (!b) return null;
+  if (typeof b.maxFights === "number") return b.maxFights;
+  if (b.maxExpKey) return LEGACY_TIER_MAXFIGHTS[b.maxExpKey] ?? null;
+  return null;
 }
 export const SUPER4_CATEGORIES = [
   { key: "cadete71", label: "Cadetes 71kg", ageKey: "cadete", maxKg: 71, sexo: "M", regla: "Cadete (15-16) · hasta 71kg" },
@@ -77,11 +84,11 @@ export function pairSemis(four) {
 // completaba la liviana. Devuelve también las categorías que no se pudieron
 // armar por falta de elegibles.
 const PROCESS_ORDER = ["cadete71", "juvenil81", "adulto60", "adulto67", "adulto92"];
-export function buildSuper4Brackets(fighters, maxExpKey = null) {
-  // Tope de experiencia: solo entran a la llave los peleadores hasta ese
-  // nivel (ej. novatos = hasta 3 peleas). Se guarda en cada llave para que
-  // los reemplazos (botón ✕) respeten el mismo tope.
-  const pool = filterByMaxExperience(fighters, maxExpKey);
+export function buildSuper4Brackets(fighters, maxFights = null) {
+  // Tope de peleas: solo entran a la llave los peleadores hasta esa cantidad
+  // de peleas (ej. novatos = hasta 3). Se guarda en cada llave para que los
+  // reemplazos (botón ✕) respeten el mismo tope.
+  const pool = filterByMaxFights(fighters, maxFights);
   const usedIds = new Set();
   const usedPersons = new Set();
   // Identidad de persona = la misma clave que usa la deduplicación
@@ -115,7 +122,7 @@ export function buildSuper4Brackets(fighters, maxExpKey = null) {
         { red: semi2[0].id, blue: semi2[1].id, winner: null },
       ],
       finalWinner: null,
-      maxExpKey: maxExpKey || null,
+      maxFights: maxFights == null ? null : maxFights,
       createdAt: new Date().toISOString(),
     };
   }
@@ -171,13 +178,13 @@ export function replaceFighter(brackets, bracketId, semiIndex, lado, newFid) {
 }
 
 // Atletas que pueden entrar a reemplazar a alguien en una llave: elegibles
-// para esa categoría, dentro del mismo tope de experiencia con que se armó
-// la llave (maxExpKey), y que NO están ya en ninguna llave (ni por id ni
-// por persona, para no duplicar a nadie). `catKey` identifica la categoría.
-export function availableReplacements(catKey, fighters, brackets, maxExpKey = null) {
+// para esa categoría, dentro del mismo tope de peleas con que se armó la
+// llave (maxFights), y que NO están ya en ninguna llave (ni por id ni por
+// persona, para no duplicar a nadie). `catKey` identifica la categoría.
+export function availableReplacements(catKey, fighters, brackets, maxFights = null) {
   const cat = SUPER4_CATEGORIES.find(c => c.key === catKey);
   if (!cat) return [];
-  const pool = filterByMaxExperience(fighters, maxExpKey);
+  const pool = filterByMaxFights(fighters, maxFights);
   const byId = {};
   (fighters || []).forEach(f => { byId[f.id] = f; });
   const person = dupKey; // misma identidad que la deduplicación (ver buildSuper4Brackets)
