@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements } from "../super4.js";
+import { SUPER4_CATEGORIES, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxExperience } from "../super4.js";
 
 let n = 0;
 function f(over) {
@@ -255,5 +255,66 @@ describe("reemplazo de peleadores (botón ✕)", () => {
     const disp = availableReplacements("cadete71", fighters, brackets);
     expect(disp.some(x => x.id === "dupExacto")).toBe(false); // mismo peso → misma persona → excluido
     expect(disp.some(x => x.id === "homonimo")).toBe(true);   // distinto peso → persona distinta → ofrecido
+  });
+});
+
+describe("tope de experiencia (Peleadores hasta:)", () => {
+  it("filterByMaxExperience deja solo a los de experiencia hasta el tope (0-3 = novatos)", () => {
+    const fighters = [
+      f({ id: "deb", fightCount: 0 }),   // debutante
+      f({ id: "pri", fightCount: 3 }),   // principiante (1-3)
+      f({ id: "ama", fightCount: 4 }),   // amateur (4-10)
+      f({ id: "pro", fightCount: 15 }),  // pro (11+)
+    ];
+    const novatos = filterByMaxExperience(fighters, "principiante").map(x => x.id).sort();
+    expect(novatos).toEqual(["deb", "pri"]);
+    // sin tope: entran todos
+    expect(filterByMaxExperience(fighters, null)).toHaveLength(4);
+  });
+
+  it("buildSuper4Brackets con tope 'principiante' solo arma con novatos (0-3 peleas)", () => {
+    const fighters = [
+      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
+      f({ id: "n4", age: 16, weightKg: 68, fightCount: 1 }),
+      // dos con muchas peleas: NO deben entrar bajo el tope de novatos
+      f({ id: "exp1", age: 15, weightKg: 67, fightCount: 12 }),
+      f({ id: "exp2", age: 16, weightKg: 66, fightCount: 8 }),
+    ];
+    const { brackets } = buildSuper4Brackets(fighters, "principiante");
+    const b = brackets.find(x => x.catKey === "cadete71");
+    expect(b).toBeTruthy();
+    const ids = [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].sort();
+    expect(ids).toEqual(["n1", "n2", "n3", "n4"]);
+    expect(b.maxExpKey).toBe("principiante"); // el tope queda guardado en la llave
+  });
+
+  it("con tope de novatos y solo 3 novatos, la categoría no se arma aunque haya expertos de sobra", () => {
+    const fighters = [
+      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
+      f({ id: "e1", age: 16, weightKg: 68, fightCount: 20 }),
+      f({ id: "e2", age: 15, weightKg: 67, fightCount: 15 }),
+    ];
+    const { brackets, faltantes } = buildSuper4Brackets(fighters, "principiante");
+    expect(brackets.find(b => b.catKey === "cadete71")).toBeFalsy();
+    expect(faltantes.find(x => x.catKey === "cadete71").elegibles).toBe(3);
+  });
+
+  it("availableReplacements respeta el tope: no ofrece a un experto para una llave de novatos", () => {
+    const fighters = [
+      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
+      f({ id: "n4", age: 16, weightKg: 68, fightCount: 1 }),
+      f({ id: "n5", age: 15, weightKg: 67, fightCount: 0 }), // novato libre → sí se ofrece
+      f({ id: "exp", age: 15, weightKg: 66, fightCount: 18 }), // experto → NO se ofrece
+    ];
+    const { brackets } = buildSuper4Brackets(fighters, "principiante");
+    const disp = availableReplacements("cadete71", fighters, brackets, "principiante").map(x => x.id);
+    expect(disp).toContain("n5");
+    expect(disp).not.toContain("exp");
   });
 });
