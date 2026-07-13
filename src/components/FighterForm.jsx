@@ -1,7 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, guessGenderFromName, genId } from "../constants.js";
 import { normName } from "../lib/dedup.js";
 import Badge from "./Badge.jsx";
+
+// Pone en mayúscula la primera letra de cada palabra al escribir (juan perez
+// → Juan Perez), sin tocar el resto de las letras ni forzar minúsculas.
+function titleCaseLive(s) {
+  return String(s).replace(/(^|\s)(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase());
+}
 
 // ============================================
 // COMPONENTE: FORMULARIO PELEADOR
@@ -22,6 +28,14 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
 
   useEffect(() => { if (editingFighter) { setFullName(editingFighter.fullName || ""); setGym(editingFighter.gym || ""); setAgeStr(editingFighter.age?.toString() || ""); setWeightStr(editingFighter.weightKg?.toString() || ""); setFightCountStr(editingFighter.fightCount?.toString() || "0"); setNotes(editingFighter.notes || ""); setSexo(editingFighter.sexo || "M"); setErrors({}); } }, [editingFighter]);
   useEffect(() => () => clearTimeout(addedTimerRef.current), []);
+
+  // Escuelas ya registradas (únicas) para el autocompletado predictivo del
+  // campo Escuela/Gimnasio: al escribir las iniciales el navegador sugiere.
+  const gymOptions = useMemo(() => {
+    const set = new Set();
+    existingFighters.forEach(f => { const g = (f.gym || "").trim(); if (g) set.add(g); });
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [existingFighters]);
 
   const parsedWeight = parseFloat(weightStr); const weightCategory = !isNaN(parsedWeight) && parsedWeight > 0 ? getWeightCategory(parsedWeight, sexo) : null; const categoryInfo = weightCategory ? getCategoryInfo(weightCategory) : null;
   const parsedAge = parseInt(ageStr); const ageCategoryInfo = !isNaN(parsedAge) && parsedAge > 0 ? getAgeCategory(parsedAge) : null;
@@ -89,7 +103,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
         <span className="text-green-400 text-lg">✓</span>
         <span className="text-green-400 text-sm font-semibold">{addedName} fue agregado correctamente a la cartelera</span>
       </div>}
-      <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
+      <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(titleCaseLive(e.target.value))} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e => setWeightStr(e.target.value)} placeholder="65" step="0.1" className={ic} />{errors.weightStr && <p className="text-red-400 text-xs mt-1">{errors.weightStr}</p>}</div>
         <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
@@ -98,7 +112,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
       {ageCategoryInfo && <div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Edad (FECHIBOX): </span><Badge color={ageCategoryInfo.color}>{ageCategoryInfo.label} · {ageCategoryInfo.formato}</Badge></div>}
       <div><label className={lbl}>Nº peleas</label><input type="number" value={fightCountStr} onChange={e => setFightCountStr(e.target.value)} placeholder="0" min="0" className={ic} /></div>
       {experienceInfo && <div className="bg-black px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Nivel: </span><Badge color={experienceInfo.color}>{experienceInfo.label}</Badge></div>}
-      <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" value={gym} onChange={e => setGym(e.target.value)} placeholder="Team Azuaje" maxLength={60} className={ic} />{errors.gym && <p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
+      <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" list="gym-options" value={gym} onChange={e => setGym(titleCaseLive(e.target.value))} placeholder="Team Azuaje" maxLength={60} autoComplete="off" className={ic} /><datalist id="gym-options">{gymOptions.map(g => <option key={g} value={g} />)}</datalist>{errors.gym && <p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
       <div><label className={lbl}>Sexo</label><div className="flex gap-2">
         <button type="button" onClick={() => setSexo("M")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors " + (sexo === "M" ? "bg-blue-600/15 border-blue-500 text-blue-300" : "bg-black border-boxing-lineBright text-boxing-muted")}>Masculino</button>
         <button type="button" onClick={() => setSexo("F")} className={"flex-1 py-2.5 text-sm font-bold border tracking-widest uppercase transition-colors " + (sexo === "F" ? "bg-pink-600/15 border-pink-500 text-pink-300" : "bg-black border-boxing-lineBright text-boxing-muted")}>Femenino</button>
