@@ -358,13 +358,16 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
             <button type="button" onClick={() => setDivsAll(false)} className="text-boxing-muted hover:underline">Ninguno</button>
           </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {DIVISION_OPTIONS.map(d => {
             const on = selectedDivs.includes(d.key);
             return (
-              <button key={d.key} type="button" onClick={() => toggleDiv(d.key)} className={"flex items-center gap-1.5 px-2 py-1 border text-[13px] transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15 text-boxing-cream" : "border-boxing-lineBright text-boxing-muted hover:border-boxing-lineBright/80")}>
-                <span className={"w-3 h-3 flex items-center justify-center text-[9px] border rounded-sm " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
-                {d.label} <span className="text-[8.5px] text-boxing-muted">{d.genero === "F" ? "♀" : "♂"} {weightRangeLabel(d)}</span>
+              <button key={d.key} type="button" onClick={() => toggleDiv(d.key)} className={"flex items-center gap-1.5 px-2 py-1.5 border text-left transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15" : "border-boxing-lineBright hover:border-boxing-lineBright/80")}>
+                <span className={"w-3.5 h-3.5 flex items-center justify-center text-[9px] border rounded-sm flex-shrink-0 " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
+                <span className="flex flex-col min-w-0 leading-tight">
+                  <span className={"font-bold text-[13px] whitespace-nowrap " + (on ? "text-boxing-cream" : "text-boxing-muted")}>{weightRangeLabel(d)}</span>
+                  <span className="text-[9px] text-boxing-muted truncate">{d.genero === "F" ? "F" : "M"} · {d.label}</span>
+                </span>
               </button>
             );
           })}
