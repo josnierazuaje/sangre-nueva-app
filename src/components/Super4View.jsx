@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { save, patchSuper4Bracket } from "../lib/storage.js";
-import { SUPER4_CATEGORIES, buildSuper4Brackets, setSemiWinner, setFinalWinner } from "../lib/super4.js";
+import { SUPER4_CATEGORIES, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements } from "../lib/super4.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -17,6 +17,8 @@ function escapeHtml(s) {
 export default function Super4View({ fighters, super4, setSuper4, ready = true }) {
   const byId = useMemo(() => { const m = {}; fighters.forEach(f => { m[f.id] = f; }); return m; }, [fighters]);
   const resultado = useMemo(() => buildSuper4Brackets(fighters), [fighters]);
+  // Cupo que se está reemplazando vía el botón ✕ (null = ningún modal abierto).
+  const [reemplazo, setReemplazo] = useState(null);
 
   function checkReady() {
     if (ready) return true;
@@ -37,18 +39,35 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     if (!confirm("¿Eliminar todas las llaves del Super 4?\n\nLos peleadores no se tocan; solo se borran las llaves y sus resultados.")) return;
     persist([]);
   }
-  // Los ganadores se escriben con un update dirigido a la llave tocada (no
-  // se reescribe el arreglo completo): dos personas marcando llaves
-  // distintas al mismo tiempo no se pisan entre sí.
-  function marcarResultado(updated, bId) {
+  // Los resultados se escriben con un update dirigido: solo la semifinal
+  // tocada (semis/0 o semis/1) y el campeón. Así, dos personas editando
+  // semifinales DISTINTAS de la misma llave a la vez no se pisan entre sí
+  // (antes se reescribía todo el arreglo `semis` y la última escritura
+  // borraba el resultado de la otra semifinal). semiIndex null = solo la
+  // final cambió (no se toca ninguna semifinal).
+  function marcarResultado(updated, bId, semiIndex) {
     const idx = updated.findIndex(b => b.id === bId);
     if (idx === -1) return;
     setSuper4(updated);
     const b = updated[idx];
-    patchSuper4Bracket(updated, idx, { semis: b.semis, finalWinner: b.finalWinner ?? null });
+    const fields = { finalWinner: b.finalWinner ?? null };
+    if (semiIndex != null) fields["semis/" + semiIndex] = b.semis[semiIndex];
+    patchSuper4Bracket(updated, idx, fields);
   }
-  function marcarSemi(bId, i, fid) { if (checkReady()) marcarResultado(setSemiWinner(super4, bId, i, fid), bId); }
-  function marcarFinal(bId, fid) { if (checkReady()) marcarResultado(setFinalWinner(super4, bId, fid), bId); }
+  function marcarSemi(bId, i, fid) { if (checkReady()) marcarResultado(setSemiWinner(super4, bId, i, fid), bId, i); }
+  function marcarFinal(bId, fid) { if (checkReady()) marcarResultado(setFinalWinner(super4, bId, fid), bId, null); }
+
+  // Botón ✕: abre el selector de reemplazo para ese cupo de semifinal.
+  function pedirReemplazo(bId, semiIndex, lado, saliente) {
+    if (!checkReady()) return;
+    setReemplazo({ bId, semiIndex, lado, saliente });
+  }
+  function hacerReemplazo(newFid) {
+    if (!reemplazo) return;
+    const { bId, semiIndex, lado } = reemplazo;
+    marcarResultado(replaceFighter(super4, bId, semiIndex, lado, newFid), bId, semiIndex);
+    setReemplazo(null);
+  }
 
   function nombre(fid) { return byId[fid]?.fullName || "—"; }
 
@@ -178,7 +197,12 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     );
   }
 
-  function Fila({ fid, winner, onPick, lado, placeholder, bloqueada }) {
+  // Una fila = un peleador del cupo, con dos acciones:
+  //   ✓ marca (o desmarca) que ganó y avanza a la siguiente ronda.
+  //   ✕ lo elimina de la llave y abre el selector para poner a otro.
+  // La final no lleva ✕ (sus atletas salen de las semifinales, no se
+  // reemplazan a mano), así que onRemove llega sólo en las semifinales.
+  function Fila({ fid, winner, onWin, onRemove, lado, placeholder, bloqueada }) {
     const cuadro = <span className="rounded-sm flex-shrink-0" style={{ width: 11, height: 11, background: lado === "rojo" ? "#c0392b" : "#2980b9" }} />;
     if (!fid) return (
       <div className="flex items-center gap-2 px-2.5 py-2 opacity-50">
@@ -189,19 +213,20 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     const f = byId[fid];
     const esGanador = winner === fid;
     const perdio = winner && winner !== fid;
-    // Deshabilitada si el peleador ya no existe (eliminado o aún no
-    // sincronizado) o si la final todavía no tiene a sus dos finalistas
-    // (no se puede coronar campeón con una sola semifinal decidida).
-    const deshabilitada = !f || bloqueada;
+    const inexistente = !f; // eliminado o aún no sincronizado
+    // El ✓ se bloquea si el atleta ya no existe o si la final aún no tiene a
+    // sus dos finalistas (no se puede coronar con una sola semi decidida).
+    const winBloqueado = inexistente || bloqueada;
     return (
-      <button type="button" disabled={deshabilitada} onClick={() => onPick(fid)} className={"w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors " + (esGanador ? "bg-boxing-goldDim/15" : "hover:bg-white/5") + (deshabilitada ? " opacity-40 cursor-not-allowed" : "")}>
+      <div className={"flex items-center gap-2 px-2.5 py-1.5 " + (esGanador ? "bg-boxing-goldDim/15" : "")}>
         {cuadro}
         <span className="flex flex-col min-w-0 flex-1">
-          <span className={"text-[12.5px] leading-tight truncate " + (perdio ? "text-boxing-muted" : "text-boxing-cream font-bold")}>{f ? f.fullName : "—"}</span>
+          <span className={"text-[12.5px] leading-tight truncate " + (perdio ? "text-boxing-muted line-through" : "text-boxing-cream font-bold")}>{f ? f.fullName : "—"}</span>
           <span className="text-[8.5px] text-boxing-muted truncate">{f ? `${f.gym} · ${f.weightKg}kg · ${f.age}a` : "peleador eliminado"}</span>
         </span>
-        {esGanador && <span className="text-boxing-goldFight text-[11px] flex-shrink-0">◀</span>}
-      </button>
+        {onWin && <button type="button" disabled={winBloqueado} onClick={onWin} title={esGanador ? "Quitar como ganador" : "Marcó ganador — avanza"} className={"w-7 h-7 flex items-center justify-center rounded border text-sm flex-shrink-0 transition-colors " + (esGanador ? "bg-green-600 border-green-500 text-white" : "border-boxing-lineBright text-green-400 hover:bg-green-600/20") + (winBloqueado ? " opacity-30 cursor-not-allowed" : "")}>✓</button>}
+        {onRemove && <button type="button" onClick={onRemove} title="Eliminar y elegir otro" className="w-7 h-7 flex items-center justify-center rounded border border-boxing-lineBright text-red-400 hover:bg-red-600/20 text-sm flex-shrink-0 transition-colors">✕</button>}
+      </div>
     );
   }
 
@@ -245,23 +270,23 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                 <p className="text-boxing-goldFight font-bold truncate" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.08em" }}>{"🏆"} {b.catLabel}</p>
                 <p className="text-[10px] text-boxing-muted truncate">{b.regla}</p>
               </div>
-              <span className="text-[8.5px] text-boxing-muted flex-shrink-0">toca al ganador</span>
+              <span className="text-[8.5px] text-boxing-muted flex-shrink-0 text-right leading-tight"><span className="text-green-400">✓</span> gana · <span className="text-red-400">✕</span> cambia</span>
             </div>
             <div className="p-3">
               <div className="grid items-stretch" style={{ gridTemplateColumns: "1fr 18px 1fr" }}>
                 <div className="flex flex-col justify-between gap-3">
                   {b.semis.map((s, i) => (
                     <Tarjeta key={i} dia={`Sáb 01 · Semi ${i + 1}`} decidido={!!s.winner}>
-                      <Fila fid={s.red} winner={s.winner} lado="rojo" onPick={fid => marcarSemi(b.id, i, fid)} />
-                      <Fila fid={s.blue} winner={s.winner} lado="azul" onPick={fid => marcarSemi(b.id, i, fid)} />
+                      <Fila fid={s.red} winner={s.winner} lado="rojo" onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
+                      <Fila fid={s.blue} winner={s.winner} lado="azul" onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
                     </Tarjeta>
                   ))}
                 </div>
                 <Conector />
                 <div className="flex flex-col justify-center">
                   <Tarjeta dia="Dom 02 · Final" decidido={!!campeon} destacada>
-                    <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onPick={fid => marcarFinal(b.id, fid)} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
-                    <Fila fid={finalistas[1]} winner={campeon} lado="azul" onPick={fid => marcarFinal(b.id, fid)} placeholder="Ganador Semi 2" bloqueada={!(finalistas[0] && finalistas[1])} />
+                    <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onWin={() => marcarFinal(b.id, finalistas[0])} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
+                    <Fila fid={finalistas[1]} winner={campeon} lado="azul" onWin={() => marcarFinal(b.id, finalistas[1])} placeholder="Ganador Semi 2" bloqueada={!(finalistas[0] && finalistas[1])} />
                   </Tarjeta>
                 </div>
               </div>
@@ -273,6 +298,33 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           </div>
         );
       })}
+
+      {reemplazo && (() => {
+        const b = super4.find(x => x.id === reemplazo.bId);
+        if (!b) return null;
+        const opciones = availableReplacements(b.catKey, fighters, super4);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4" onClick={() => setReemplazo(null)}>
+            <div className="w-full max-w-md bg-boxing-panel border border-boxing-goldDim/50 rounded-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-4 py-3 border-b border-boxing-line">
+                <p className="text-boxing-cream font-bold" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.05em" }}>Reemplazar peleador</p>
+                <p className="text-[11px] text-boxing-muted">{b.catLabel} · sale <span className="text-boxing-cream font-semibold">{nombre(reemplazo.saliente)}</span></p>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto">
+                {opciones.length === 0
+                  ? <p className="p-4 text-sm text-boxing-muted text-center">No hay más atletas elegibles para esta categoría.<br />Registra uno nuevo (pestaña Agregar) o libera un cupo de otra llave.</p>
+                  : opciones.map(f => (
+                    <button key={f.id} onClick={() => hacerReemplazo(f.id)} className="w-full text-left px-4 py-2.5 border-b border-boxing-line/50 hover:bg-white/5 transition-colors">
+                      <span className="text-boxing-cream font-semibold text-sm block truncate">{f.fullName}</span>
+                      <span className="text-[10px] text-boxing-muted">{f.gym} · {f.weightKg}kg · {f.age}a</span>
+                    </button>
+                  ))}
+              </div>
+              <button onClick={() => setReemplazo(null)} className="w-full py-3 bg-black/40 text-boxing-muted text-sm tracking-widest uppercase border-t border-boxing-line">Cancelar</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, setSemiWinner, setFinalWinner } from "../super4.js";
+import { SUPER4_CATEGORIES, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements } from "../super4.js";
 
 let n = 0;
 function f(over) {
@@ -157,10 +157,10 @@ describe("progresión de ganadores", () => {
 });
 
 describe("duplicados y orden de categorías en la generación", () => {
-  it("la misma persona registrada dos veces (pesos levemente distintos) no ocupa dos cupos de una llave", () => {
+  it("un registro con IDENTIDAD EXACTA repetida (mismo nombre+sexo+peso) no ocupa dos cupos", () => {
     const fighters = [
       f({ id: "p1", fullName: "Jose Perez", age: 25, weightKg: 95, gym: "A" }),
-      f({ id: "p2", fullName: "JOSE PEREZ", age: 25, weightKg: 95.5, gym: "A" }), // duplicado que la dedup no atrapa (peso distinto)
+      f({ id: "p2", fullName: "JOSE PEREZ", age: 25, weightKg: 95, gym: "B" }), // misma identidad exacta que p1
       f({ id: "q1", fullName: "Rival Uno", age: 25, weightKg: 96, gym: "B" }),
       f({ id: "q2", fullName: "Rival Dos", age: 25, weightKg: 97, gym: "C" }),
       f({ id: "q3", fullName: "Rival Tres", age: 25, weightKg: 98, gym: "D" }),
@@ -169,8 +169,22 @@ describe("duplicados y orden de categorías en la generación", () => {
     const b92 = brackets.find(b => b.catKey === "adulto92");
     expect(b92).toBeTruthy();
     const ids = [b92.semis[0].red, b92.semis[0].blue, b92.semis[1].red, b92.semis[1].blue];
-    // solo una copia de Jose Perez puede estar en la llave
+    // solo una copia de Jose Perez (misma identidad) puede estar en la llave
     expect(ids.filter(id => id === "p1" || id === "p2")).toHaveLength(1);
+  });
+
+  it("dos personas DISTINTAS con el mismo nombre pero distinto peso pueden estar ambas (consistente con la dedup)", () => {
+    const fighters = [
+      f({ id: "s1", fullName: "Juan Soto", age: 15, weightKg: 71 }),
+      f({ id: "s2", fullName: "Juan Soto", age: 15, weightKg: 64 }), // otra persona (la dedup los mantiene separados)
+      f({ id: "x1", fullName: "Pedro Uno", age: 15, weightKg: 70 }),
+      f({ id: "x2", fullName: "Luis Dos", age: 16, weightKg: 69 }),
+    ];
+    const { brackets } = buildSuper4Brackets(fighters);
+    const b = brackets.find(x => x.catKey === "cadete71");
+    expect(b).toBeTruthy(); // se arma la llave con los 4 (no se descarta a un Juan Soto)
+    const ids = [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].sort();
+    expect(ids).toEqual(["s1", "s2", "x1", "x2"]);
   });
 
   it("la llave de 60 se procesa antes que la de 67 y no le 'roban' al atleta que la completa", () => {
@@ -187,5 +201,59 @@ describe("duplicados y orden de categorías en la generación", () => {
     expect(ids60).toEqual(["L57", "L58", "L59", "L60"]);
     const f67 = faltantes.find(x => x.catKey === "adulto67");
     expect(f67.elegibles).toBe(3);
+  });
+});
+
+describe("reemplazo de peleadores (botón ✕)", () => {
+  function bracketCadetes() {
+    const fighters = [
+      f({ id: "a", age: 15, weightKg: 71 }), f({ id: "b", age: 15, weightKg: 70 }),
+      f({ id: "c", age: 16, weightKg: 69 }), f({ id: "d", age: 16, weightKg: 68 }),
+      f({ id: "e", age: 15, weightKg: 67 }), // 5º elegible, sin cupo
+    ];
+    return { fighters, brackets: buildSuper4Brackets(fighters).brackets };
+  }
+
+  it("replaceFighter cambia el atleta del cupo y limpia el ganador de esa semi", () => {
+    let { brackets } = bracketCadetes();
+    const b = brackets[0];
+    const rojoOriginal = b.semis[0].red;
+    brackets = setSemiWinner(brackets, b.id, 0, rojoOriginal); // gana el rojo
+    expect(brackets[0].semis[0].winner).toBe(rojoOriginal);
+    brackets = replaceFighter(brackets, b.id, 0, "red", "e"); // lo reemplaza
+    expect(brackets[0].semis[0].red).toBe("e");
+    expect(brackets[0].semis[0].winner).toBe(null); // el cruce cambió → sin ganador
+  });
+
+  it("replaceFighter destrona al campeón si el reemplazado era finalista", () => {
+    let { brackets } = bracketCadetes();
+    const b = brackets[0];
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
+    brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].red);
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);
+    expect(brackets[0].finalWinner).toBe(b.semis[0].red);
+    brackets = replaceFighter(brackets, b.id, 0, "red", "e"); // sale un finalista
+    expect(brackets[0].finalWinner).toBe(null);
+  });
+
+  it("availableReplacements ofrece sólo elegibles que no están en ninguna llave", () => {
+    const { fighters, brackets } = bracketCadetes();
+    const disp = availableReplacements("cadete71", fighters, brackets);
+    expect(disp.map(x => x.id)).toEqual(["e"]); // a,b,c,d ya están en la llave
+  });
+
+  it("availableReplacements excluye un duplicado exacto del presente, pero ofrece a un homónimo de distinto peso", () => {
+    const fighters = [
+      f({ id: "a", age: 15, weightKg: 71, fullName: "Juan Soto" }), // queda en la llave
+      f({ id: "b", age: 15, weightKg: 70 }),
+      f({ id: "c", age: 16, weightKg: 69 }),
+      f({ id: "d", age: 16, weightKg: 68 }),
+      f({ id: "dupExacto", age: 15, weightKg: 71, fullName: "JUAN SOTO" }), // misma identidad que 'a'
+      f({ id: "homonimo", age: 15, weightKg: 60, fullName: "juan soto" }), // otra persona (peso distinto)
+    ];
+    const { brackets } = buildSuper4Brackets(fighters);
+    const disp = availableReplacements("cadete71", fighters, brackets);
+    expect(disp.some(x => x.id === "dupExacto")).toBe(false); // mismo peso → misma persona → excluido
+    expect(disp.some(x => x.id === "homonimo")).toBe(true);   // distinto peso → persona distinta → ofrecido
   });
 });
