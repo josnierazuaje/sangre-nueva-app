@@ -1,4 +1,4 @@
-import { genId, getAgeCategory } from "../constants.js";
+import { genId, getAgeCategory, getExperienceLevel, EXPERIENCE_LEVELS } from "../constants.js";
 import { dupKey } from "./dedup.js";
 
 // ============================================
@@ -6,6 +6,19 @@ import { dupKey } from "./dedup.js";
 // Semifinales el sábado 01 y final el domingo 02. Las categorías en
 // disputa salen del afiche oficial del campeonato de novatos.
 // ============================================
+
+// Filtra un grupo de peleadores por experiencia MÁXIMA: deja solo a los que
+// están en maxExpKey o por debajo (ej. "principiante" incluye debutantes y
+// principiantes = 0 a 3 peleas). maxExpKey null/ausente = sin tope (todos).
+// La experiencia se recalcula desde fightCount (no del campo guardado, que
+// podría estar desactualizado).
+export function experienceIndex(key) { return EXPERIENCE_LEVELS.findIndex(e => e.key === key); }
+export function filterByMaxExperience(fighters, maxExpKey) {
+  if (!maxExpKey) return fighters || [];
+  const maxIdx = experienceIndex(maxExpKey);
+  if (maxIdx < 0) return fighters || [];
+  return (fighters || []).filter(f => experienceIndex(getExperienceLevel(Number(f.fightCount) || 0)) <= maxIdx);
+}
 export const SUPER4_CATEGORIES = [
   { key: "cadete71", label: "Cadetes 71kg", ageKey: "cadete", maxKg: 71, sexo: "M", regla: "Cadete (15-16) · hasta 71kg" },
   { key: "juvenil81", label: "Juvenil 81kg", ageKey: "juvenil", maxKg: 81, sexo: "M", regla: "Juvenil (17-18) · hasta 81kg" },
@@ -64,7 +77,11 @@ export function pairSemis(four) {
 // completaba la liviana. Devuelve también las categorías que no se pudieron
 // armar por falta de elegibles.
 const PROCESS_ORDER = ["cadete71", "juvenil81", "adulto60", "adulto67", "adulto92"];
-export function buildSuper4Brackets(fighters) {
+export function buildSuper4Brackets(fighters, maxExpKey = null) {
+  // Tope de experiencia: solo entran a la llave los peleadores hasta ese
+  // nivel (ej. novatos = hasta 3 peleas). Se guarda en cada llave para que
+  // los reemplazos (botón ✕) respeten el mismo tope.
+  const pool = filterByMaxExperience(fighters, maxExpKey);
   const usedIds = new Set();
   const usedPersons = new Set();
   // Identidad de persona = la misma clave que usa la deduplicación
@@ -76,7 +93,7 @@ export function buildSuper4Brackets(fighters) {
   for (const key of PROCESS_ORDER) {
     const cat = SUPER4_CATEGORIES.find(c => c.key === key);
     const seenPersons = new Set();
-    const eligibles = eligibleForCategory(cat, fighters).filter(f => {
+    const eligibles = eligibleForCategory(cat, pool).filter(f => {
       if (usedIds.has(f.id) || usedPersons.has(person(f)) || seenPersons.has(person(f))) return false;
       seenPersons.add(person(f));
       return true;
@@ -98,6 +115,7 @@ export function buildSuper4Brackets(fighters) {
         { red: semi2[0].id, blue: semi2[1].id, winner: null },
       ],
       finalWinner: null,
+      maxExpKey: maxExpKey || null,
       createdAt: new Date().toISOString(),
     };
   }
@@ -153,11 +171,13 @@ export function replaceFighter(brackets, bracketId, semiIndex, lado, newFid) {
 }
 
 // Atletas que pueden entrar a reemplazar a alguien en una llave: elegibles
-// para esa categoría y que NO están ya en ninguna llave (ni por id ni por
-// persona, para no duplicar a nadie). `catKey` identifica la categoría.
-export function availableReplacements(catKey, fighters, brackets) {
+// para esa categoría, dentro del mismo tope de experiencia con que se armó
+// la llave (maxExpKey), y que NO están ya en ninguna llave (ni por id ni
+// por persona, para no duplicar a nadie). `catKey` identifica la categoría.
+export function availableReplacements(catKey, fighters, brackets, maxExpKey = null) {
   const cat = SUPER4_CATEGORIES.find(c => c.key === catKey);
   if (!cat) return [];
+  const pool = filterByMaxExperience(fighters, maxExpKey);
   const byId = {};
   (fighters || []).forEach(f => { byId[f.id] = f; });
   const person = dupKey; // misma identidad que la deduplicación (ver buildSuper4Brackets)
@@ -172,5 +192,5 @@ export function availableReplacements(catKey, fighters, brackets) {
       if (f) usedPersons.add(person(f));
     });
   }));
-  return eligibleForCategory(cat, fighters).filter(f => !usedIds.has(f.id) && !usedPersons.has(person(f)));
+  return eligibleForCategory(cat, pool).filter(f => !usedIds.has(f.id) && !usedPersons.has(person(f)));
 }
