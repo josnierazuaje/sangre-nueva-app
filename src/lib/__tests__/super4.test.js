@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, eligibleForCategory, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights } from "../super4.js";
+import { dupKey } from "../dedup.js";
 
 let n = 0;
 function f(over) {
@@ -7,122 +8,173 @@ function f(over) {
   return { id: over.id || "f" + n, fullName: over.fullName || "Peleador " + n, gym: over.gym || "Gimnasio " + n, age: over.age ?? 25, weightKg: over.weightKg ?? 60, sexo: over.sexo || "M", fightCount: 1, createdAt: new Date(2026, 0, 1).toISOString(), ...over };
 }
 
-const cat71 = SUPER4_CATEGORIES.find(c => c.key === "cadete71");
-const cat92 = SUPER4_CATEGORIES.find(c => c.key === "adulto92");
-const cat60 = SUPER4_CATEGORIES.find(c => c.key === "adulto60");
-const cat67 = SUPER4_CATEGORIES.find(c => c.key === "adulto67");
+// Divisiones oficiales usadas en los tests (masculinas): m_ligero 55-60,
+// m_welter 60-65, m_pesado 85-90. getWeightCategory asigna cada peso a la
+// primera división cuyo tope no supere.
 
-describe("eligibleForCategory", () => {
+const cat71 = SUPER4_CATEGORIES.find(c => c.key === "cadete71"); // llave vieja (compat)
+const cat92 = SUPER4_CATEGORIES.find(c => c.key === "adulto92");
+
+// ---------- Funciones legacy (cinturones), aún usadas para compatibilidad ----------
+describe("eligibleForCategory (cinturones, compat)", () => {
   it("exige categoría de edad FECHIBOX, sexo y límite de peso", () => {
-    const ok = f({ age: 15, weightKg: 70 });          // cadete, ≤71 ✓
-    const pesado = f({ age: 16, weightKg: 72 });      // cadete pero pasa 71
-    const juvenil = f({ age: 17, weightKg: 65 });     // edad equivocada
+    const ok = f({ age: 15, weightKg: 70 });
+    const pesado = f({ age: 16, weightKg: 72 });
+    const juvenil = f({ age: 17, weightKg: 65 });
     const mujer = f({ age: 15, weightKg: 65, sexo: "F" });
     const sinPeso = f({ age: 15, weightKg: undefined });
     const res = eligibleForCategory(cat71, [ok, pesado, juvenil, mujer, sinPeso]);
     expect(res.map(x => x.id)).toEqual([ok.id]);
   });
-
   it("la categoría +92 exige peso desde 92 hacia arriba", () => {
-    const bajo = f({ age: 25, weightKg: 91 });
-    const justo = f({ age: 25, weightKg: 92 });
-    const alto = f({ age: 25, weightKg: 120 });
-    const res = eligibleForCategory(cat92, [bajo, justo, alto]);
-    expect(res.map(x => x.id)).toEqual([justo.id, alto.id]);
+    const res = eligibleForCategory(cat92, [f({ weightKg: 91 }), f({ id: "j", weightKg: 92 }), f({ id: "a", weightKg: 120 })]);
+    expect(res.map(x => x.id)).toEqual(["j", "a"]);
   });
 });
 
-describe("pickFour", () => {
-  it("elige a los 4 más cercanos al límite (desde abajo en categorías 'hasta X')", () => {
+describe("pickFour (cinturones, compat)", () => {
+  it("elige a los 4 más cercanos al límite (hasta X)", () => {
     const els = [55, 66, 60, 70, 68, 58].map(w => f({ age: 15, weightKg: w, id: "w" + w }));
-    const four = pickFour(cat71, els);
-    expect(four.map(x => x.weightKg).sort((a, b) => a - b)).toEqual([60, 66, 68, 70]);
-  });
-
-  it("en +92 elige a los 4 más cercanos a 92 (desde arriba)", () => {
-    const els = [93, 120, 95, 100, 110].map(w => f({ age: 25, weightKg: w, id: "p" + w }));
-    const four = pickFour(cat92, els);
-    expect(four.map(x => x.weightKg).sort((a, b) => a - b)).toEqual([93, 95, 100, 110]);
+    expect(pickFour(cat71, els).map(x => x.weightKg).sort((a, b) => a - b)).toEqual([60, 66, 68, 70]);
   });
 });
 
 describe("pairSemis", () => {
   it("evita cruzar compañeros de la misma escuela cuando hay alternativa", () => {
     const four = [
-      f({ id: "a", gym: "AZUAJE", weightKg: 70 }),
-      f({ id: "b", gym: "AZUAJE", weightKg: 69 }),
-      f({ id: "c", gym: "HH ARIAS", weightKg: 68 }),
-      f({ id: "d", gym: "HH ARIAS", weightKg: 67 }),
+      f({ id: "a", gym: "AZUAJE", weightKg: 70 }), f({ id: "b", gym: "AZUAJE", weightKg: 69 }),
+      f({ id: "c", gym: "HH ARIAS", weightKg: 68 }), f({ id: "d", gym: "HH ARIAS", weightKg: 67 }),
     ];
     const [s1, s2] = pairSemis(four);
-    const gyms = pair => pair.map(x => x.gym);
-    expect(new Set(gyms(s1)).size).toBe(2);
-    expect(new Set(gyms(s2)).size).toBe(2);
+    expect(new Set(s1.map(x => x.gym)).size).toBe(2);
+    expect(new Set(s2.map(x => x.gym)).size).toBe(2);
   });
 });
 
-describe("buildSuper4Brackets", () => {
-  it("arma la llave con 4 elegibles y reporta la categoría incompleta", () => {
+// ---------- Generación por (edad × división de peso oficial) ----------
+describe("eligibleForDivision", () => {
+  it("exige edad y división correctas (con el sexo implícito en la división)", () => {
+    const ok = f({ age: 15, weightKg: 63, sexo: "M" });   // cadete · m_welter
+    const otroPeso = f({ age: 15, weightKg: 58, sexo: "M" }); // m_ligero
+    const otraEdad = f({ age: 25, weightKg: 63, sexo: "M" }); // adulto
+    const mujer = f({ age: 15, weightKg: 63, sexo: "F" });    // f_welter, no m_welter
+    const res = eligibleForDivision("cadete", "m_welter", [ok, otroPeso, otraEdad, mujer]);
+    expect(res.map(x => x.id)).toEqual([ok.id]);
+  });
+});
+
+describe("buildSuper4Brackets (edad × división)", () => {
+  it("arma la llave con 4 elegibles y reporta la combinación incompleta (1-3)", () => {
     const fighters = [
-      // 4 cadetes ≤71 → llave completa
-      f({ age: 15, weightKg: 70 }), f({ age: 15, weightKg: 68 }), f({ age: 16, weightKg: 66 }), f({ age: 16, weightKg: 71 }),
-      // solo 2 adultos +92 → falta
-      f({ age: 25, weightKg: 95 }), f({ age: 30, weightKg: 100 }),
+      // 4 cadetes en m_welter (60-65)
+      f({ age: 15, weightKg: 61 }), f({ age: 15, weightKg: 62 }), f({ age: 16, weightKg: 63 }), f({ age: 16, weightKg: 64 }),
+      // 2 adultos en m_pesado (85-90) → falta
+      f({ age: 25, weightKg: 86 }), f({ age: 30, weightKg: 88 }),
     ];
     const { brackets, faltantes } = buildSuper4Brackets(fighters);
-    expect(brackets.map(b => b.catKey)).toEqual(["cadete71"]);
-    const f92 = faltantes.find(x => x.catKey === "adulto92");
-    expect(f92.elegibles).toBe(2);
-    expect(f92.faltan).toBe(2);
+    expect(brackets.map(b => b.catKey)).toEqual(["cadete__m_welter"]);
+    const falta = faltantes.find(x => x.catKey === "adulto__m_pesado");
+    expect(falta.elegibles).toBe(2);
+    expect(falta.faltan).toBe(2);
   });
 
-  it("un mismo atleta nunca queda en dos llaves (solape 60/67 en adultos)", () => {
-    // 4 adultos de ≤60kg: elegibles para 67 y para 60 a la vez.
-    // Más 4 de 61-67: solo elegibles para 67.
-    const livianos = [58, 59, 60, 57].map(w => f({ age: 25, weightKg: w, id: "L" + w }));
-    const medios = [67, 66, 65, 64].map(w => f({ age: 25, weightKg: w, id: "M" + w }));
-    const { brackets } = buildSuper4Brackets([...livianos, ...medios]);
-    const b67 = brackets.find(b => b.catKey === "adulto67");
-    const b60 = brackets.find(b => b.catKey === "adulto60");
-    expect(b67).toBeTruthy();
-    expect(b60).toBeTruthy();
-    const ids67 = [b67.semis[0].red, b67.semis[0].blue, b67.semis[1].red, b67.semis[1].blue];
-    const ids60 = [b60.semis[0].red, b60.semis[0].blue, b60.semis[1].red, b60.semis[1].blue];
-    expect(ids67.filter(id => ids60.includes(id))).toEqual([]);
-    // el 67 se queda con los más pesados; el 60 con los livianos
-    expect(ids67.sort()).toEqual(["M64", "M65", "M66", "M67"]);
-    expect(ids60.sort()).toEqual(["L57", "L58", "L59", "L60"]);
+  it("cada atleta cae en su división; distintas divisiones = distintas llaves sin solape", () => {
+    const ligero = [56, 57, 58, 59].map((w, i) => f({ id: "lig" + i, age: 25, weightKg: w }));
+    const welter = [61, 62, 63, 64].map((w, i) => f({ id: "wel" + i, age: 25, weightKg: w }));
+    const { brackets } = buildSuper4Brackets([...ligero, ...welter]);
+    const bLig = brackets.find(b => b.catKey === "adulto__m_ligero");
+    const bWel = brackets.find(b => b.catKey === "adulto__m_welter");
+    expect(bLig).toBeTruthy();
+    expect(bWel).toBeTruthy();
+    const idsLig = [bLig.semis[0].red, bLig.semis[0].blue, bLig.semis[1].red, bLig.semis[1].blue].sort();
+    const idsWel = [bWel.semis[0].red, bWel.semis[0].blue, bWel.semis[1].red, bWel.semis[1].blue];
+    expect(idsLig).toEqual(["lig0", "lig1", "lig2", "lig3"]);
+    expect(idsWel.filter(id => idsLig.includes(id))).toEqual([]);
+  });
+
+  it("arma llaves separadas por sexo (división masculina y femenina)", () => {
+    const fighters = [
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "m" + i, age: 25, weightKg: w, sexo: "M" })), // m_welter
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "fe" + i, age: 25, weightKg: w, sexo: "F" })), // f_welter
+    ];
+    const keys = buildSuper4Brackets(fighters).brackets.map(b => b.catKey);
+    expect(keys).toContain("adulto__m_welter");
+    expect(keys).toContain("adulto__f_welter");
+  });
+
+  it("solo arma llaves de las categorías de edad seleccionadas", () => {
+    const fighters = [
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "c" + i, age: 15, weightKg: w })), // cadetes m_welter
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "a" + i, age: 25, weightKg: w })), // adultos m_welter
+    ];
+    expect(buildSuper4Brackets(fighters, null, ["cadete"]).brackets.map(b => b.catKey)).toEqual(["cadete__m_welter"]);
+    expect(buildSuper4Brackets(fighters, null, ["cadete"]).faltantes.some(x => x.catKey.startsWith("adulto"))).toBe(false);
+    expect(buildSuper4Brackets(fighters, null, ["adulto"]).brackets.map(b => b.catKey)).toEqual(["adulto__m_welter"]);
+    const todas = buildSuper4Brackets(fighters, null, null).brackets.map(b => b.catKey);
+    expect(todas).toContain("cadete__m_welter");
+    expect(todas).toContain("adulto__m_welter");
+  });
+
+  it("solo arma llaves de las divisiones de peso seleccionadas", () => {
+    const fighters = [
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "w" + i, age: 25, weightKg: w })), // m_welter
+      ...[56, 57, 58, 59].map((w, i) => f({ id: "l" + i, age: 25, weightKg: w })), // m_ligero
+    ];
+    expect(buildSuper4Brackets(fighters, null, null, ["m_welter"]).brackets.map(b => b.catKey)).toEqual(["adulto__m_welter"]);
+    expect(buildSuper4Brackets(fighters, null, null, ["m_welter", "m_ligero"]).brackets.map(b => b.catKey).sort()).toEqual(["adulto__m_ligero", "adulto__m_welter"]);
+  });
+
+  it("ALL_DIVISION_KEYS incluye las 10 masculinas y 10 femeninas", () => {
+    expect(ALL_DIVISION_KEYS.filter(k => k.startsWith("m_"))).toHaveLength(10);
+    expect(ALL_DIVISION_KEYS.filter(k => k.startsWith("f_"))).toHaveLength(10);
+  });
+
+  it("divisiones/edades = [] (ninguna) NO cae por error a 'todas'", () => {
+    const fighters = [61, 62, 63, 64].map((w, i) => f({ id: "w" + i, age: 25, weightKg: w }));
+    expect(buildSuper4Brackets(fighters, null, null, []).brackets).toHaveLength(0); // sin divisiones
+    expect(buildSuper4Brackets(fighters, null, [], null).brackets).toHaveLength(0); // sin edades
+    // null sigue significando "todas"
+    expect(buildSuper4Brackets(fighters, null, null, null).brackets.length).toBeGreaterThan(0);
+  });
+
+  it("reservedPersons excluye a quien ya está en otra llave (evita doble-agendamiento)", () => {
+    const fighters = [
+      f({ id: "a", age: 25, weightKg: 64 }), f({ id: "b", age: 25, weightKg: 63 }),
+      f({ id: "c", age: 25, weightKg: 62 }), f({ id: "d", age: 25, weightKg: 61 }),
+    ];
+    // 'a' y 'b' ya están reservados en otra llave → la división debe quedar con solo 2 y no armarse
+    const reserved = new Set([dupKey(fighters[0]), dupKey(fighters[1])]);
+    const { brackets, faltantes } = buildSuper4Brackets(fighters, null, null, ["m_welter"], reserved);
+    expect(brackets).toHaveLength(0);
+    expect(faltantes.find(x => x.catKey === "adulto__m_welter").elegibles).toBe(2);
   });
 });
 
 describe("progresión de ganadores", () => {
   function bracketBase() {
     const fighters = [
-      f({ id: "a", age: 15, weightKg: 70 }), f({ id: "b", age: 15, weightKg: 68 }),
-      f({ id: "c", age: 16, weightKg: 66 }), f({ id: "d", age: 16, weightKg: 71 }),
+      f({ id: "a", age: 15, weightKg: 64 }), f({ id: "b", age: 15, weightKg: 63 }),
+      f({ id: "c", age: 16, weightKg: 62 }), f({ id: "d", age: 16, weightKg: 61 }),
     ];
     return buildSuper4Brackets(fighters).brackets;
   }
 
-  it("marcar ganadores de semis habilita la final; cambiar un semifinalista limpia el resultado de la final", () => {
+  it("marcar ganadores de semis habilita la final; cambiar un semifinalista limpia la final", () => {
     let brackets = bracketBase();
     const b = brackets[0];
-    const s1red = b.semis[0].red, s1blue = b.semis[0].blue, s2red = b.semis[1].red;
-    brackets = setSemiWinner(brackets, b.id, 0, s1red);
-    brackets = setSemiWinner(brackets, b.id, 1, s2red);
-    brackets = setFinalWinner(brackets, b.id, s1red);
-    expect(brackets[0].finalWinner).toBe(s1red);
-    // cambia el ganador de la semi 1 → el campeón anterior ya no es finalista
-    brackets = setSemiWinner(brackets, b.id, 0, s1blue);
-    expect(brackets[0].semis[0].winner).toBe(s1blue);
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
+    brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].red);
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);
+    expect(brackets[0].finalWinner).toBe(b.semis[0].red);
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].blue);
     expect(brackets[0].finalWinner).toBe(null);
   });
 
   it("NO permite coronar campeón con una sola semifinal decidida", () => {
     let brackets = bracketBase();
     const b = brackets[0];
-    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red); // solo la semi 1
-    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);   // intenta coronar
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);
     expect(brackets[0].finalWinner).toBe(null);
   });
 
@@ -131,7 +183,7 @@ describe("progresión de ganadores", () => {
     const b = brackets[0];
     brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
     brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].red);
-    brackets = setFinalWinner(brackets, b.id, b.semis[0].blue); // perdió su semi
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].blue);
     expect(brackets[0].finalWinner).toBe(null);
   });
 
@@ -143,73 +195,52 @@ describe("progresión de ganadores", () => {
     expect(brackets[0].semis[0].winner).toBe(null);
   });
 
-  it("corregir la OTRA semifinal también destrona al campeón (la final ya no es la misma)", () => {
+  it("corregir la OTRA semifinal también destrona al campeón", () => {
     let brackets = bracketBase();
     const b = brackets[0];
-    const s2blue = b.semis[1].blue;
     brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
     brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].red);
-    brackets = setFinalWinner(brackets, b.id, b.semis[0].red); // campeón = ganador semi 1
-    // se corrige la semi 2 (cambia el otro finalista) → el campeón cae
-    brackets = setSemiWinner(brackets, b.id, 1, s2blue);
+    brackets = setFinalWinner(brackets, b.id, b.semis[0].red);
+    brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].blue);
     expect(brackets[0].finalWinner).toBe(null);
   });
 });
 
-describe("duplicados y orden de categorías en la generación", () => {
-  it("un registro con IDENTIDAD EXACTA repetida (mismo nombre+sexo+peso) no ocupa dos cupos", () => {
+describe("duplicados en la generación", () => {
+  it("un registro con IDENTIDAD EXACTA repetida (nombre+sexo+peso) no ocupa dos cupos", () => {
     const fighters = [
-      f({ id: "p1", fullName: "Jose Perez", age: 25, weightKg: 95, gym: "A" }),
-      f({ id: "p2", fullName: "JOSE PEREZ", age: 25, weightKg: 95, gym: "B" }), // misma identidad exacta que p1
-      f({ id: "q1", fullName: "Rival Uno", age: 25, weightKg: 96, gym: "B" }),
-      f({ id: "q2", fullName: "Rival Dos", age: 25, weightKg: 97, gym: "C" }),
-      f({ id: "q3", fullName: "Rival Tres", age: 25, weightKg: 98, gym: "D" }),
+      f({ id: "p1", fullName: "Jose Perez", age: 25, weightKg: 88 }),
+      f({ id: "p2", fullName: "JOSE PEREZ", age: 25, weightKg: 88 }), // misma identidad
+      f({ id: "q1", fullName: "Rival Uno", age: 25, weightKg: 86 }),
+      f({ id: "q2", fullName: "Rival Dos", age: 25, weightKg: 87 }),
+      f({ id: "q3", fullName: "Rival Tres", age: 25, weightKg: 89 }),
     ];
-    const { brackets } = buildSuper4Brackets(fighters);
-    const b92 = brackets.find(b => b.catKey === "adulto92");
-    expect(b92).toBeTruthy();
-    const ids = [b92.semis[0].red, b92.semis[0].blue, b92.semis[1].red, b92.semis[1].blue];
-    // solo una copia de Jose Perez (misma identidad) puede estar en la llave
+    const b = buildSuper4Brackets(fighters).brackets.find(b => b.catKey === "adulto__m_pesado");
+    expect(b).toBeTruthy();
+    const ids = [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue];
     expect(ids.filter(id => id === "p1" || id === "p2")).toHaveLength(1);
   });
 
-  it("dos personas DISTINTAS con el mismo nombre pero distinto peso pueden estar ambas (consistente con la dedup)", () => {
+  it("dos personas distintas con el mismo nombre pero distinto peso pueden estar ambas en la misma división", () => {
     const fighters = [
-      f({ id: "s1", fullName: "Juan Soto", age: 15, weightKg: 71 }),
-      f({ id: "s2", fullName: "Juan Soto", age: 15, weightKg: 64 }), // otra persona (la dedup los mantiene separados)
-      f({ id: "x1", fullName: "Pedro Uno", age: 15, weightKg: 70 }),
-      f({ id: "x2", fullName: "Luis Dos", age: 16, weightKg: 69 }),
+      f({ id: "s1", fullName: "Juan Soto", age: 25, weightKg: 62 }),
+      f({ id: "s2", fullName: "Juan Soto", age: 25, weightKg: 63 }), // otra persona
+      f({ id: "x1", fullName: "Pedro Uno", age: 25, weightKg: 61 }),
+      f({ id: "x2", fullName: "Luis Dos", age: 25, weightKg: 64 }),
     ];
-    const { brackets } = buildSuper4Brackets(fighters);
-    const b = brackets.find(x => x.catKey === "cadete71");
-    expect(b).toBeTruthy(); // se arma la llave con los 4 (no se descarta a un Juan Soto)
+    const b = buildSuper4Brackets(fighters).brackets.find(x => x.catKey === "adulto__m_welter");
+    expect(b).toBeTruthy();
     const ids = [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].sort();
     expect(ids).toEqual(["s1", "s2", "x1", "x2"]);
-  });
-
-  it("la llave de 60 se procesa antes que la de 67 y no le 'roban' al atleta que la completa", () => {
-    const fighters = [
-      // 4 adultos que completan la llave de 60
-      ...[57, 58, 59, 60].map(w => f({ age: 25, weightKg: w, id: "L" + w })),
-      // solo 3 de 61-67: la de 67 debe quedar incompleta (sin robarse al de 60)
-      ...[65, 66, 67].map(w => f({ age: 25, weightKg: w, id: "M" + w })),
-    ];
-    const { brackets, faltantes } = buildSuper4Brackets(fighters);
-    const b60 = brackets.find(b => b.catKey === "adulto60");
-    expect(b60).toBeTruthy();
-    const ids60 = [b60.semis[0].red, b60.semis[0].blue, b60.semis[1].red, b60.semis[1].blue].sort();
-    expect(ids60).toEqual(["L57", "L58", "L59", "L60"]);
-    const f67 = faltantes.find(x => x.catKey === "adulto67");
-    expect(f67.elegibles).toBe(3);
   });
 });
 
 describe("reemplazo de peleadores (botón ✕)", () => {
   function bracketCadetes() {
     const fighters = [
-      f({ id: "a", age: 15, weightKg: 71 }), f({ id: "b", age: 15, weightKg: 70 }),
-      f({ id: "c", age: 16, weightKg: 69 }), f({ id: "d", age: 16, weightKg: 68 }),
-      f({ id: "e", age: 15, weightKg: 67 }), // 5º elegible, sin cupo
+      f({ id: "a", age: 15, weightKg: 64 }), f({ id: "b", age: 15, weightKg: 63 }),
+      f({ id: "c", age: 16, weightKg: 62 }), f({ id: "d", age: 16, weightKg: 61 }),
+      f({ id: "e", age: 15, weightKg: 60.5 }), // 5º en m_welter, el más liviano → queda fuera
     ];
     return { fighters, brackets: buildSuper4Brackets(fighters).brackets };
   }
@@ -217,12 +248,10 @@ describe("reemplazo de peleadores (botón ✕)", () => {
   it("replaceFighter cambia el atleta del cupo y limpia el ganador de esa semi", () => {
     let { brackets } = bracketCadetes();
     const b = brackets[0];
-    const rojoOriginal = b.semis[0].red;
-    brackets = setSemiWinner(brackets, b.id, 0, rojoOriginal); // gana el rojo
-    expect(brackets[0].semis[0].winner).toBe(rojoOriginal);
-    brackets = replaceFighter(brackets, b.id, 0, "red", "e"); // lo reemplaza
+    brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
+    brackets = replaceFighter(brackets, b.id, 0, "red", "e");
     expect(brackets[0].semis[0].red).toBe("e");
-    expect(brackets[0].semis[0].winner).toBe(null); // el cruce cambió → sin ganador
+    expect(brackets[0].semis[0].winner).toBe(null);
   });
 
   it("replaceFighter destrona al campeón si el reemplazado era finalista", () => {
@@ -231,156 +260,138 @@ describe("reemplazo de peleadores (botón ✕)", () => {
     brackets = setSemiWinner(brackets, b.id, 0, b.semis[0].red);
     brackets = setSemiWinner(brackets, b.id, 1, b.semis[1].red);
     brackets = setFinalWinner(brackets, b.id, b.semis[0].red);
-    expect(brackets[0].finalWinner).toBe(b.semis[0].red);
-    brackets = replaceFighter(brackets, b.id, 0, "red", "e"); // sale un finalista
+    brackets = replaceFighter(brackets, b.id, 0, "red", "e");
     expect(brackets[0].finalWinner).toBe(null);
   });
 
   it("availableReplacements ofrece sólo elegibles que no están en ninguna llave", () => {
     const { fighters, brackets } = bracketCadetes();
-    const disp = availableReplacements("cadete71", fighters, brackets);
-    expect(disp.map(x => x.id)).toEqual(["e"]); // a,b,c,d ya están en la llave
+    expect(availableReplacements("cadete__m_welter", fighters, brackets).map(x => x.id)).toEqual(["e"]);
   });
 
   it("availableReplacements excluye un duplicado exacto del presente, pero ofrece a un homónimo de distinto peso", () => {
     const fighters = [
-      f({ id: "a", age: 15, weightKg: 71, fullName: "Juan Soto" }), // queda en la llave
-      f({ id: "b", age: 15, weightKg: 70 }),
-      f({ id: "c", age: 16, weightKg: 69 }),
-      f({ id: "d", age: 16, weightKg: 68 }),
-      f({ id: "dupExacto", age: 15, weightKg: 71, fullName: "JUAN SOTO" }), // misma identidad que 'a'
-      f({ id: "homonimo", age: 15, weightKg: 60, fullName: "juan soto" }), // otra persona (peso distinto)
+      f({ id: "a", age: 15, weightKg: 64, fullName: "Juan Soto" }),
+      f({ id: "b", age: 15, weightKg: 63.5 }),
+      f({ id: "c", age: 16, weightKg: 63 }),
+      f({ id: "d", age: 16, weightKg: 62.5 }),
+      f({ id: "dupExacto", age: 15, weightKg: 64, fullName: "JUAN SOTO" }), // misma identidad que 'a'
+      f({ id: "homonimo", age: 15, weightKg: 61, fullName: "juan soto" }),  // otra persona
     ];
     const { brackets } = buildSuper4Brackets(fighters);
-    const disp = availableReplacements("cadete71", fighters, brackets);
-    expect(disp.some(x => x.id === "dupExacto")).toBe(false); // mismo peso → misma persona → excluido
-    expect(disp.some(x => x.id === "homonimo")).toBe(true);   // distinto peso → persona distinta → ofrecido
+    const disp = availableReplacements("cadete__m_welter", fighters, brackets);
+    expect(disp.some(x => x.id === "dupExacto")).toBe(false);
+    expect(disp.some(x => x.id === "homonimo")).toBe(true);
+  });
+
+  it("availableReplacements funciona con una llave VIEJA de cinturón (compat)", () => {
+    const fighters = [
+      f({ id: "u1", age: 25, weightKg: 66 }), f({ id: "u2", age: 25, weightKg: 65 }),
+      f({ id: "libre", age: 25, weightKg: 60 }),
+      f({ id: "pesado", age: 25, weightKg: 80 }), // pasa 67 → no elegible para adulto67
+    ];
+    const bracketViejo = [{ id: "b", catKey: "adulto67", semis: [{ red: "u1", blue: "u2", winner: null }, { red: "x", blue: "y", winner: null }] }];
+    const disp = availableReplacements("adulto67", fighters, bracketViejo).map(x => x.id);
+    expect(disp).toContain("libre");
+    expect(disp).not.toContain("u1");
+    expect(disp).not.toContain("pesado");
   });
 });
 
 describe("tope por número de peleas (Peleadores hasta con:)", () => {
   it("filterByMaxFights deja solo a los que tienen esa cantidad de peleas o menos", () => {
-    const fighters = [
-      f({ id: "a", fightCount: 0 }),
-      f({ id: "b", fightCount: 3 }),
-      f({ id: "c", fightCount: 4 }),
-      f({ id: "d", fightCount: 15 }),
-    ];
+    const fighters = [f({ id: "a", fightCount: 0 }), f({ id: "b", fightCount: 3 }), f({ id: "c", fightCount: 4 }), f({ id: "d", fightCount: 15 })];
     expect(filterByMaxFights(fighters, 3).map(x => x.id).sort()).toEqual(["a", "b"]);
     expect(filterByMaxFights(fighters, 0).map(x => x.id)).toEqual(["a"]);
-    // sin tope: entran todos
     expect(filterByMaxFights(fighters, null)).toHaveLength(4);
   });
 
-  it("fightCount ausente cuenta como 0 peleas (entra en cualquier tope)", () => {
+  it("fightCount ausente cuenta como 0 peleas", () => {
     const fighters = [f({ id: "x", fightCount: undefined }), f({ id: "y", fightCount: "abc" })];
     expect(filterByMaxFights(fighters, 0).map(x => x.id).sort()).toEqual(["x", "y"]);
   });
 
   it("buildSuper4Brackets con tope 3 solo arma con peleadores de hasta 3 peleas", () => {
     const fighters = [
-      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
-      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
-      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
-      f({ id: "n4", age: 16, weightKg: 68, fightCount: 1 }),
-      // dos con muchas peleas: NO deben entrar bajo el tope de 3
-      f({ id: "exp1", age: 15, weightKg: 67, fightCount: 12 }),
-      f({ id: "exp2", age: 16, weightKg: 66, fightCount: 8 }),
+      f({ id: "n1", age: 15, weightKg: 64, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 63, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 62, fightCount: 3 }),
+      f({ id: "n4", age: 16, weightKg: 61, fightCount: 1 }),
+      f({ id: "exp1", age: 15, weightKg: 60.5, fightCount: 12 }),
+      f({ id: "exp2", age: 16, weightKg: 64.5, fightCount: 8 }),
     ];
-    const { brackets } = buildSuper4Brackets(fighters, 3);
-    const b = brackets.find(x => x.catKey === "cadete71");
+    const b = buildSuper4Brackets(fighters, 3).brackets.find(x => x.catKey === "cadete__m_welter");
     expect(b).toBeTruthy();
-    const ids = [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].sort();
-    expect(ids).toEqual(["n1", "n2", "n3", "n4"]);
-    expect(b.maxFights).toBe(3); // el tope queda guardado en la llave
+    expect([b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].sort()).toEqual(["n1", "n2", "n3", "n4"]);
+    expect(b.maxFights).toBe(3);
   });
 
-  it("con tope 3 y solo 3 elegibles, la categoría no se arma aunque haya expertos de sobra", () => {
+  it("con tope 3 y solo 3 elegibles, la combinación no se arma aunque haya expertos", () => {
     const fighters = [
-      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
-      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
-      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
-      f({ id: "e1", age: 16, weightKg: 68, fightCount: 20 }),
-      f({ id: "e2", age: 15, weightKg: 67, fightCount: 15 }),
+      f({ id: "n1", age: 15, weightKg: 64, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 63, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 62, fightCount: 3 }),
+      f({ id: "e1", age: 16, weightKg: 61, fightCount: 20 }),
+      f({ id: "e2", age: 15, weightKg: 60.5, fightCount: 15 }),
     ];
     const { brackets, faltantes } = buildSuper4Brackets(fighters, 3);
-    expect(brackets.find(b => b.catKey === "cadete71")).toBeFalsy();
-    expect(faltantes.find(x => x.catKey === "cadete71").elegibles).toBe(3);
+    expect(brackets.find(b => b.catKey === "cadete__m_welter")).toBeFalsy();
+    expect(faltantes.find(x => x.catKey === "cadete__m_welter").elegibles).toBe(3);
   });
 
-  it("availableReplacements respeta el tope: no ofrece a un experto para una llave con tope 3", () => {
+  it("availableReplacements respeta el tope: no ofrece a un experto", () => {
     const fighters = [
-      f({ id: "n1", age: 15, weightKg: 71, fightCount: 0 }),
-      f({ id: "n2", age: 15, weightKg: 70, fightCount: 2 }),
-      f({ id: "n3", age: 16, weightKg: 69, fightCount: 3 }),
-      f({ id: "n4", age: 16, weightKg: 68, fightCount: 1 }),
-      f({ id: "n5", age: 15, weightKg: 67, fightCount: 0 }), // libre y dentro del tope → se ofrece
-      f({ id: "exp", age: 15, weightKg: 66, fightCount: 18 }), // experto → NO se ofrece
+      f({ id: "n1", age: 15, weightKg: 64, fightCount: 0 }),
+      f({ id: "n2", age: 15, weightKg: 63, fightCount: 2 }),
+      f({ id: "n3", age: 16, weightKg: 62, fightCount: 3 }),
+      f({ id: "n4", age: 16, weightKg: 61, fightCount: 1 }),
+      f({ id: "n5", age: 15, weightKg: 60.5, fightCount: 0 }),
+      f({ id: "exp", age: 15, weightKg: 64.5, fightCount: 18 }),
     ];
     const { brackets } = buildSuper4Brackets(fighters, 3);
-    const disp = availableReplacements("cadete71", fighters, brackets, bracketMaxFights(brackets[0])).map(x => x.id);
+    const disp = availableReplacements("cadete__m_welter", fighters, brackets, bracketMaxFights(brackets[0])).map(x => x.id);
     expect(disp).toContain("n5");
     expect(disp).not.toContain("exp");
-  });
-
-  it("solo arma llaves de las categorías de edad seleccionadas", () => {
-    const fighters = [
-      // 4 cadetes
-      ...[71, 70, 69, 68].map((w, i) => f({ id: "c" + i, age: 15, weightKg: w })),
-      // 4 adultos ≤67
-      ...[67, 66, 65, 64].map((w, i) => f({ id: "a" + i, age: 25, weightKg: w })),
-    ];
-    // solo Cadete participa → no se arma ninguna de adultos
-    const soloCadete = buildSuper4Brackets(fighters, null, ["cadete"]);
-    expect(soloCadete.brackets.map(b => b.catKey)).toEqual(["cadete71"]);
-    expect(soloCadete.faltantes.some(x => x.catKey.startsWith("adulto"))).toBe(false); // ni se reportan
-    // solo Adulto participa → no se arma la de cadetes
-    const soloAdulto = buildSuper4Brackets(fighters, null, ["adulto"]);
-    expect(soloAdulto.brackets.some(b => b.catKey === "cadete71")).toBe(false);
-    expect(soloAdulto.brackets.some(b => b.catKey.startsWith("adulto"))).toBe(true);
-    // ageKeys null = todas (comportamiento anterior)
-    const todas = buildSuper4Brackets(fighters, null, null);
-    expect(todas.brackets.some(b => b.catKey === "cadete71")).toBe(true);
-    expect(todas.brackets.some(b => b.catKey === "adulto67")).toBe(true);
-  });
-
-  it("SUPER4_AGE_KEYS lista las edades que el Super 4 cubre, sin repetir", () => {
-    expect(SUPER4_AGE_KEYS).toEqual(["cadete", "juvenil", "adulto"]);
-  });
-
-  it("mergeRegenerated CONSERVA las llaves de categorías no regeneradas (no borra campeones)", () => {
-    const existing = [
-      { catKey: "cadete71", finalWinner: null },
-      { catKey: "juvenil81", finalWinner: null },
-      { catKey: "adulto67", finalWinner: "campeon-x" }, // ¡tiene campeón!
-      { catKey: "adulto60", finalWinner: null },
-    ];
-    const regenerated = [
-      { catKey: "cadete71", finalWinner: null, nuevo: true },
-      { catKey: "juvenil81", finalWinner: null, nuevo: true },
-    ];
-    // Se regeneran solo cadete y juvenil; adulto NO participa esta vez
-    const merged = mergeRegenerated(existing, regenerated, ["cadete", "juvenil"]);
-    expect(merged.find(b => b.catKey === "adulto67").finalWinner).toBe("campeon-x"); // campeón intacto
-    expect(merged.find(b => b.catKey === "adulto60")).toBeTruthy();
-    expect(merged.find(b => b.catKey === "cadete71").nuevo).toBe(true); // cadete rearmada
-    expect(merged.map(b => b.catKey)).toEqual(["cadete71", "juvenil81", "adulto67", "adulto60"]); // orden oficial
-  });
-
-  it("mergeRegenerated con todas las edades = solo las regeneradas (sin conservar viejas)", () => {
-    const existing = [{ catKey: "adulto67", finalWinner: "x" }];
-    const regenerated = [{ catKey: "cadete71" }];
-    const merged = mergeRegenerated(existing, regenerated, ["cadete", "juvenil", "adulto"]);
-    // adulto SÍ participa (se regenera) y no vino en regenerated → no se conserva
-    expect(merged.map(b => b.catKey)).toEqual(["cadete71"]);
   });
 
   it("bracketMaxFights lee el número nuevo y convierte el nivel viejo (compat)", () => {
     expect(bracketMaxFights({ maxFights: 3 })).toBe(3);
     expect(bracketMaxFights({ maxFights: 0 })).toBe(0);
     expect(bracketMaxFights({ maxFights: null })).toBe(null);
-    expect(bracketMaxFights({ maxExpKey: "principiante" })).toBe(3); // llave vieja
+    expect(bracketMaxFights({ maxExpKey: "principiante" })).toBe(3);
     expect(bracketMaxFights({ maxExpKey: "debutante" })).toBe(0);
     expect(bracketMaxFights({})).toBe(null);
+  });
+});
+
+describe("mergeRegenerated (no destructivo)", () => {
+  it("CONSERVA las llaves que no se regeneraron (no borra campeones)", () => {
+    const existing = [
+      { catKey: "cadete__m_welter", finalWinner: null },
+      { catKey: "adulto__m_pesado", finalWinner: "campeon-x" },
+    ];
+    const regenerated = [{ catKey: "cadete__m_welter", finalWinner: null, nuevo: true }];
+    const merged = mergeRegenerated(existing, regenerated);
+    expect(merged.find(b => b.catKey === "adulto__m_pesado").finalWinner).toBe("campeon-x");
+    expect(merged.find(b => b.catKey === "cadete__m_welter").nuevo).toBe(true);
+  });
+
+  it("conserva también llaves viejas de cinturón (compat)", () => {
+    const existing = [{ catKey: "adulto67", finalWinner: "y" }];
+    const regenerated = [{ catKey: "cadete__m_welter" }];
+    const merged = mergeRegenerated(existing, regenerated);
+    expect(merged.map(b => b.catKey).sort()).toEqual(["adulto67", "cadete__m_welter"]);
+    expect(merged.find(b => b.catKey === "adulto67").finalWinner).toBe("y");
+  });
+
+  it("ordena por edad primero: una llave femenina de cadete va ANTES que una masculina de juvenil", () => {
+    const merged = mergeRegenerated([], [{ catKey: "juvenil__m_ligero" }, { catKey: "cadete__f_welter" }]);
+    expect(merged.map(b => b.catKey)).toEqual(["cadete__f_welter", "juvenil__m_ligero"]);
+  });
+});
+
+describe("SUPER4_AGE_KEYS", () => {
+  it("lista las edades que el Super 4 ofrece por defecto, sin repetir", () => {
+    expect(SUPER4_AGE_KEYS).toEqual(["cadete", "juvenil", "adulto"]);
   });
 });
