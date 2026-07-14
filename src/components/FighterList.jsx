@@ -27,7 +27,8 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     let r = [...fighters];
     if (showFaltantes) r = r.filter(f => !matchedIds.has(f.id));
     if (sexFilter !== "all") r = r.filter(f => (f.sexo || "M") === sexFilter);
-    if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
+    if (ageFilter === "invalid") r = r.filter(f => { const k = getAgeCategory(f.age).key; return k === "infantil" || k === "veterano"; });
+    else if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
     if (searchQuery.trim()) { const s = searchQuery.toLowerCase(); r = r.filter(f => f.fullName.toLowerCase().includes(s) || f.gym.toLowerCase().includes(s)); }
     if (categoryFilter !== "all") r = r.filter(f => f.weightCategory === categoryFilter);
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
@@ -39,6 +40,8 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   const sexCounts = useMemo(() => { const c = { M: 0, F: 0 }; fighters.forEach(f => { c[(f.sexo || "M") === "F" ? "F" : "M"]++; }); return c; }, [fighters]);
   // Conteo por categoría de edad (World Boxing) para las chips de edad.
   const ageCounts = useMemo(() => { const c = {}; fighters.forEach(f => { const k = getAgeCategory(f.age).key; c[k] = (c[k] || 0) + 1; }); return c; }, [fighters]);
+  // Atletas fuera de los rangos oficiales (menores de 13 o mayores de 40).
+  const invalidCount = (ageCounts.infantil || 0) + (ageCounts.veterano || 0);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
   // Chip "Todos": limpia todos los filtros para ver a todos los registrados.
   const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && !showFaltantes && sexFilter === "all" && ageFilter === "all";
@@ -53,7 +56,8 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     const filtros = [];
     if (showFaltantes) filtros.push("FALTANTES (sin rival asignado en el VS)");
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
-    if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
+    if (ageFilter === "invalid") filtros.push("INVÁLIDOS (fuera de rango oficial 13-40)");
+    else if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
     if (categoryFilter !== "all") { const c = getCategoryInfo(categoryFilter); if (c) filtros.push(`División: ${c.label} ${weightRangeLabel(c)} (${c.genero === "F" ? "Mujeres" : "Hombres"})`); }
     if (experienceFilter !== "all") { const e = getExperienceInfo(experienceFilter); if (e) filtros.push(`Nivel: ${e.label}`); }
     if (searchQuery.trim()) filtros.push(`Búsqueda: "${searchQuery.trim()}"`);
@@ -136,6 +140,10 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
           <span className="text-sm font-bold leading-none" style={{ color: a.color }}>{c}</span>
           <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: a.color }}>{a.label} · {FECHIBOX_LABEL[a.key] || a.label}</span>
         </button>; })}
+        {invalidCount > 0 && <button onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: ageFilter === "invalid" ? "#DC2626" : "#DC262640" }}>
+          <span className="text-sm font-bold leading-none" style={{ color: "#DC2626" }}>{invalidCount}</span>
+          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#DC2626" }}>Inválidos</span>
+        </button>}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
         <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
