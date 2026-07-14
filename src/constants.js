@@ -35,24 +35,25 @@ export const WEIGHT_CATEGORIES = [...WEIGHT_CATEGORIES_M, ...WEIGHT_CATEGORIES_F
 export function weightRangeLabel(c) {
   return c.maxWeight === Infinity ? `+${c.minWeight}kg` : `${c.minWeight}-${c.maxWeight}kg`;
 }
-// Rangos de edad oficiales FECHIBOX (Federación Chilena de Boxeo): las
-// categorías NO se pueden mezclar en competencia. La normativa define la
-// categoría por la edad que se cumple al 31 de diciembre del año en curso;
-// la app usa la edad registrada del atleta como aproximación (no guarda
-// fecha de nacimiento).
+// Rangos de edad oficiales World Boxing (worldboxing.org, Reglamento de
+// Competición, sección 2.1): las categorías NO se pueden mezclar en
+// competencia. La edad se determina por el año calendario de nacimiento; la
+// app usa la edad registrada del atleta como aproximación (no guarda fecha
+// de nacimiento). Las claves internas se conservan (escolar/cadete/… ) por
+// compatibilidad; solo cambian las etiquetas visibles a las de World Boxing.
 export const AGE_CATEGORIES = [
-  { key: "escolar", label: "Escolar", minAge: 13, maxAge: 14, formato: "3R × 1,5min", color: "#3B82F6" },
-  { key: "cadete", label: "Cadete", minAge: 15, maxAge: 16, formato: "3R × 2min", color: "#EAB308" },
-  { key: "juvenil", label: "Juvenil", minAge: 17, maxAge: 18, formato: "3R × 3min", color: "#EF4444" },
-  { key: "adulto", label: "Adulto/Elite", minAge: 19, maxAge: 40, formato: "3R × 3min", color: "#9CA3AF" },
+  { key: "escolar", label: "U15", minAge: 13, maxAge: 14, formato: "3R × 1,5min", color: "#3B82F6" },
+  { key: "cadete", label: "U17", minAge: 15, maxAge: 16, formato: "3R × 2min", color: "#EAB308" },
+  { key: "juvenil", label: "U19", minAge: 17, maxAge: 18, formato: "3R × 3min", color: "#EF4444" },
+  { key: "adulto", label: "Elite", minAge: 19, maxAge: 40, formato: "3R × 3min", color: "#9CA3AF" },
 ];
 export function getAgeCategory(age) {
   const c = AGE_CATEGORIES.find(c => age >= c.minAge && age <= c.maxAge);
   if (c) return c;
-  // Fuera del rango oficial FECHIBOX: se agrupan aparte para que nunca
-  // se emparejen con las categorías oficiales.
-  if (age < 13) return { key: "infantil", label: "Infantil (fuera de rango oficial)", formato: "—", color: "#6B7280" };
-  return { key: "veterano", label: "Veterano (fuera de rango oficial)", formato: "—", color: "#6B7280" };
+  // Fuera del rango oficial World Boxing (U15 a Elite): se agrupan aparte
+  // para que nunca se emparejen con las categorías oficiales.
+  if (age < 13) return { key: "infantil", label: "Sub-13 (fuera de rango oficial)", formato: "—", color: "#6B7280" };
+  return { key: "veterano", label: "+40 (fuera de rango oficial)", formato: "—", color: "#6B7280" };
 }
 
 export const EXPERIENCE_LEVELS = [

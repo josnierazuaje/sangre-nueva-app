@@ -8,7 +8,7 @@ export const ALL_DIVISION_KEYS = WEIGHT_CATEGORIES.map(d => d.key);
 const AGE_ORDER = ["escolar", "cadete", "juvenil", "adulto"];
 
 // Peleadores elegibles para una llave (edad × división): misma categoría de
-// edad FECHIBOX y misma división de peso oficial. La división ya lleva el
+// edad World Boxing y misma división de peso oficial. La división ya lleva el
 // sexo (getWeightCategory usa la lista del género del atleta), así que un
 // atleta nunca cae en una división del otro sexo.
 export function eligibleForDivision(ageKey, divKey, fighters) {
@@ -54,7 +54,7 @@ export const SUPER4_CATEGORIES = [
 ];
 
 // Peleadores que cumplen la regla de una categoría del torneo: misma
-// categoría de edad FECHIBOX, mismo sexo y dentro del límite de peso.
+// categoría de edad World Boxing, mismo sexo y dentro del límite de peso.
 export function eligibleForCategory(cat, fighters) {
   return (fighters || []).filter(f => {
     if ((f.sexo || "M") !== cat.sexo) return false;
@@ -102,7 +102,7 @@ export function pairSemis(four) {
 // pesada (60 antes que 67) para que la llave pesada no "robe" al atleta que
 // completaba la liviana. Devuelve también las categorías que no se pudieron
 // armar por falta de elegibles.
-// Categorías de edad (FECHIBOX) que el Super 4 ofrece por defecto. Sirven
+// Categorías de edad (World Boxing) que el Super 4 ofrece por defecto. Sirven
 // para el filtro "qué categorías de edad participan".
 export const SUPER4_AGE_KEYS = [...new Set(SUPER4_CATEGORIES.map(c => c.ageKey))];
 

@@ -4,7 +4,7 @@ import { AGE_CATEGORIES, WEIGHT_CATEGORIES, weightRangeLabel } from "../constant
 import { dupKey } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 
-// Categorías de edad (FECHIBOX) que el Super 4 puede armar, con su etiqueta.
+// Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
 // Divisiones de peso oficiales (World Boxing), masculinas y femeninas.
 const DIVISION_OPTIONS = WEIGHT_CATEGORIES;

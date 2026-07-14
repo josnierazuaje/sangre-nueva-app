@@ -53,7 +53,7 @@ describe("getScore / analyzeMatch — filtros de seguridad", () => {
     expect(w.severity).toBe("high");
   });
 
-  it("analyzeMatch marca 'high' entre categorías FECHIBOX vecinas (Escolar 14 vs Cadete 15)", () => {
+  it("analyzeMatch marca 'high' entre categorías World Boxing vecinas (Escolar 14 vs Cadete 15)", () => {
     const escolar = makeFighter({ id: "e1", age: 14 });
     const cadete = makeFighter({ id: "c1", age: 15 });
     const w = analyzeMatch(escolar, cadete).find(x => x.type === "age");
@@ -61,7 +61,7 @@ describe("getScore / analyzeMatch — filtros de seguridad", () => {
     expect(w.severity).toBe("high");
   });
 
-  it("analyzeMatch NO marca advertencia de edad dentro de la misma categoría FECHIBOX (13 vs 14)", () => {
+  it("analyzeMatch NO marca advertencia de edad dentro de la misma categoría World Boxing (13 vs 14)", () => {
     const f1 = makeFighter({ id: "a", age: 13 });
     const f2 = makeFighter({ id: "b", age: 14 });
     expect(analyzeMatch(f1, f2).find(x => x.type === "age")).toBeUndefined();
@@ -150,8 +150,8 @@ describe("autoMatchAll — filtro duro de edad y sexo", () => {
     });
   });
 
-  it("nunca mezcla categorías FECHIBOX vecinas (Escolar 14 vs Cadete 15), aunque ambos sean menores", () => {
-    // Antes de la regla FECHIBOX este cruce SÍ se permitía (ambos <18):
+  it("nunca mezcla categorías World Boxing vecinas (Escolar 14 vs Cadete 15), aunque ambos sean menores", () => {
+    // Antes de la regla World Boxing este cruce SÍ se permitía (ambos <18):
     // mismo peso y experiencia, gimnasios distintos → score alto. Ahora el
     // filtro duro por categoría de edad debe descartarlo por completo.
     const fighters = [
@@ -171,7 +171,7 @@ describe("autoMatchAll — filtro duro de edad y sexo", () => {
     expect(matchups.length).toBe(0);
   });
 
-  it("sí empareja dentro de la misma categoría FECHIBOX (dos Cadetes 15 y 16)", () => {
+  it("sí empareja dentro de la misma categoría World Boxing (dos Cadetes 15 y 16)", () => {
     const fighters = [
       makeFighter({ id: "c1", age: 15, gym: "Gimnasio A" }),
       makeFighter({ id: "c2", age: 16, gym: "Gimnasio B" }),
@@ -222,7 +222,7 @@ describe("sorteoMatch — filtro duro de edad y sexo", () => {
     }
   });
 
-  it("nunca mezcla categorías FECHIBOX en el sorteo (Escolar 14 vs Cadete 15, múltiples corridas)", () => {
+  it("nunca mezcla categorías World Boxing en el sorteo (Escolar 14 vs Cadete 15, múltiples corridas)", () => {
     const fighters = [
       makeFighter({ id: "e1", age: 14, gym: "Gimnasio A" }),
       makeFighter({ id: "c1", age: 15, gym: "Gimnasio B" }),
