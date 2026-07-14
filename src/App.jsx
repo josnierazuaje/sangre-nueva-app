@@ -1,16 +1,20 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
-import Super4View from "./components/Super4View.jsx";
 import MatchmakingView from "./components/MatchmakingView.jsx";
-import FightCardView from "./components/FightCardView.jsx";
-import TicketsManager from "./components/TicketsManager.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
+
+// Vistas pesadas cargadas bajo demanda (code-splitting): salen del bundle
+// inicial de arranque. TicketsManager arrastra qrcode (y, al escanear, jsQR);
+// Super4View es grande. La PWA precachea sus chunks para que funcionen offline.
+const Super4View = lazy(() => import("./components/Super4View.jsx"));
+const FightCardView = lazy(() => import("./components/FightCardView.jsx"));
+const TicketsManager = lazy(() => import("./components/TicketsManager.jsx"));
 
 // APP PRINCIPAL
 // ============================================
@@ -33,7 +37,14 @@ export default function App() {
   const [cloudMode, setCloudMode] = useState(null);
   const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
   const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
-  function logout() { signOut(FB.auth); }
+  // Al cerrar sesión: borra los datos locales sensibles (un dispositivo perdido
+  // no debe conservarlos legibles sin login) y recarga para partir de un estado
+  // limpio en el próximo inicio (evita listeners de sync colgados tras re-login).
+  async function logout() {
+    clearLocalEventData();
+    try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
+    location.reload();
+  }
   function keyReady(k) {
     if (k === "bm_fighters_v4") setHydrated(h => (h.fighters ? h : { ...h, fighters: true }));
     else if (k === "bm_matchups_v3") setHydrated(h => (h.matchups ? h : { ...h, matchups: true }));
@@ -230,12 +241,14 @@ export default function App() {
       </header>
 
       <main style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 16px 80px" }}>
-        {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
-        {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
-        {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
-        {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
-        {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
-        {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
+        <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
+          {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
+          {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
+          {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
+          {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
+          {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
+          {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
+        </Suspense>
       </main>
 
       {/* Event Dates Bar (editable: tocar para cambiar) */}
