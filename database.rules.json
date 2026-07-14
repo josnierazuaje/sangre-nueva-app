@@ -8,17 +8,25 @@
     },
     "sangre_nueva": {
       ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
-      ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
+      "bm_fighters_v4": { ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())" },
+      "bm_matchups_v3": { ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())" },
+      "bm_super4_v1": { ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())" },
+      "bm_event_label": { ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())" },
       "counters": {
+        ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
         "$tipo": {
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
           ".validate": "newData.isNumber() && (!data.exists() || newData.val() >= data.val())"
         }
       },
       "tickets": {
+        ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
         "$id": {
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
           ".validate": "newData.child('id').val() === $id && newData.child('price').isNumber() && newData.child('status').val().matches(/^(activo|ingresado|anulado)$/)"
         }
-      }
+      },
+      "$other": { ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'" }
     },
     "sangre_nueva_backups": {
       ".read": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",

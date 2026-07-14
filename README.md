@@ -44,7 +44,22 @@ Cada push a la rama conectada dispara un nuevo deploy automáticamente.
   **no** esté en la lista no ve ni toca los datos (antes bastaba con estar
   logueado — cualquier cuenta creada contra el proyecto tenía acceso total a
   datos de menores y boletas).
+- **Borrado masivo reservado al dueño**: el staff puede vender, actualizar y
+  borrar boletas **individuales** (`tickets/$id`) e incrementar contadores,
+  pero **solo el dueño** puede borrar el nodo completo de `tickets` o
+  `counters` (lo que hace "Reiniciar evento"). Así, ni un staff ni un
+  dispositivo con la sesión abierta pueden destruir toda la venta desde la
+  consola. Cualquier nodo no listado (`$other`) también queda reservado al
+  dueño. *(Nota técnica: `.write` en Firebase se hereda hacia abajo, así que
+  el permiso se otorga por hijo dentro de `sangre_nueva`, no a nivel del nodo.)*
 - **Backups** (`sangre_nueva_backups`): solo el dueño.
+
+**Probar las reglas sin riesgo:** antes de publicar, usa el **Rules Playground**
+de la consola de Firebase (Realtime Database → Reglas → "Simulador") para
+confirmar, simulando distintos usuarios: (a) un UID en `/staff` puede escribir
+`sangre_nueva/tickets/<algo>` pero **no** borrar `sangre_nueva/tickets`; (b) el
+dueño (por email) sí puede ambas; (c) un UID fuera de `/staff` no puede leer
+`sangre_nueva`.
 
 ### ⚠️ Antes de publicar: sembrar `/staff` (o el equipo se queda afuera)
 
