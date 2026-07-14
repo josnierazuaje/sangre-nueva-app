@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { save, load, patchSuper4Bracket } from "../lib/storage.js";
+import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
 import { AGE_CATEGORIES, WEIGHT_CATEGORIES, weightRangeLabel } from "../constants.js";
 import { dupKey } from "../lib/dedup.js";
-import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
+import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
@@ -61,6 +61,17 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // El preview usa la selección REAL (si el usuario dejó algo vacío, se ve
   // vacío — no cae a "todas" por error).
   const resultado = useMemo(() => buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs), [fighters, fightsCeil, selectedAges.join(","), selectedDivs.join(",")]);
+  // "Posibles llaves": TODAS las combinaciones (edad × división) que se pueden
+  // armar con los peleadores que aún NO están en ninguna llave (respeta el
+  // tope de peleas, pero ignora los filtros de edad/peso para revelar todo lo
+  // que falta). El usuario agrega la que le sirva, una por una.
+  const [showPosibles, setShowPosibles] = useState(false);
+  const posibles = useMemo(() => {
+    const reserved = new Set();
+    super4.forEach(b => (b.semis || []).forEach(s => ["red", "blue"].forEach(l => { const f = byId[s[l]]; if (f) reserved.add(dupKey(f)); })));
+    const yaHay = new Set(super4.map(b => b.catKey));
+    return buildSuper4Brackets(fighters, fightsCeil, null, null, reserved).brackets.filter(b => !yaHay.has(b.catKey));
+  }, [fighters, super4, fightsCeil, byId]);
   // Cupo que se está reemplazando vía el botón ✕ (null = ningún modal abierto).
   const [reemplazo, setReemplazo] = useState(null);
   // Colapso de los bloques de filtros (para llegar antes al fondo sin scroll).
@@ -92,6 +103,14 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     return false;
   }
   function persist(brackets) { setSuper4(brackets); save("bm_super4_v1", brackets); }
+  // Agrega una sola llave sugerida (de "Posibles llaves"). Sus 4 atletas ya
+  // fueron elegidos entre los libres, así que no pisa ninguna llave existente.
+  // Fusiona contra el estado real del servidor (transacción) para no borrar
+  // llaves/resultados de otro dispositivo.
+  function agregarPosible(b) {
+    if (!checkReady()) return;
+    mergeSuper4Tx(super4, [b], setSuper4);
+  }
   function generar() {
     if (!checkReady()) return;
     if (!selectedAges.length) { alert("Elige al menos una categoría de edad para el Super 4."); return; }
@@ -112,10 +131,10 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     const { brackets, faltantes } = buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs, reserved);
     const tope = fightsCeil != null ? ` con el tope de ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"}` : "";
     if (!brackets.length) { alert("No hay 4 peleadores libres en ninguna combinación de edad y peso elegida" + tope + " para armar una llave."); return; }
-    // Fusión no destructiva: solo se rearman las combinaciones elegidas; las
-    // demás llaves se conservan (incluidos sus campeones), para no borrar
-    // datos de producción por regenerar un subconjunto.
-    persist(mergeRegenerated(super4, brackets));
+    // Fusión no destructiva contra el estado real del servidor (transacción):
+    // solo se rearman las combinaciones elegidas; las demás llaves se
+    // conservan (incluidos sus campeones), sin pisar otro dispositivo.
+    mergeSuper4Tx(super4, brackets, setSuper4);
     if (faltantes.length) alert("Se armaron " + brackets.length + " llave(s). Con atletas pero sin completar 4" + tope + ":\n\n" + faltantes.slice(0, 12).map(f => `• ${f.catLabel}: hay ${f.elegibles}, faltan ${f.faltan}`).join("\n") + (faltantes.length > 12 ? `\n…y ${faltantes.length - 12} más.` : ""));
   }
   function limpiar() {
@@ -136,7 +155,9 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     const b = updated[idx];
     const fields = { finalWinner: b.finalWinner ?? null };
     if (semiIndex != null) fields["semis/" + semiIndex] = b.semis[semiIndex];
-    patchSuper4Bracket(updated, idx, fields);
+    // Se ubica la llave por su ID (estable) dentro de la transacción, no por
+    // índice: al agregar/generar llaves el arreglo se reordena.
+    patchSuper4Bracket(updated, bId, fields);
   }
   function marcarSemi(bId, i, fid) { if (checkReady()) marcarResultado(setSemiWinner(super4, bId, i, fid), bId, i); }
   function marcarFinal(bId, fid) { if (checkReady()) marcarResultado(setFinalWinner(super4, bId, fid), bId, null); }
@@ -327,6 +348,30 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         </button>
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="px-4 bg-black border border-boxing-goldDim text-boxing-goldFight text-xl transition-colors hover:bg-boxing-goldDim/10">🖨️</button>
       </div>
+
+      <button onClick={() => setShowPosibles(o => !o)} className="w-full py-2.5 bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
+        Posibles llaves{posibles.length ? ` (${posibles.length})` : ""} <span className="text-xs">{showPosibles ? "▾" : "▸"}</span>
+      </button>
+      {showPosibles && <div className="border border-blue-500/30 bg-blue-950/10 p-3 space-y-2 fade-in">
+        <p className="text-[10px] text-boxing-muted">Combinaciones que se pueden armar con los peleadores que aún NO están en una llave{fightsCeil != null ? ` (hasta ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"})` : ""}. Toca "Agregar" en la que quieras.</p>
+        {posibles.length === 0
+          ? <p className="text-boxing-muted text-sm text-center py-2">No hay más llaves posibles con los peleadores libres.</p>
+          : posibles.map(b => (
+            <div key={b.catKey} className="border border-boxing-line bg-black/40 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-boxing-goldFight font-bold text-sm min-w-0 truncate" style={{ fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.05em" }}>{"🏆"} {b.catLabel}</p>
+                <button onClick={() => agregarPosible(b)} className="flex-shrink-0 px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold tracking-widest uppercase transition-colors">Agregar</button>
+              </div>
+              <p className="text-[9px] text-boxing-muted mb-1">{b.regla}</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                {[b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].map(id => {
+                  const f = byId[id];
+                  return <p key={id} className="text-[11px] text-boxing-cream truncate">• {f ? f.fullName : "—"} <span className="text-boxing-muted">{f ? `${f.weightKg}kg` : ""}</span></p>;
+                })}
+              </div>
+            </div>
+          ))}
+      </div>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Experiencia de peleadores en el Super 4</p>
