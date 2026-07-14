@@ -153,6 +153,34 @@ export function updateTicketNode(id, patch) {
   try { dbUpdate(ref(FB.db, fbPath("tickets/" + id)), patch); }
   catch (e) { console.error("No se pudo actualizar la boleta en Firebase (sigue actualizada localmente):", e); }
 }
+
+// Marca el ingreso de una boleta de forma ATÓMICA en el servidor: la
+// transacción solo pasa la boleta de "activo" a "ingresado" si en ese momento
+// SIGUE activa. Así, si dos puertas escanean el mismo QR (o el original y una
+// captura reenviada) casi a la vez, solo una gana: la otra recibe already=true
+// y no cuenta un segundo ingreso. Sin esto, ambas leían "activo" del espejo
+// local y escribían "ingresado" (last-write-wins), dejando pasar a dos
+// personas con una sola entrada pagada.
+// Devuelve: { ok } (recién ingresada), { already, ticket } (ya estaba
+// ingresada / otra puerta la marcó), { offline } (sin conexión: no se pudo
+// confirmar en el servidor), o { error }.
+export async function checkInTicketTx(id) {
+  if (!FB.ready) return { offline: true };
+  const nodeRef = ref(FB.db, fbPath("tickets/" + id));
+  try {
+    const res = await withTimeout(runTransaction(nodeRef, t => {
+      if (!t || t.status !== "activo") return; // no existe o ya no está activa: aborta
+      return { ...t, status: "ingresado", checkedInAt: new Date().toISOString() };
+    }), 8000);
+    const val = res.snapshot.val();
+    if (res.committed && val && val.status === "ingresado") return { ok: true, ticket: val };
+    if (val && val.status === "ingresado") return { already: true, ticket: val };
+    return { error: new Error("boleta no encontrada o no activa"), ticket: val };
+  } catch (e) {
+    console.error("No se pudo marcar el ingreso de la boleta en Firebase:", e);
+    return { error: e };
+  }
+}
 export function removeTicketNode(id) {
   if (!FB.ready) return;
   try { dbRemove(ref(FB.db, fbPath("tickets/" + id))); }

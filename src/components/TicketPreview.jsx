@@ -5,7 +5,7 @@ import QRDisplay from "./QRDisplay.jsx";
 
 export default function TicketPreview({ ticket }) {
   const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === ticket.ticketType) || TICKET_TYPES_V2[0];
-  const qrData = location.origin + location.pathname + "?ticket=" + encodeURIComponent(ticket.id);
+  const qrData = location.origin + location.pathname + "?ticket=" + encodeURIComponent(ticket.id) + (ticket.token ? "&t=" + encodeURIComponent(ticket.token) : "");
   const qrWrapRef = useRef(null);
   const busyRef = useRef(false);
   const [sharing, setSharing] = useState(false);

@@ -20,6 +20,7 @@ export default function App() {
   const [super4, setSuper4] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
+  const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
   const [editF, setEditF] = useState(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
@@ -231,7 +232,7 @@ export default function App() {
         {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
         {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
         {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
-        {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} />}
+        {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
       </main>
 
       {/* Event Dates Bar (editable: tocar para cambiar) */}
