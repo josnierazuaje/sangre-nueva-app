@@ -13,7 +13,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showFaltantes, setShowFaltantes] = useState(false);
   // "Faltantes": peleadores que no quedaron en ninguna pelea del VS —
-  // el matchmaking nunca empareja cruces que rompan las reglas FECHIBOX
+  // el matchmaking nunca empareja cruces que rompan las reglas World Boxing
   // (categoría de edad, sexo), así que quien no tiene rival compatible
   // queda aquí, con sus datos intactos, a la espera de un rival nuevo.
   const matchedIds = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
@@ -33,7 +33,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   // Imprime exactamente la lista que se está viendo (respeta el filtro de
   // Faltante, la búsqueda, la categoría, el nivel y el orden activos), con
   // los datos útiles para buscarle rival a cada uno: división de peso,
-  // categoría de edad FECHIBOX, nivel de experiencia y escuela. El
+  // categoría de edad World Boxing, nivel de experiencia y escuela. El
   // subtítulo deja claro qué filtro estaba activo al imprimir.
   function printList() {
     const filtros = [];
@@ -106,7 +106,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         </button>}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
-        <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad FECHIBOX). Sus datos quedan guardados a la espera de un rival.</p>
+        <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
       </div>}
       <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors" />
       <div className="flex gap-2">

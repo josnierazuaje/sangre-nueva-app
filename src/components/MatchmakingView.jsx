@@ -16,7 +16,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
   const unmatched = fighters.filter(f => !matched.has(f.id));
   // Los emparejamientos guardados traen sus advertencias congeladas al
   // momento de crearse; esta verificación se calcula en vivo para detectar
-  // cruces de categorías de edad FECHIBOX en VS armados antes de la regla
+  // cruces de categorías de edad World Boxing en VS armados antes de la regla
   // (o si a un peleador le editaron la edad después de emparejarlo).
   const fechiboxViolations = useMemo(() => matchups.map(m => {
     const r = fighters.find(f => f.id === m.fighterRedId);
@@ -59,9 +59,9 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
         <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>
       </div>
 
-      {/* Aviso de cruces de categoría de edad FECHIBOX en VS ya guardados */}
+      {/* Aviso de cruces de categoría de edad World Boxing en VS ya guardados */}
       {fechiboxViolations.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
-        <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {fechiboxViolations.length} pelea{fechiboxViolations.length !== 1 ? "s" : ""} mezcla{fechiboxViolations.length !== 1 ? "n" : ""} categorías de edad — FECHIBOX no lo permite</p>
+        <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {fechiboxViolations.length} pelea{fechiboxViolations.length !== 1 ? "s" : ""} mezcla{fechiboxViolations.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
         <div className="space-y-1">{fechiboxViolations.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
       </div>}

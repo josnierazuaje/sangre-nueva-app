@@ -17,7 +17,7 @@ const cat92 = SUPER4_CATEGORIES.find(c => c.key === "adulto92");
 
 // ---------- Funciones legacy (cinturones), aún usadas para compatibilidad ----------
 describe("eligibleForCategory (cinturones, compat)", () => {
-  it("exige categoría de edad FECHIBOX, sexo y límite de peso", () => {
+  it("exige categoría de edad World Boxing, sexo y límite de peso", () => {
     const ok = f({ age: 15, weightKg: 70 });
     const pesado = f({ age: 16, weightKg: 72 });
     const juvenil = f({ age: 17, weightKg: 65 });

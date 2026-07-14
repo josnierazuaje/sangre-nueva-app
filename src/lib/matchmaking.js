@@ -18,9 +18,9 @@ export function analyzeMatch(f1, f2) {
     else w.push({ type: "experience", severity: "medium", message: `Niveles: ${getExperienceInfo(f1.experienceLevel)?.label} vs ${getExperienceInfo(f2.experienceLevel)?.label}` });
   }
   if ((f1.sexo || "M") !== (f2.sexo || "M")) w.push({ type: "sexo", severity: "high", message: "Sexos distintos — NO EMPAREJAR" });
-  // Rangos de edad oficiales FECHIBOX: las categorías no se pueden mezclar.
+  // Rangos de edad oficiales World Boxing: las categorías no se pueden mezclar.
   const ac1 = getAgeCategory(f1.age), ac2 = getAgeCategory(f2.age);
-  if (ac1.key !== ac2.key) w.push({ type: "age", severity: "high", message: `${ac1.label} (${f1.age}a) vs ${ac2.label} (${f2.age}a) — NO SE PUEDEN MEZCLAR (FECHIBOX)` });
+  if (ac1.key !== ac2.key) w.push({ type: "age", severity: "high", message: `${ac1.label} (${f1.age}a) vs ${ac2.label} (${f2.age}a) — NO SE PUEDEN MEZCLAR (World Boxing)` });
   else if (Math.abs(f1.age - f2.age) > 10) w.push({ type: "age", severity: "medium", message: `Δ${Math.abs(f1.age - f2.age)} años de edad` });
   if (f1.gym.toLowerCase() === f2.gym.toLowerCase()) w.push({ type: "same_gym", severity: "low", message: `Misma escuela: ${f1.gym}` });
   return w;
@@ -60,7 +60,7 @@ export function autoMatchAll(fighters) {
     if (used.has(rem[i].id)) continue; let best = null, bs = -1;
     for (let j = i + 1; j < rem.length; j++) {
       if (used.has(rem[j].id)) continue;
-      // Filtro duro: nunca mezclar categorías de edad FECHIBOX ni sexos distintos, sin excepción de puntaje.
+      // Filtro duro: nunca mezclar categorías de edad World Boxing ni sexos distintos, sin excepción de puntaje.
       if (getAgeCategory(rem[i].age).key !== getAgeCategory(rem[j].age).key) continue;
       if ((rem[i].sexo || "M") !== (rem[j].sexo || "M")) continue;
       const sc = getScore(rem[i], rem[j]); if (sc > bs) { bs = sc; best = rem[j]; }
@@ -100,7 +100,7 @@ export function sorteoMatch(fighters) {
   const rem = shuffle(fighters.filter(f => !used.has(f.id)));
   for (let i = 0; i < rem.length - 1; i += 2) {
     if (used.has(rem[i].id) || used.has(rem[i + 1].id)) continue;
-    // Filtro duro: nunca mezclar categorías de edad FECHIBOX ni sexos distintos, sin excepción de puntaje.
+    // Filtro duro: nunca mezclar categorías de edad World Boxing ni sexos distintos, sin excepción de puntaje.
     if (getAgeCategory(rem[i].age).key !== getAgeCategory(rem[i + 1].age).key) continue;
     if ((rem[i].sexo || "M") !== (rem[i + 1].sexo || "M")) continue;
     const sc = getScore(rem[i], rem[i + 1]);

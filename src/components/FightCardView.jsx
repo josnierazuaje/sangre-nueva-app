@@ -17,7 +17,7 @@ export default function FightCardView({ matchups, fighters }) {
   // Abre una ventana con una tabla imprimible (N°/Escuela/Atleta/VS/Atleta/
   // Escuela/Peso/Nota) y dispara el diálogo de impresión del navegador —
   // desde ahí se puede imprimir directo o guardar como PDF. Las peleas se
-  // agrupan por categoría de edad FECHIBOX (con su formato de rounds en el
+  // agrupan por categoría de edad World Boxing (con su formato de rounds en el
   // encabezado de cada bloque) y dentro de cada bloque van de más liviano
   // a más pesado. La numeración se reinicia por bloque, como en la planilla
   // de Excel que usan los jueces.
@@ -29,7 +29,7 @@ export default function FightCardView({ matchups, fighters }) {
     const groups = {};
     withData.forEach(x => {
       const c1 = getAgeCategory(x.r.age), c2 = getAgeCategory(x.b.age);
-      // Un cruce de categorías distintas (prohibido por FECHIBOX) se agrupa
+      // Un cruce de categorías distintas (prohibido por World Boxing) se agrupa
       // aparte y bien visible para que los jueces lo detecten de inmediato.
       const key = c1.key === c2.key ? c1.key : "mixta";
       if (!groups[key]) groups[key] = [];
@@ -40,7 +40,7 @@ export default function FightCardView({ matchups, fighters }) {
       const cat = k === "mixta" ? null : getAgeCategory(list[0].r.age);
       const headerText = cat
         ? `${cat.label} · ${cat.formato}`.toUpperCase()
-        : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (FECHIBOX NO PERMITE ESTE CRUCE)";
+        : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (WORLD BOXING NO PERMITE ESTE CRUCE)";
       const headerRow = `<tr><td colspan="8" class="${k === "mixta" ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
       const groupRows = list.map((x, i) => {
         const { m, r, b } = x;
