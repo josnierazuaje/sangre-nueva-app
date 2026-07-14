@@ -1,6 +1,17 @@
 import { ref, set as dbSet, update as dbUpdate, remove as dbRemove, get, onValue, runTransaction } from "firebase/database";
 import { SYNC_KEYS } from "../constants.js";
 import { FB, fbPath } from "./firebase.js";
+import { mergeRegenerated } from "./super4.js";
+
+// Normaliza el valor crudo del nodo bm_super4_v1 (que RTDB puede devolver como
+// arreglo, objeto con claves numéricas, null o el centinela "__EMPTY__") a un
+// arreglo de llaves.
+function super4NodeToArray(v) {
+  if (v == null || v === "__EMPTY__") return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === "object") return Object.values(v);
+  return [];
+}
 
 // ============================================
 // STORAGE
@@ -32,15 +43,54 @@ export function save(k, v) {
   }
 }
 
-// Marca ganadores del Super 4 con una escritura dirigida a la llave tocada
-// (update de sus campos) en vez de reescribir el arreglo completo: dos
-// personas marcando llaves DISTINTAS a la vez no se pisan entre sí. La
-// lista completa igual se guarda en localStorage para la UI local.
-export function patchSuper4Bracket(fullList, index, fields) {
+// Marca resultados del Super 4 (ganadores/campeón) ubicando la llave por su
+// ID dentro de una TRANSACCIÓN sobre el nodo completo. Antes se escribía por
+// índice de posición; pero al agregar/generar llaves el arreglo se reordena,
+// así que un índice viejo podía caer en la llave equivocada y corromper otro
+// resultado. Por id, la escritura siempre llega a la llave correcta, y la
+// transacción reintenta ante escrituras concurrentes (dos personas marcando
+// semifinales distintas de la misma llave no se pisan). `fields` puede traer
+// "semis/N" (una semifinal) y "finalWinner".
+export function patchSuper4Bracket(fullList, bracketId, fields) {
   localStorage.setItem("bm_super4_v1", JSON.stringify(fullList));
   if (!FB.ready) return;
-  try { dbUpdate(ref(FB.db, fbPath("bm_super4_v1/" + index)), JSON.parse(JSON.stringify(fields))); }
-  catch (e) { console.error("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e); }
+  const clean = JSON.parse(JSON.stringify(fields));
+  const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
+  runTransaction(nodeRef, cur => {
+    if (!Array.isArray(cur)) return cur; // "__EMPTY__"/null/objeto raro: no pisar a ciegas
+    const i = cur.findIndex(b => b && b.id === bracketId);
+    if (i === -1) return cur; // la llave aún no llegó a la nube: no escribir a ciegas
+    const next = cur.slice();
+    const b = { ...next[i], semis: (next[i].semis || []).map(s => ({ ...s })) };
+    for (const [k, v] of Object.entries(clean)) {
+      if (k.indexOf("semis/") === 0) b.semis[Number(k.split("/")[1])] = v;
+      else b[k] = v;
+    }
+    next[i] = b;
+    return next;
+  }).catch(e => console.error("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e));
+}
+
+// Agrega/regenera llaves del Super 4 fusionando contra el estado MÁS FRESCO
+// del servidor dentro de una transacción, en vez de reescribir el nodo con un
+// arreglo local que puede estar atrasado (lo que borraría en silencio una
+// llave o un resultado creado en otro dispositivo). Actualiza el estado local
+// primero de forma optimista y luego con el resultado real de la transacción.
+export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
+  const optimista = mergeRegenerated(existingLocal || [], newBrackets);
+  localStorage.setItem("bm_super4_v1", JSON.stringify(optimista));
+  onMerged(optimista);
+  if (!FB.ready) return;
+  const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
+  const clean = JSON.parse(JSON.stringify(newBrackets));
+  runTransaction(nodeRef, cur => mergeRegenerated(super4NodeToArray(cur), clean))
+    .then(res => {
+      if (!res.committed) return;
+      const list = super4NodeToArray(res.snapshot.val());
+      localStorage.setItem("bm_super4_v1", JSON.stringify(list));
+      onMerged(list);
+    })
+    .catch(e => console.error("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
 }
 
 export function loadFighters() {
