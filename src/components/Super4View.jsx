@@ -6,6 +6,9 @@ import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, mergeRegenerat
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
+// Equivalencia FECHIBOX (nombre chileno) de cada categoría World Boxing, para
+// que se entienda con ambas nomenclaturas.
+const FECHIBOX_LABEL = { escolar: "Escolar", cadete: "Cadete", juvenil: "Juvenil", adulto: "Adulto/Elite" };
 // Divisiones de peso oficiales (World Boxing), masculinas y femeninas.
 const DIVISION_OPTIONS = WEIGHT_CATEGORIES;
 
@@ -60,6 +63,9 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   const resultado = useMemo(() => buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs), [fighters, fightsCeil, selectedAges.join(","), selectedDivs.join(",")]);
   // Cupo que se está reemplazando vía el botón ✕ (null = ningún modal abierto).
   const [reemplazo, setReemplazo] = useState(null);
+  // Colapso de los bloques de filtros (para llegar antes al fondo sin scroll).
+  const [agesOpen, setAgesOpen] = useState(true);
+  const [divsOpen, setDivsOpen] = useState(true);
   function cambiarMaxFights(v) { setMaxFightsSel(v); save("bm_super4_maxfights", v); }
   function toggleAge(k) {
     setSelectedAges(prev => {
@@ -334,31 +340,45 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {fightsCeil != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Solo entran a la llave los peleadores con {fightsCeil} pelea{fightsCeil === 1 ? "" : "s"} como máximo. Toca GENERAR LLAVES para aplicarlo.</p>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
-        <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</p>
-        <div className="flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => setAgesOpen(o => !o)} className="w-full flex items-center justify-between gap-2">
+          <span className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</span>
+          <span className="flex items-center gap-2">
+            {!agesOpen && <span className="text-[9px] text-boxing-goldFight">{selectedAges.length} elegida{selectedAges.length !== 1 ? "s" : ""}</span>}
+            <span className="text-boxing-muted text-sm leading-none">{agesOpen ? "▾" : "▸"}</span>
+          </span>
+        </button>
+        {agesOpen && <div className="flex flex-wrap gap-1.5">
           {AGE_OPTIONS.map(a => {
             const on = selectedAges.includes(a.key);
             return (
               <button key={a.key} type="button" onClick={() => toggleAge(a.key)} className={"flex items-center gap-1.5 px-2.5 py-1.5 border text-sm transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15 text-boxing-cream" : "border-boxing-lineBright text-boxing-muted hover:border-boxing-lineBright/80")}>
-                <span className={"w-3.5 h-3.5 flex items-center justify-center text-[10px] border rounded-sm " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
-                {a.label} <span className="text-[9px] text-boxing-muted">({a.minAge}-{a.maxAge})</span>
+                <span className={"w-3.5 h-3.5 flex items-center justify-center text-[10px] border rounded-sm flex-shrink-0 " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
+                <span className="flex flex-col leading-tight text-left">
+                  <span>{a.label} <span className="text-[9px] text-boxing-muted">({a.minAge}-{a.maxAge})</span></span>
+                  <span className="text-[9px] text-boxing-muted">FECHIBOX: {FECHIBOX_LABEL[a.key] || a.label}</span>
+                </span>
               </button>
             );
           })}
-        </div>
+        </div>}
       </div>
       {!selectedAges.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos una categoría de edad.</p>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Peso oficial de peleadores en el Super 4</p>
-          <span className="text-[9px] flex-shrink-0">
-            <button type="button" onClick={() => setDivsAll(true)} className="text-boxing-goldFight hover:underline">Todos</button>
-            <span className="text-boxing-muted"> · </span>
-            <button type="button" onClick={() => setDivsAll(false)} className="text-boxing-muted hover:underline">Ninguno</button>
-          </span>
+          <button type="button" onClick={() => setDivsOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+            <span className="text-[11px] text-boxing-muted tracking-wide uppercase truncate">Peso oficial de peleadores en el Super 4</span>
+            <span className="text-boxing-muted text-sm leading-none flex-shrink-0">{divsOpen ? "▾" : "▸"}</span>
+          </button>
+          {divsOpen
+            ? <span className="text-[9px] flex-shrink-0">
+                <button type="button" onClick={() => setDivsAll(true)} className="text-boxing-goldFight hover:underline">Todos</button>
+                <span className="text-boxing-muted"> · </span>
+                <button type="button" onClick={() => setDivsAll(false)} className="text-boxing-muted hover:underline">Ninguno</button>
+              </span>
+            : <span className="text-[9px] text-boxing-goldFight flex-shrink-0">{selectedDivs.length} elegido{selectedDivs.length !== 1 ? "s" : ""}</span>}
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        {divsOpen && <div className="grid grid-cols-3 gap-1.5">
           {DIVISION_OPTIONS.map(d => {
             const on = selectedDivs.includes(d.key);
             return (
@@ -371,7 +391,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               </button>
             );
           })}
-        </div>
+        </div>}
       </div>
       {!selectedDivs.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos un peso.</p>}
 
