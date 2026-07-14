@@ -296,6 +296,15 @@ export async function migrateTicketsIfNeeded() {
 
 export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); }
 
+// Borra del dispositivo los datos del evento (peleadores —incluye menores—,
+// peleas, Super 4 y boletas con datos de compradores) al cerrar sesión, para
+// que un aparato perdido o prestado no los exponga sin autenticación. La nube
+// es la fuente de verdad: al volver a iniciar sesión se re-sincroniza todo.
+export function clearLocalEventData() {
+  Object.keys(SYNC_KEYS).forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem("bm_tickets_v4");
+}
+
 // ============================================
 // REINICIAR EVENTO (Fase 5) — respaldo antes de borrar
 // ============================================

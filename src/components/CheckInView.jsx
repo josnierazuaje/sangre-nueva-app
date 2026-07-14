@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import jsQR from "jsqr";
 import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken } from "../constants.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
@@ -22,6 +21,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // evitamos activar una cámara que el usuario ya canceló (o que quedó
   // esperando en un componente ya desmontado).
   const scanRequestRef = useRef(null);
+  // jsQR (≈130 KB) se carga bajo demanda al escanear, no en el bundle inicial:
+  // un organizador que solo registra peleadores nunca lo descarga.
+  const jsQRRef = useRef(null);
 
   // manual=true cuando el operador tecleó el id (no escaneó): vía de confianza
   // del staff. En un escaneo (manual=false) el token del QR debe coincidir.
@@ -65,7 +67,8 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
     const ctx = canvas.getContext("2d");
     ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    const jsQR = jsQRRef.current;
+    const code = jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
     if (code && code.data) {
       const { id, token } = extractTicketData(code.data);
       setInput(id.toUpperCase());
@@ -77,6 +80,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   }
   function startScan() {
     setScanErr(""); setResult(null);
+    // Carga el lector de QR bajo demanda, en paralelo mientras el usuario
+    // concede el permiso de cámara. Si falla, queda "Validar manualmente".
+    if (!jsQRRef.current) import("jsqr").then(m => { jsQRRef.current = m.default; }).catch(e => setScanErr("No se pudo cargar el lector de QR. Usa 'Validar manualmente'. " + e.message));
     const requestId = {};
     scanRequestRef.current = requestId;
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
