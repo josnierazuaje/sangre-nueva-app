@@ -1,6 +1,6 @@
 import { ref, set as dbSet, update as dbUpdate, remove as dbRemove, get, onValue, runTransaction } from "firebase/database";
 import { SYNC_KEYS } from "../constants.js";
-import { FB, fbPath } from "./firebase.js";
+import { FB, fbPath, reportSyncError } from "./firebase.js";
 import { mergeRegenerated } from "./super4.js";
 
 // Normaliza el valor crudo del nodo bm_super4_v1 (que RTDB puede devolver como
@@ -28,8 +28,9 @@ export function load(k, def) { try { const d = localStorage.getItem(k); return d
 export function save(k, v) {
   localStorage.setItem(k, JSON.stringify(v));
   if (FB.ready && Object.prototype.hasOwnProperty.call(SYNC_KEYS, k)) {
+    let payload;
     try {
-      let payload = JSON.parse(JSON.stringify(v));
+      payload = JSON.parse(JSON.stringify(v));
       // RTDB no guarda arreglos vacíos: set([]) BORRA el nodo, y un nodo
       // ausente hace que la próxima conexión de un dispositivo con datos
       // viejos en localStorage los re-suba ("resucita" lo borrado, ver
@@ -38,8 +39,10 @@ export function save(k, v) {
       // (bm_super4_v1): los clientes viejos en producción no la conocen y
       // un centinela en claves compartidas los haría fallar.
       if (k === "bm_super4_v1" && Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
-      dbSet(ref(FB.db, fbPath(k)), payload);
-    } catch (e) { console.error("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e); }
+    } catch (e) { console.error("No se pudo preparar " + k + " para sincronizar:", e); return; }
+    // dbSet devuelve una promesa: un rechazo asíncrono (permiso, token, dato
+    // inválido) NO lo atraparía un try/catch, por eso va con .catch().
+    dbSet(ref(FB.db, fbPath(k)), payload).catch(e => reportSyncError("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e));
   }
 }
 
@@ -68,7 +71,7 @@ export function patchSuper4Bracket(fullList, bracketId, fields) {
     }
     next[i] = b;
     return next;
-  }).catch(e => console.error("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e));
+  }).catch(e => reportSyncError("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e));
 }
 
 // Agrega/regenera llaves del Super 4 fusionando contra el estado MÁS FRESCO
@@ -90,7 +93,7 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
       localStorage.setItem("bm_super4_v1", JSON.stringify(list));
       onMerged(list);
     })
-    .catch(e => console.error("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
+    .catch(e => reportSyncError("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
 }
 
 export function loadFighters() {
@@ -143,15 +146,19 @@ export async function nextTicketId(tipo, prefix, localTickets) {
   return prefix + "-" + padN(next);
 }
 
+// Devuelve la promesa de la escritura (con su propio .catch), por si el
+// llamador quiere reaccionar; NO debe esperarse con await en el flujo de venta:
+// sin conexión RTDB deja la promesa pendiente hasta reconectar y colgaría el
+// voucher. El fallo real (rechazo) se avisa por el chip vía reportSyncError.
 export function addTicketNode(ticket) {
-  if (!FB.ready) return;
-  try { dbSet(ref(FB.db, fbPath("tickets/" + ticket.id)), ticket); }
-  catch (e) { console.error("No se pudo guardar la boleta en Firebase (sigue guardada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbSet(ref(FB.db, fbPath("tickets/" + ticket.id)), ticket)
+    .catch(e => reportSyncError("No se pudo guardar la boleta en Firebase (sigue guardada localmente):", e));
 }
 export function updateTicketNode(id, patch) {
-  if (!FB.ready) return;
-  try { dbUpdate(ref(FB.db, fbPath("tickets/" + id)), patch); }
-  catch (e) { console.error("No se pudo actualizar la boleta en Firebase (sigue actualizada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbUpdate(ref(FB.db, fbPath("tickets/" + id)), patch)
+    .catch(e => reportSyncError("No se pudo actualizar la boleta en Firebase (sigue actualizada localmente):", e));
 }
 
 // Marca el ingreso de una boleta de forma ATÓMICA en el servidor: la
@@ -182,9 +189,9 @@ export async function checkInTicketTx(id) {
   }
 }
 export function removeTicketNode(id) {
-  if (!FB.ready) return;
-  try { dbRemove(ref(FB.db, fbPath("tickets/" + id))); }
-  catch (e) { console.error("No se pudo eliminar la boleta en Firebase (sigue eliminada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbRemove(ref(FB.db, fbPath("tickets/" + id)))
+    .catch(e => reportSyncError("No se pudo eliminar la boleta en Firebase (sigue eliminada localmente):", e));
 }
 
 // Escucha sangre_nueva/tickets completo y reconstruye el arreglo ordenado
