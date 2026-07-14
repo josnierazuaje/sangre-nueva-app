@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
-import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
+import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
+
+// Equivalente FECHIBOX de cada categoría World Boxing, para las chips de edad.
+const FECHIBOX_LABEL = { escolar: "Escolar", cadete: "Cadete", juvenil: "Juvenil", adulto: "Adulto" };
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -13,6 +16,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showFaltantes, setShowFaltantes] = useState(false);
   const [sexFilter, setSexFilter] = useState("all"); // "all" | "M" | "F"
+  const [ageFilter, setAgeFilter] = useState("all"); // "all" | clave de categoría de edad
   // "Faltantes": peleadores que no quedaron en ninguna pelea del VS —
   // el matchmaking nunca empareja cruces que rompan las reglas World Boxing
   // (categoría de edad, sexo), así que quien no tiene rival compatible
@@ -23,19 +27,22 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     let r = [...fighters];
     if (showFaltantes) r = r.filter(f => !matchedIds.has(f.id));
     if (sexFilter !== "all") r = r.filter(f => (f.sexo || "M") === sexFilter);
+    if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
     if (searchQuery.trim()) { const s = searchQuery.toLowerCase(); r = r.filter(f => f.fullName.toLowerCase().includes(s) || f.gym.toLowerCase().includes(s)); }
     if (categoryFilter !== "all") r = r.filter(f => f.weightCategory === categoryFilter);
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
     switch (sortBy) { case "name": r.sort((a, b) => a.fullName.localeCompare(b.fullName)); break; case "weight": r.sort((a, b) => a.weightKg - b.weightKg); break; case "experience": r.sort((a, b) => b.fightCount - a.fightCount); break; default: r.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
     return r;
-  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, sexFilter, matchedIds]);
+  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, sexFilter, ageFilter, matchedIds]);
   const stats = useMemo(() => { const e = {}; fighters.forEach(f => { e[f.experienceLevel] = (e[f.experienceLevel] || 0) + 1; }); return e; }, [fighters]);
   // Conteo por sexo para los chips Masculino/Femenino (junto a "Faltante").
   const sexCounts = useMemo(() => { const c = { M: 0, F: 0 }; fighters.forEach(f => { c[(f.sexo || "M") === "F" ? "F" : "M"]++; }); return c; }, [fighters]);
+  // Conteo por categoría de edad (World Boxing) para las chips de edad.
+  const ageCounts = useMemo(() => { const c = {}; fighters.forEach(f => { const k = getAgeCategory(f.age).key; c[k] = (c[k] || 0) + 1; }); return c; }, [fighters]);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
   // Chip "Todos": limpia todos los filtros para ver a todos los registrados.
-  const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && !showFaltantes && sexFilter === "all";
-  function verTodos() { setSearchQuery(""); setCategoryFilter("all"); setExperienceFilter("all"); setShowFaltantes(false); setSexFilter("all"); }
+  const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && !showFaltantes && sexFilter === "all" && ageFilter === "all";
+  function verTodos() { setSearchQuery(""); setCategoryFilter("all"); setExperienceFilter("all"); setShowFaltantes(false); setSexFilter("all"); setAgeFilter("all"); }
 
   // Imprime exactamente la lista que se está viendo (respeta el filtro de
   // Faltante, la búsqueda, la categoría, el nivel y el orden activos), con
@@ -46,6 +53,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     const filtros = [];
     if (showFaltantes) filtros.push("FALTANTES (sin rival asignado en el VS)");
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
+    if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
     if (categoryFilter !== "all") { const c = getCategoryInfo(categoryFilter); if (c) filtros.push(`División: ${c.label} ${weightRangeLabel(c)} (${c.genero === "F" ? "Mujeres" : "Hombres"})`); }
     if (experienceFilter !== "all") { const e = getExperienceInfo(experienceFilter); if (e) filtros.push(`Nivel: ${e.label}`); }
     if (searchQuery.trim()) filtros.push(`Búsqueda: "${searchQuery.trim()}"`);
@@ -124,6 +132,10 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
           <span className="text-sm font-bold leading-none" style={{ color: "#EC4899" }}>{sexCounts.F}</span>
           <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#EC4899" }}>Femenino</span>
         </button>
+        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <button key={a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: ageFilter === a.key ? a.color : a.color + "40" }}>
+          <span className="text-sm font-bold leading-none" style={{ color: a.color }}>{c}</span>
+          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: a.color }}>{a.label} · {FECHIBOX_LABEL[a.key] || a.label}</span>
+        </button>; })}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
         <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
