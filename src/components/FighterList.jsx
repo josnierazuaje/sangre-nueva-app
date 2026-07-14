@@ -33,6 +33,9 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   // Conteo por sexo para los chips Masculino/Femenino (junto a "Faltante").
   const sexCounts = useMemo(() => { const c = { M: 0, F: 0 }; fighters.forEach(f => { c[(f.sexo || "M") === "F" ? "F" : "M"]++; }); return c; }, [fighters]);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
+  // Chip "Todos": limpia todos los filtros para ver a todos los registrados.
+  const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && !showFaltantes && sexFilter === "all";
+  function verTodos() { setSearchQuery(""); setCategoryFilter("all"); setExperienceFilter("all"); setShowFaltantes(false); setSexFilter("all"); }
 
   // Imprime exactamente la lista que se está viendo (respeta el filtro de
   // Faltante, la búsqueda, la categoría, el nivel y el orden activos), con
@@ -100,7 +103,11 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
         Peleadores <span className="text-boxing-goldFight">({fighters.length})</span>
       </h2>
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={verTodos} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: sinFiltros ? "#E5C76B" : "#E5C76B40" }}>
+          <span className="text-sm font-bold leading-none" style={{ color: "#E5C76B" }}>{fighters.length}</span>
+          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#E5C76B" }}>Todos</span>
+        </button>
         {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; return <button key={e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: experienceFilter === e.key ? e.color : e.color + "40" }}>
           <span className="text-sm font-bold leading-none" style={{ color: e.color }}>{c}</span>
           <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: e.color }}>{e.label}</span>
