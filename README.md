@@ -35,10 +35,39 @@ Cada push a la rama conectada dispara un nuevo deploy automáticamente.
 
 ## Firebase Realtime Database — reglas de seguridad
 
-**Estas reglas todavía no están publicadas — hazlo tú manualmente.** Por
-seguridad, no las publico yo mismo (es un cambio de permisos de acceso sobre
-una base de datos en producción). Las reglas viven en `database.rules.json`
-en la raíz del repo. Para publicarlas:
+**Modelo de acceso** (`database.rules.json`):
+
+- **Denegado por defecto** en la raíz.
+- **Dueño** (`josnier.azuaje@gmail.com`): lectura/escritura total, siempre.
+- **Staff**: para leer/escribir `sangre_nueva` su UID debe estar en el nodo
+  `/staff`. Solo el dueño puede editar `/staff`. Una cuenta autenticada que
+  **no** esté en la lista no ve ni toca los datos (antes bastaba con estar
+  logueado — cualquier cuenta creada contra el proyecto tenía acceso total a
+  datos de menores y boletas).
+- **Backups** (`sangre_nueva_backups`): solo el dueño.
+
+### ⚠️ Antes de publicar: sembrar `/staff` (o el equipo se queda afuera)
+
+Estas reglas exigen que cada colaborador (que no sea el dueño) tenga su UID en
+`/staff`. **Si publicas sin sembrarlo, todos menos el dueño pierden acceso.**
+Hazlo primero:
+
+1. Firebase Console → **Authentication → Users**: copia el **UID** de cada
+   persona del staff (columna "User UID").
+2. Firebase Console → **Realtime Database → Datos**: crea el nodo `staff` y,
+   dentro, una clave por cada UID con valor `true`:
+   ```
+   staff/
+     abc123UID… : true
+     def456UID… : true
+   ```
+   (El dueño no necesita estar en `/staff`; entra por su correo.)
+3. Para dar de alta o de baja a alguien después, agrega/borra su UID en
+   `/staff` — **sin volver a desplegar reglas**.
+
+### Publicar las reglas
+
+Es un cambio de permisos sobre una base en producción; publícalo tú:
 
 - Opción A — Consola: Firebase Console → proyecto `velada-sangre-nueva-22fb0`
   → Realtime Database → pestaña **Reglas** → pega el contenido de
@@ -47,10 +76,15 @@ en la raíz del repo. Para publicarlas:
   `firebase login` y el proyecto seleccionado en `.firebaserc`, que ya
   apunta a `velada-sangre-nueva-22fb0`).
 
-**Verificación:** abre en una ventana de incógnito
-`https://velada-sangre-nueva-22fb0-default-rtdb.firebaseio.com/sangre_nueva.json`
-— debe devolver `null` con un error de permisos ("Permission denied"), nunca
-los datos. Si ves los datos, las reglas no se aplicaron.
+### Verificación
+
+1. **Anónimo:** en una ventana de incógnito abre
+   `https://velada-sangre-nueva-22fb0-default-rtdb.firebaseio.com/sangre_nueva.json`
+   — debe devolver `Permission denied`, nunca los datos.
+2. **Staff sembrado:** inicia sesión en la app con una cuenta de staff cuyo
+   UID sí pusiste en `/staff` — debe cargar los datos con normalidad.
+3. **Cuenta fuera de la lista:** una cuenta autenticada cuyo UID no esté en
+   `/staff` no debe ver datos (la app quedará vacía / sin sincronizar).
 
 ## PWA / offline
 

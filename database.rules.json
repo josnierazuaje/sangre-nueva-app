@@ -2,9 +2,13 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "staff": {
+      ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
+      ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'"
+    },
     "sangre_nueva": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())"
     },
     "sangre_nueva_backups": {
       ".read": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
