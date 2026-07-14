@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import jsQR from "jsqr";
-import { TICKET_TYPES_V2, extractTicketCode } from "../constants.js";
+import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken } from "../constants.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
-export default function CheckInView({ tickets, onCheckIn, initialCode }) {
+export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken }) {
   const [input, setInput] = useState(initialCode ? initialCode.toUpperCase() : "");
   const [result, setResult] = useState(null);
+  const [verify, setVerify] = useState("ok"); // "ok" | "warn" | "bad" (ver verifyTicketToken)
+  const [checking, setChecking] = useState(false);
+  const [actionErr, setActionErr] = useState("");
+  const [already, setAlready] = useState(false); // otra puerta ya marcó este ingreso
   const [justCheckedIn, setJustCheckedIn] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState("");
@@ -19,13 +23,33 @@ export default function CheckInView({ tickets, onCheckIn, initialCode }) {
   // esperando en un componente ya desmontado).
   const scanRequestRef = useRef(null);
 
-  function lookup(code) {
+  // manual=true cuando el operador tecleó el id (no escaneó): vía de confianza
+  // del staff. En un escaneo (manual=false) el token del QR debe coincidir.
+  function lookup(code, token, manual) {
+    setActionErr(""); setAlready(false);
     const f = tickets.find(t => t.id.toUpperCase() === String(code).trim().toUpperCase());
-    setResult(f || "notfound");
+    if (!f) { setResult("notfound"); setVerify("ok"); return; }
+    setResult(f); setVerify(verifyTicketToken(f, token, manual));
   }
-  function search(e) { e.preventDefault(); lookup(input); }
-  function doIn() { if (result && result !== "notfound" && result.status === "activo") { onCheckIn(result.id); const updated = { ...result, status: "ingresado", checkedInAt: new Date().toISOString() }; setResult(updated); setJustCheckedIn(updated); } }
-  function closeWelcome() { setJustCheckedIn(null); setResult(null); setInput(""); }
+  function search(e) { e.preventDefault(); lookup(input, null, true); }
+  async function doIn() {
+    if (checking) return;
+    if (!(result && result !== "notfound" && result.status === "activo" && verify !== "bad")) return;
+    setChecking(true); setActionErr("");
+    const res = await onCheckIn(result.id);
+    setChecking(false);
+    if (res && res.already) {
+      // Otra puerta marcó el ingreso mientras tanto: no cuenta como nuevo.
+      setResult({ ...result, status: "ingresado", checkedInAt: res.ticket?.checkedInAt || null });
+      setAlready(true);
+      return;
+    }
+    if (!res || res.error) { setActionErr("No se pudo marcar el ingreso. Revisa la conexión y reintenta."); return; }
+    // res.ok (confirmado en el servidor) o res.offline (optimista, sin red)
+    const updated = { ...result, status: "ingresado", checkedInAt: res.ticket?.checkedInAt || new Date().toISOString() };
+    setResult(updated); setJustCheckedIn(updated);
+  }
+  function closeWelcome() { setJustCheckedIn(null); setResult(null); setInput(""); setVerify("ok"); setAlready(false); setActionErr(""); }
 
   function stopScan() {
     scanRequestRef.current = null;
@@ -43,9 +67,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode }) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height);
     if (code && code.data) {
-      const ticketId = extractTicketCode(code.data);
-      setInput(ticketId.toUpperCase());
-      lookup(ticketId);
+      const { id, token } = extractTicketData(code.data);
+      setInput(id.toUpperCase());
+      lookup(id, token, false);
       stopScan();
       return;
     }
@@ -76,7 +100,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode }) {
     }
   }, [scanning]);
   useEffect(() => () => stopScan(), []);
-  useEffect(() => { if (initialCode) lookup(initialCode); }, []);
+  // Arranque desde la URL (?ticket=&t=): un QR abierto con la cámara del
+  // teléfono. Trae token, así que se valida como un escaneo (manual=false).
+  useEffect(() => { if (initialCode) lookup(initialCode, initialToken, false); }, []);
 
   const checked = tickets.filter(t => t.status === "ingresado");
   const pending = tickets.filter(t => t.status === "activo");
@@ -116,16 +142,33 @@ export default function CheckInView({ tickets, onCheckIn, initialCode }) {
       </form>
       {result && result !== "notfound" && (() => {
         const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === result.ticketType) || TICKET_TYPES_V2[0];
+        const inAt = result.checkedInAt ? new Date(result.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : null;
+        // QR falsificado: el token no coincide con la boleta. Se bloquea el
+        // ingreso; si de verdad es el dueño, el staff puede validar a mano.
+        if (verify === "bad") {
+          return (
+            <div className="rounded-xl p-4 space-y-2 scale-in text-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.45)" }}>
+              <p className="text-red-400 font-black text-lg">⚠️ Código QR inválido</p>
+              <p className="text-gray-300 text-sm">El QR no coincide con la boleta <span className="font-bold text-white">#{result.id}</span>. Puede ser una entrada falsificada o duplicada.</p>
+              <p className="text-gray-500 text-xs">Si la persona insiste, pide su boleta original y valida el número a mano.</p>
+            </div>
+          );
+        }
         return (
           <div className="rounded-xl p-4 space-y-3 scale-in" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid " + (result.status === "ingresado" ? "rgba(34,197,94,0.4)" : "rgba(245,158,11,0.35)") }}>
             <div className="flex items-center gap-3">
               <span className="text-3xl">{result.status === "ingresado" ? "✅" : "🎫"}</span>
               <div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-xs text-gray-400">#{result.id} · <span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</span></p></div>
             </div>
+            {verify === "warn" && result.status === "activo" &&
+              <p className="text-yellow-300/90 text-xs text-center py-1.5 rounded-lg" style={{ background: "rgba(245,158,11,0.1)" }}>⚠️ Sin verificación por QR — coteja la identidad antes de marcar</p>}
             {result.status === "ingresado"
-              ? <p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.1)" }}>✓ Ya registrado como ingresado</p>
-              : <button onClick={doIn} className="w-full py-3 rounded-xl font-black text-white" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>✅ MARCAR INGRESO</button>
+              ? (already
+                  ? <p className="text-yellow-300 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.12)" }}>⚠️ Otra puerta ya marcó este ingreso{inAt ? " (" + inAt + ")" : ""}</p>
+                  : <p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.1)" }}>✓ Ya registrado como ingresado{inAt ? " (" + inAt + ")" : ""}</p>)
+              : <button onClick={doIn} disabled={checking} className="w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>{checking ? "MARCANDO..." : "✅ MARCAR INGRESO"}</button>
             }
+            {actionErr && <p className="text-red-400 text-xs text-center">{actionErr}</p>}
           </div>
         );
       })()}

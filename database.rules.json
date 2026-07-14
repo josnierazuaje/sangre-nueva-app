@@ -8,7 +8,17 @@
     },
     "sangre_nueva": {
       ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
-      ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())"
+      ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
+      "counters": {
+        "$tipo": {
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() >= data.val())"
+        }
+      },
+      "tickets": {
+        "$id": {
+          ".validate": "newData.child('id').val() === $id && newData.child('price').isNumber() && newData.child('status').val().matches(/^(activo|ingresado|anulado)$/)"
+        }
+      }
     },
     "sangre_nueva_backups": {
       ".read": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",

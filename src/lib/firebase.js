@@ -55,10 +55,32 @@ export function initFirebaseApp(cfg) {
 // estado local ya refleja la nube (ej. la reconciliación automática de
 // duplicados espera a que peleadores Y peleas estén hidratados, porque las
 // claves sincronizan por canales separados y sin orden garantizado).
+// Guarda el callback de estado para que las escrituras (en storage.js) puedan
+// avisar de un fallo real de sincronización (ver reportSyncError). onValue de
+// .info/connected lo restablece a "on"/"connecting" cuando cambia la conexión.
+let notifyStatus = null;
+
+// Marca el chip de sincronización como "error" y loguea. Se llama cuando una
+// escritura a Firebase es RECHAZADA de verdad (permiso denegado, token
+// vencido, dato inválido) — no cuando solo está sin conexión (RTDB encola esas
+// escrituras y las promesas quedan pendientes, no rechazadas). Antes estos
+// fallos caían en un try/catch que no atrapa promesas: se perdían en silencio.
+export function reportSyncError(context, e) {
+  console.error(context, e);
+  if (notifyStatus) notifyStatus("error");
+}
+
 export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
   if (FB.ready) return;
+  notifyStatus = onStatus;
   onStatus("connecting");
-  FB.ready = true; onStatus("on");
+  FB.ready = true;
+  // Estado REAL de conexión: .info/connected es un nodo especial del cliente
+  // RTDB (siempre legible) que refleja si el socket está conectado. Antes se
+  // ponía "on" de forma incondicional en esta línea y el chip se quedaba verde
+  // para siempre aunque el teléfono perdiera la red toda la noche — el
+  // operador creía que sus ventas estaban respaldadas cuando no lo estaban.
+  onValue(ref(FB.db, ".info/connected"), s => onStatus(s.val() ? "on" : "connecting"));
   Object.keys(SYNC_KEYS).forEach(k => {
     const nodeRef = ref(FB.db, fbPath(k));
     get(nodeRef).then(snap => {

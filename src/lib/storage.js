@@ -1,16 +1,33 @@
 import { ref, set as dbSet, update as dbUpdate, remove as dbRemove, get, onValue, runTransaction } from "firebase/database";
 import { SYNC_KEYS } from "../constants.js";
-import { FB, fbPath } from "./firebase.js";
+import { FB, fbPath, reportSyncError } from "./firebase.js";
 import { mergeRegenerated } from "./super4.js";
 
-// Normaliza el valor crudo del nodo bm_super4_v1 (que RTDB puede devolver como
+// Normaliza el valor crudo de un nodo-arreglo (que RTDB puede devolver como
 // arreglo, objeto con claves numéricas, null o el centinela "__EMPTY__") a un
-// arreglo de llaves.
-function super4NodeToArray(v) {
+// arreglo. Usado por Super 4 y por las escrituras transaccionales de peleadores.
+export function nodeToArray(v) {
   if (v == null || v === "__EMPTY__") return [];
   if (Array.isArray(v)) return v;
   if (typeof v === "object") return Object.values(v);
   return [];
+}
+
+// Fusiones puras (testeables) para las transacciones de peleadores. upsert
+// reemplaza el peleador con el mismo id o lo agrega; remove lo quita. Se
+// aplican SOBRE el estado más fresco del servidor dentro de la transacción,
+// así dos dispositivos registrando a la vez no se pisan (antes cada save()
+// reescribía el arreglo completo desde el estado local, last-write-wins).
+export function applyUpsertFighter(list, fighter) {
+  const arr = nodeToArray(list);
+  const i = arr.findIndex(x => x && x.id === fighter.id);
+  if (i === -1) return [...arr, fighter];
+  const next = arr.slice();
+  next[i] = fighter;
+  return next;
+}
+export function applyRemoveFighter(list, id) {
+  return nodeToArray(list).filter(x => x && x.id !== id);
 }
 
 // ============================================
@@ -28,18 +45,24 @@ export function load(k, def) { try { const d = localStorage.getItem(k); return d
 export function save(k, v) {
   localStorage.setItem(k, JSON.stringify(v));
   if (FB.ready && Object.prototype.hasOwnProperty.call(SYNC_KEYS, k)) {
+    let payload;
     try {
-      let payload = JSON.parse(JSON.stringify(v));
+      payload = JSON.parse(JSON.stringify(v));
       // RTDB no guarda arreglos vacíos: set([]) BORRA el nodo, y un nodo
       // ausente hace que la próxima conexión de un dispositivo con datos
       // viejos en localStorage los re-suba ("resucita" lo borrado, ver
       // startFirebaseSync). El centinela mantiene el nodo vivo con el
-      // significado "vaciado a propósito". Solo se usa en claves nuevas
-      // (bm_super4_v1): los clientes viejos en producción no la conocen y
-      // un centinela en claves compartidas los haría fallar.
-      if (k === "bm_super4_v1" && Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
-      dbSet(ref(FB.db, fbPath(k)), payload);
-    } catch (e) { console.error("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e); }
+      // significado "vaciado a propósito". Se aplica a TODAS las claves de
+      // arreglo (peleadores, peleas y Super 4): antes solo cubría bm_super4_v1,
+      // así que al "Reiniciar evento" un dispositivo ausente resucitaba
+      // peleadores y peleas borrados (incluidos datos de menores). El lector
+      // (firebase.js) ya traduce "__EMPTY__" → [] de forma genérica para
+      // cualquier clave, así que es seguro para los clientes actuales.
+      if (Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
+    } catch (e) { console.error("No se pudo preparar " + k + " para sincronizar:", e); return; }
+    // dbSet devuelve una promesa: un rechazo asíncrono (permiso, token, dato
+    // inválido) NO lo atraparía un try/catch, por eso va con .catch().
+    dbSet(ref(FB.db, fbPath(k)), payload).catch(e => reportSyncError("No se pudo sincronizar " + k + " con Firebase (el cambio sí quedó guardado localmente):", e));
   }
 }
 
@@ -68,7 +91,7 @@ export function patchSuper4Bracket(fullList, bracketId, fields) {
     }
     next[i] = b;
     return next;
-  }).catch(e => console.error("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e));
+  }).catch(e => reportSyncError("No se pudo sincronizar el resultado del Super 4 (sí quedó guardado localmente):", e));
 }
 
 // Agrega/regenera llaves del Super 4 fusionando contra el estado MÁS FRESCO
@@ -83,18 +106,46 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
   if (!FB.ready) return;
   const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
   const clean = JSON.parse(JSON.stringify(newBrackets));
-  runTransaction(nodeRef, cur => mergeRegenerated(super4NodeToArray(cur), clean))
+  runTransaction(nodeRef, cur => mergeRegenerated(nodeToArray(cur), clean))
     .then(res => {
       if (!res.committed) return;
-      const list = super4NodeToArray(res.snapshot.val());
+      const list = nodeToArray(res.snapshot.val());
       localStorage.setItem("bm_super4_v1", JSON.stringify(list));
       onMerged(list);
     })
-    .catch(e => console.error("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
+    .catch(e => reportSyncError("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
 }
 
 export function loadFighters() {
   return load("bm_fighters_v4", []);
+}
+
+// Alta/edición y baja de peleadores de forma TRANSACCIONAL: la fusión (por id)
+// se aplica sobre el estado más fresco del servidor dentro de runTransaction,
+// no sobre el arreglo local que puede estar atrasado. Así, el día del pesaje
+// con varios organizadores registrando a la vez, un peleador nuevo ya no
+// desaparece porque otro dispositivo guardó su propia copia encima. Actualiza
+// localStorage de inmediato (optimista) y avisa el resultado real al confirmar.
+// `optimisticList` es el arreglo local ya actualizado; `onMerged(list)` recibe
+// la lista autoritativa fusionada del servidor (el llamador la normaliza).
+export function upsertFighterTx(fighter, optimisticList, onMerged) {
+  fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, onMerged);
+}
+export function removeFighterTx(id, optimisticList, onMerged) {
+  fighterArrayTx(cur => applyRemoveFighter(cur, id), optimisticList, onMerged);
+}
+function fighterArrayTx(apply, optimisticList, onMerged) {
+  const k = "bm_fighters_v4";
+  localStorage.setItem(k, JSON.stringify(optimisticList));
+  if (!FB.ready) return;
+  runTransaction(ref(FB.db, fbPath(k)), cur => {
+    const next = apply(cur);
+    // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
+    // que un arreglo vacío borre el nodo y resucite datos, ver save()).
+    return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
+  }).then(res => {
+    if (res.committed) onMerged(nodeToArray(res.snapshot.val()));
+  }).catch(e => reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e));
 }
 
 // ============================================
@@ -143,20 +194,52 @@ export async function nextTicketId(tipo, prefix, localTickets) {
   return prefix + "-" + padN(next);
 }
 
+// Devuelve la promesa de la escritura (con su propio .catch), por si el
+// llamador quiere reaccionar; NO debe esperarse con await en el flujo de venta:
+// sin conexión RTDB deja la promesa pendiente hasta reconectar y colgaría el
+// voucher. El fallo real (rechazo) se avisa por el chip vía reportSyncError.
 export function addTicketNode(ticket) {
-  if (!FB.ready) return;
-  try { dbSet(ref(FB.db, fbPath("tickets/" + ticket.id)), ticket); }
-  catch (e) { console.error("No se pudo guardar la boleta en Firebase (sigue guardada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbSet(ref(FB.db, fbPath("tickets/" + ticket.id)), ticket)
+    .catch(e => reportSyncError("No se pudo guardar la boleta en Firebase (sigue guardada localmente):", e));
 }
 export function updateTicketNode(id, patch) {
-  if (!FB.ready) return;
-  try { dbUpdate(ref(FB.db, fbPath("tickets/" + id)), patch); }
-  catch (e) { console.error("No se pudo actualizar la boleta en Firebase (sigue actualizada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbUpdate(ref(FB.db, fbPath("tickets/" + id)), patch)
+    .catch(e => reportSyncError("No se pudo actualizar la boleta en Firebase (sigue actualizada localmente):", e));
+}
+
+// Marca el ingreso de una boleta de forma ATÓMICA en el servidor: la
+// transacción solo pasa la boleta de "activo" a "ingresado" si en ese momento
+// SIGUE activa. Así, si dos puertas escanean el mismo QR (o el original y una
+// captura reenviada) casi a la vez, solo una gana: la otra recibe already=true
+// y no cuenta un segundo ingreso. Sin esto, ambas leían "activo" del espejo
+// local y escribían "ingresado" (last-write-wins), dejando pasar a dos
+// personas con una sola entrada pagada.
+// Devuelve: { ok } (recién ingresada), { already, ticket } (ya estaba
+// ingresada / otra puerta la marcó), { offline } (sin conexión: no se pudo
+// confirmar en el servidor), o { error }.
+export async function checkInTicketTx(id) {
+  if (!FB.ready) return { offline: true };
+  const nodeRef = ref(FB.db, fbPath("tickets/" + id));
+  try {
+    const res = await withTimeout(runTransaction(nodeRef, t => {
+      if (!t || t.status !== "activo") return; // no existe o ya no está activa: aborta
+      return { ...t, status: "ingresado", checkedInAt: new Date().toISOString() };
+    }), 8000);
+    const val = res.snapshot.val();
+    if (res.committed && val && val.status === "ingresado") return { ok: true, ticket: val };
+    if (val && val.status === "ingresado") return { already: true, ticket: val };
+    return { error: new Error("boleta no encontrada o no activa"), ticket: val };
+  } catch (e) {
+    console.error("No se pudo marcar el ingreso de la boleta en Firebase:", e);
+    return { error: e };
+  }
 }
 export function removeTicketNode(id) {
-  if (!FB.ready) return;
-  try { dbRemove(ref(FB.db, fbPath("tickets/" + id))); }
-  catch (e) { console.error("No se pudo eliminar la boleta en Firebase (sigue eliminada localmente):", e); }
+  if (!FB.ready) return Promise.resolve();
+  return dbRemove(ref(FB.db, fbPath("tickets/" + id)))
+    .catch(e => reportSyncError("No se pudo eliminar la boleta en Firebase (sigue eliminada localmente):", e));
 }
 
 // Escucha sangre_nueva/tickets completo y reconstruye el arreglo ordenado

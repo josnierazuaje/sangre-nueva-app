@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
-import { TICKET_TYPES_V2, MAX_CAP, fmt$ } from "../constants.js";
-import { nextTicketId, addTicketNode, updateTicketNode, removeTicketNode } from "../lib/storage.js";
+import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken } from "../constants.js";
+import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode } from "../lib/storage.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
 
-export default function TicketsManager({ tickets, setTickets, initialTicketCode }) {
+export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken }) {
   const [subView, setSubView] = useState(initialTicketCode ? "checkin" : "sell");
   const kpis = useMemo(() => {
     const byType = {}, byPayment = {};
@@ -21,15 +21,23 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode 
     const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === data.ticketType);
     const prefix = ticketTypeInfo.label.substring(0, 3).toUpperCase();
     const id = await nextTicketId(data.ticketType, prefix, tickets);
-    const newT = { ...data, id, price: ticketTypeInfo.price, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
+    // token: acompaña al id en el QR para que el check-in pueda distinguir una
+    // boleta legítima de un correlativo adivinado (ver verifyTicketToken).
+    const newT = { ...data, id, token: genTicketToken(), price: ticketTypeInfo.price, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
     setTickets([...tickets, newT]);
     addTicketNode(newT);
     return newT;
   }
-  function checkIn(id) {
-    const checkedInAt = new Date().toISOString();
-    setTickets(tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t));
-    updateTicketNode(id, { status: "ingresado", checkedInAt });
+  // Ingreso atómico: la transacción en el servidor decide si esta boleta cuenta
+  // como ingreso (only activo→ingresado). Actualiza el estado local con el
+  // resultado y devuelve el veredicto a la vista para avisar dobles ingresos.
+  async function checkIn(id) {
+    const res = await checkInTicketTx(id);
+    if (res.ok || res.already || res.offline) {
+      const checkedInAt = res.ticket?.checkedInAt || new Date().toISOString();
+      setTickets(tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t));
+    }
+    return res;
   }
   function deleteTicket(id) {
     setTickets(tickets.filter(t => t.id !== id));
@@ -67,7 +75,7 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode 
       </div>
       {subView === "sell" && <SellView onAdd={addTicket} />}
       {subView === "history" && <HistoryView tickets={tickets} onDelete={deleteTicket} />}
-      {subView === "checkin" && <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} />}
+      {subView === "checkin" && <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} />}
     </div>
   );
 }

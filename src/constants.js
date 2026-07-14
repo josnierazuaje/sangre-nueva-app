@@ -141,9 +141,42 @@ export function getCategoryInfo(k) { return WEIGHT_CATEGORIES.find(c => c.key ==
 export function getExperienceInfo(k) { return EXPERIENCE_LEVELS.find(e => e.key === k); }
 export function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
 export function getInitials(name) { return (name || "").trim().split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase(); }
-export function extractTicketCode(text) {
-  try { const u = new URL(text); const t = u.searchParams.get("ticket"); if (t) return t; } catch (e) {}
-  try { const p = JSON.parse(text); if (p && p.id) return p.id; } catch (e) {}
-  return text;
+
+// Token corto y no adivinable que se imprime en el QR de cada boleta junto al
+// id. No es un secreto de alta seguridad: solo evita que se falsifiquen
+// entradas enumerando correlativos (PRE-0041, PRE-0042…), porque el check-in
+// exige que el token del QR coincida con el guardado en la boleta. 6 caracteres
+// A-Z0-9 ≈ 2.000 millones de combinaciones.
+export function genTicketToken() {
+  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const rng = (typeof crypto !== "undefined" && crypto.getRandomValues) ? crypto : null;
+  const bytes = rng ? rng.getRandomValues(new Uint8Array(6)) : Array.from({ length: 6 }, () => Math.floor(Math.random() * 256));
+  let out = "";
+  for (let i = 0; i < 6; i++) out += chars[bytes[i] % 36];
+  return out;
+}
+
+// De un QR/entrada escaneada saca { id, token }. Soporta URL con
+// ?ticket=<id>&t=<token>, JSON {id, token}, o texto plano (solo id, sin token).
+export function extractTicketData(text) {
+  try { const u = new URL(text); const id = u.searchParams.get("ticket"); if (id) return { id, token: u.searchParams.get("t") || null }; } catch (e) {}
+  try { const p = JSON.parse(text); if (p && p.id) return { id: String(p.id), token: p.token != null ? String(p.token) : null }; } catch (e) {}
+  return { id: text, token: null };
+}
+
+// Compat: versión que solo devuelve el id (usada por el arranque desde la URL).
+export function extractTicketCode(text) { return extractTicketData(text).id; }
+
+// Veredicto de verificación de una boleta escaneada/tecleada frente al token
+// que traía el QR. "manual" = el operador tecleó el id a mano (no escaneó):
+// es una vía de confianza para el staff, se permite pero se pide cotejar
+// identidad. Devuelve: "ok" (verificada), "warn" (aceptar con precaución:
+// boleta vieja sin token, o ingreso manual), "bad" (QR falsificado: bloquear).
+export function verifyTicketToken(ticket, token, manual) {
+  if (!ticket) return "bad";
+  if (!ticket.token) return manual ? "ok" : "warn"; // boleta emitida antes de los tokens
+  const match = token != null && String(token).toUpperCase() === String(ticket.token).toUpperCase();
+  if (match) return "ok";
+  return manual ? "warn" : "bad";
 }
 export function fmt$(n) { return "$" + n.toLocaleString("es-CL"); }

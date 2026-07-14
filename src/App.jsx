@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
@@ -20,6 +20,7 @@ export default function App() {
   const [super4, setSuper4] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
+  const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
   const [editF, setEditF] = useState(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
@@ -133,9 +134,12 @@ export default function App() {
   // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
   // registrando atletas de corrido (la confirmación la muestra el propio
   // formulario); solo al editar uno existente se vuelve a la lista.
-  function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); } else { u = [...fighters, f]; } setFighters(u); save("bm_fighters_v4", u); }
+  // Alta/edición y baja escriben de forma transaccional (fusión por id contra
+  // el servidor) para no pisar peleadores que otro dispositivo registró a la
+  // vez; onMerged aplica la lista autoritativa ya fusionada.
+  function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); } else { u = [...fighters, f]; } setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged))); }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
-  function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); save("bm_fighters_v4", u); }
+  function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); removeFighterTx(id, u, merged => setFighters(normalizeFighters(merged))); }
   function cancel() { setEditF(null); setView("list"); }
 
   // Incluye ticketsNew (boletas reales v4) además de fighters/matchups —
@@ -231,7 +235,7 @@ export default function App() {
         {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
         {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
         {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
-        {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} />}
+        {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
       </main>
 
       {/* Event Dates Bar (editable: tocar para cambiar) */}
