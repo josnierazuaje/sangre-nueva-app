@@ -3,14 +3,31 @@ import { SYNC_KEYS } from "../constants.js";
 import { FB, fbPath, reportSyncError } from "./firebase.js";
 import { mergeRegenerated } from "./super4.js";
 
-// Normaliza el valor crudo del nodo bm_super4_v1 (que RTDB puede devolver como
+// Normaliza el valor crudo de un nodo-arreglo (que RTDB puede devolver como
 // arreglo, objeto con claves numéricas, null o el centinela "__EMPTY__") a un
-// arreglo de llaves.
-function super4NodeToArray(v) {
+// arreglo. Usado por Super 4 y por las escrituras transaccionales de peleadores.
+export function nodeToArray(v) {
   if (v == null || v === "__EMPTY__") return [];
   if (Array.isArray(v)) return v;
   if (typeof v === "object") return Object.values(v);
   return [];
+}
+
+// Fusiones puras (testeables) para las transacciones de peleadores. upsert
+// reemplaza el peleador con el mismo id o lo agrega; remove lo quita. Se
+// aplican SOBRE el estado más fresco del servidor dentro de la transacción,
+// así dos dispositivos registrando a la vez no se pisan (antes cada save()
+// reescribía el arreglo completo desde el estado local, last-write-wins).
+export function applyUpsertFighter(list, fighter) {
+  const arr = nodeToArray(list);
+  const i = arr.findIndex(x => x && x.id === fighter.id);
+  if (i === -1) return [...arr, fighter];
+  const next = arr.slice();
+  next[i] = fighter;
+  return next;
+}
+export function applyRemoveFighter(list, id) {
+  return nodeToArray(list).filter(x => x && x.id !== id);
 }
 
 // ============================================
@@ -35,10 +52,13 @@ export function save(k, v) {
       // ausente hace que la próxima conexión de un dispositivo con datos
       // viejos en localStorage los re-suba ("resucita" lo borrado, ver
       // startFirebaseSync). El centinela mantiene el nodo vivo con el
-      // significado "vaciado a propósito". Solo se usa en claves nuevas
-      // (bm_super4_v1): los clientes viejos en producción no la conocen y
-      // un centinela en claves compartidas los haría fallar.
-      if (k === "bm_super4_v1" && Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
+      // significado "vaciado a propósito". Se aplica a TODAS las claves de
+      // arreglo (peleadores, peleas y Super 4): antes solo cubría bm_super4_v1,
+      // así que al "Reiniciar evento" un dispositivo ausente resucitaba
+      // peleadores y peleas borrados (incluidos datos de menores). El lector
+      // (firebase.js) ya traduce "__EMPTY__" → [] de forma genérica para
+      // cualquier clave, así que es seguro para los clientes actuales.
+      if (Array.isArray(payload) && payload.length === 0) payload = "__EMPTY__";
     } catch (e) { console.error("No se pudo preparar " + k + " para sincronizar:", e); return; }
     // dbSet devuelve una promesa: un rechazo asíncrono (permiso, token, dato
     // inválido) NO lo atraparía un try/catch, por eso va con .catch().
@@ -86,10 +106,10 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
   if (!FB.ready) return;
   const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
   const clean = JSON.parse(JSON.stringify(newBrackets));
-  runTransaction(nodeRef, cur => mergeRegenerated(super4NodeToArray(cur), clean))
+  runTransaction(nodeRef, cur => mergeRegenerated(nodeToArray(cur), clean))
     .then(res => {
       if (!res.committed) return;
-      const list = super4NodeToArray(res.snapshot.val());
+      const list = nodeToArray(res.snapshot.val());
       localStorage.setItem("bm_super4_v1", JSON.stringify(list));
       onMerged(list);
     })
@@ -98,6 +118,34 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
 
 export function loadFighters() {
   return load("bm_fighters_v4", []);
+}
+
+// Alta/edición y baja de peleadores de forma TRANSACCIONAL: la fusión (por id)
+// se aplica sobre el estado más fresco del servidor dentro de runTransaction,
+// no sobre el arreglo local que puede estar atrasado. Así, el día del pesaje
+// con varios organizadores registrando a la vez, un peleador nuevo ya no
+// desaparece porque otro dispositivo guardó su propia copia encima. Actualiza
+// localStorage de inmediato (optimista) y avisa el resultado real al confirmar.
+// `optimisticList` es el arreglo local ya actualizado; `onMerged(list)` recibe
+// la lista autoritativa fusionada del servidor (el llamador la normaliza).
+export function upsertFighterTx(fighter, optimisticList, onMerged) {
+  fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, onMerged);
+}
+export function removeFighterTx(id, optimisticList, onMerged) {
+  fighterArrayTx(cur => applyRemoveFighter(cur, id), optimisticList, onMerged);
+}
+function fighterArrayTx(apply, optimisticList, onMerged) {
+  const k = "bm_fighters_v4";
+  localStorage.setItem(k, JSON.stringify(optimisticList));
+  if (!FB.ready) return;
+  runTransaction(ref(FB.db, fbPath(k)), cur => {
+    const next = apply(cur);
+    // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
+    // que un arreglo vacío borre el nodo y resucite datos, ver save()).
+    return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
+  }).then(res => {
+    if (res.committed) onMerged(nodeToArray(res.snapshot.val()));
+  }).catch(e => reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e));
 }
 
 // ============================================
