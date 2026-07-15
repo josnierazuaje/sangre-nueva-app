@@ -2,18 +2,23 @@ import { useState, useMemo } from "react";
 import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
 import { save } from "../lib/storage.js";
 import { autoMatchAll, sorteoMatch } from "../lib/matchmaking.js";
+import { super4FighterIds } from "../lib/super4.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
 
 // ============================================
 // MATCHMAKING VIEW
 // ============================================
-export default function MatchmakingView({ fighters, matchups, setMatchups, ready }) {
+export default function MatchmakingView({ fighters, matchups, setMatchups, super4, ready }) {
   const [showUn, setShowUn] = useState(false);
   const [sorting, setSorting] = useState(false);
   const [sortCount, setSortCount] = useState(0);
+  // Los atletas que ya están en una llave del Super 4 no pueden estar también
+  // en la cartelera VS: se excluyen del universo de emparejamiento.
+  const super4Ids = useMemo(() => super4FighterIds(super4), [super4]);
+  const elegibles = useMemo(() => fighters.filter(f => !super4Ids.has(f.id)), [fighters, super4Ids]);
   const matched = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
-  const unmatched = fighters.filter(f => !matched.has(f.id));
+  const unmatched = elegibles.filter(f => !matched.has(f.id));
   // Los emparejamientos guardados traen sus advertencias congeladas al
   // momento de crearse; esta verificación se calcula en vivo para detectar
   // cruces de categorías de edad World Boxing en VS armados antes de la regla
@@ -26,6 +31,15 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, ready
     if (c1.key === c2.key) return null;
     return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${c1.label}, ${r.age}a) vs ${b.fullName} (${c2.label}, ${b.age}a)` };
   }).filter(Boolean), [matchups, fighters]);
+  // Peleas ya guardadas que violan las reglas nuevas (armadas antes, o porque
+  // el atleta entró al Super 4 / le cambiaron la escuela después de emparejar).
+  const super4Conflicts = useMemo(() => matchups.filter(m => super4Ids.has(m.fighterRedId) || super4Ids.has(m.fighterBlueId)).map(m => m.roundNumber), [matchups, super4Ids]);
+  const sameGymConflicts = useMemo(() => matchups.map(m => {
+    const r = fighters.find(f => f.id === m.fighterRedId);
+    const b = fighters.find(f => f.id === m.fighterBlueId);
+    if (!r || !b || (r.gym || "").trim().toLowerCase() !== (b.gym || "").trim().toLowerCase()) return null;
+    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} vs ${b.fullName} — ${r.gym}` };
+  }).filter(Boolean), [matchups, fighters]);
   // Igual que el Super 4: no escribir la cartelera antes de recibir su primer
   // valor de la nube, o se pisan peleas armadas en otro dispositivo.
   function checkReady() {
@@ -33,7 +47,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, ready
     alert("Sincronizando la cartelera con la nube… intenta de nuevo en unos segundos.");
     return false;
   }
-  function autoM() { if (!checkReady()) return; const m = autoMatchAll(fighters); setMatchups(m); save("bm_matchups_v3", m); }
+  function autoM() { if (!checkReady()) return; const m = autoMatchAll(elegibles); setMatchups(m); save("bm_matchups_v3", m); }
   function rmM(id) { if (!checkReady()) return; const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
   function clearAll() { if (!checkReady()) return; setMatchups([]); save("bm_matchups_v3", []); }
   function notaChange(id, nota) { if (!checkReady()) return; const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
@@ -48,7 +62,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, ready
       setSortCount(count);
       if (count >= 12) {
         clearInterval(interval);
-        const m = sorteoMatch(fighters);
+        const m = sorteoMatch(elegibles);
         setMatchups(m);
         save("bm_matchups_v3", m);
         setSorting(false);
@@ -56,7 +70,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, ready
       }
     }, 120);
   }
-  if (fighters.length < 2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Necesitas al menos 2 peleadores</p></div>;
+  if (elegibles.length < 2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Necesitas al menos 2 peleadores fuera del Super 4</p></div>;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -72,6 +86,19 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, ready
         <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {fechiboxViolations.length} pelea{fechiboxViolations.length !== 1 ? "s" : ""} mezcla{fechiboxViolations.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
         <div className="space-y-1">{fechiboxViolations.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
+      </div>}
+
+      {/* Peleas con atletas que ya están en el Super 4 (no pueden estar en ambas planillas) */}
+      {super4Conflicts.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+        <p className="text-red-400 font-bold text-sm">{"⚠️"} {super4Conflicts.length} pelea{super4Conflicts.length !== 1 ? "s" : ""} incluye{super4Conflicts.length !== 1 ? "n" : ""} atletas que ya están en el Super 4</p>
+        <p className="text-red-300/90 text-xs">Peleas: {super4Conflicts.join(", ")}. Un atleta no puede estar en la cartelera y en el Super 4 a la vez — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
+      </div>}
+
+      {/* Peleas entre atletas de la misma escuela (entrenan juntos) */}
+      {sameGymConflicts.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 space-y-1 fade-in">
+        <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {sameGymConflicts.length} pelea{sameGymConflicts.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
+        <div className="space-y-0.5">{sameGymConflicts.map(v => <p key={v.n} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
       </div>}
 
       {/* Botón Sorteo destacado */}

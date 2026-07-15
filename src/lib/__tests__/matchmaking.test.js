@@ -232,3 +232,66 @@ describe("sorteoMatch — filtro duro de edad y sexo", () => {
     }
   });
 });
+
+describe("regla dura: nunca emparejar dos de la misma escuela", () => {
+  const noSameGym = (fighters, matchups) =>
+    allMatchedPairs(fighters, matchups).forEach(([a, b]) =>
+      expect((a.gym || "").toLowerCase()).not.toBe((b.gym || "").toLowerCase()));
+
+  it("Auto VS: dos de la misma escuela sin otro rival → no se emparejan", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela X", weightKg: 62 }),
+    ];
+    expect(autoMatchAll(fighters).length).toBe(0);
+  });
+
+  it("Auto VS: con un rival de otra escuela empareja cruzado y deja al compañero sin pelea", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela X", weightKg: 62 }),
+      makeFighter({ id: "b1", gym: "Escuela Y", weightKg: 63 }),
+    ];
+    const m = autoMatchAll(fighters);
+    expect(m.length).toBe(1);
+    noSameGym(fighters, m);
+  });
+
+  it("Auto VS: 2 de Escuela A + 2 de Escuela B → 2 peleas, todas cruzadas", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela A", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela A", weightKg: 62 }),
+      makeFighter({ id: "b1", gym: "Escuela B", weightKg: 63 }),
+      makeFighter({ id: "b2", gym: "Escuela B", weightKg: 64 }),
+    ];
+    const m = autoMatchAll(fighters);
+    expect(m.length).toBe(2);
+    noSameGym(fighters, m);
+  });
+
+  it("compara escuela sin importar mayúsculas/espacios", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: " escuela x ", weightKg: 62 }),
+    ];
+    expect(autoMatchAll(fighters).length).toBe(0);
+  });
+
+  it("Sorteo: 2+2 escuelas → siempre cruzado (múltiples corridas)", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela A", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela A", weightKg: 62 }),
+      makeFighter({ id: "b1", gym: "Escuela B", weightKg: 63 }),
+      makeFighter({ id: "b2", gym: "Escuela B", weightKg: 64 }),
+    ];
+    for (let i = 0; i < 30; i++) noSameGym(fighters, sorteoMatch(fighters));
+  });
+
+  it("Sorteo: dos de la misma escuela no se sortean juntos aunque sean el único par (múltiples corridas)", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela X", weightKg: 62 }),
+    ];
+    for (let i = 0; i < 30; i++) expect(sorteoMatch(fighters).length).toBe(0);
+  });
+});

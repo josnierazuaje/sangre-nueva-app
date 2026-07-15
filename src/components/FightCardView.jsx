@@ -77,7 +77,7 @@ export default function FightCardView({ matchups, fighters }) {
   th.azul{background:#2563EB;color:#fff;}
   td.atleta-rojo{background:#FCA5A5;font-weight:bold;}
   td.atleta-azul{background:#93C5FD;font-weight:bold;}
-  td.esc{font-weight:bold;}
+  td.esc{font-weight:bold;text-transform:uppercase;}
   td.grupo{background:#E5E7EB;font-weight:bold;font-size:14px;padding:8px;letter-spacing:1px;}
   td.grupo-alerta{background:#FEE2E2;color:#B91C1C;}
   .peso-detalle{font-size:10px;color:#374151;font-weight:normal;margin-top:2px;}

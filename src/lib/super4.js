@@ -257,6 +257,18 @@ export function replaceFighter(brackets, bracketId, semiIndex, lado, newFid) {
 // persona, para no duplicar a nadie). `catKey` identifica la categoría: si es
 // del formato "edad__division" usa el nuevo sistema; si no, es una llave
 // vieja de cinturón (compatibilidad con las llaves ya generadas).
+// Ids de todos los atletas que ocupan una llave del Super 4 (los 4 de cada
+// bracket: red/blue de ambas semis). Se usa para excluirlos de la cartelera
+// VS — un atleta no puede estar a la vez en el Super 4 y en la cartelera.
+export function super4FighterIds(brackets) {
+  const ids = new Set();
+  (brackets || []).forEach(b => (b.semis || []).forEach(s => {
+    if (s.red != null) ids.add(s.red);
+    if (s.blue != null) ids.add(s.blue);
+  }));
+  return ids;
+}
+
 export function availableReplacements(catKey, fighters, brackets, maxFights = null) {
   const pool = filterByMaxFights(fighters, maxFights);
   let eligible;

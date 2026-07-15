@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds } from "../super4.js";
 import { dupKey } from "../dedup.js";
 
 let n = 0;
@@ -393,5 +393,21 @@ describe("mergeRegenerated (no destructivo)", () => {
 describe("SUPER4_AGE_KEYS", () => {
   it("lista las edades que el Super 4 ofrece por defecto, sin repetir", () => {
     expect(SUPER4_AGE_KEYS).toEqual(["cadete", "juvenil", "adulto"]);
+  });
+});
+
+describe("super4FighterIds", () => {
+  it("recolecta los 4 ids (red/blue de ambas semis) de cada bracket", () => {
+    const brackets = [
+      { id: "k1", semis: [{ red: "a", blue: "b", winner: null }, { red: "c", blue: "d", winner: null }], finalWinner: null },
+      { id: "k2", semis: [{ red: "e", blue: "f", winner: null }, { red: "g", blue: null, winner: null }], finalWinner: null },
+    ];
+    expect([...super4FighterIds(brackets)].sort()).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
+  });
+  it("tolera nulos, brackets sin semis y lista vacía", () => {
+    expect(super4FighterIds(null).size).toBe(0);
+    expect(super4FighterIds([]).size).toBe(0);
+    expect(super4FighterIds([{ id: "x" }]).size).toBe(0);
+    expect(super4FighterIds([{ semis: [{ red: null, blue: null }] }]).size).toBe(0);
   });
 });
