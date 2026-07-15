@@ -8,7 +8,7 @@ import VSCard from "./VSCard.jsx";
 // ============================================
 // MATCHMAKING VIEW
 // ============================================
-export default function MatchmakingView({ fighters, matchups, setMatchups }) {
+export default function MatchmakingView({ fighters, matchups, setMatchups, ready }) {
   const [showUn, setShowUn] = useState(false);
   const [sorting, setSorting] = useState(false);
   const [sortCount, setSortCount] = useState(0);
@@ -26,12 +26,20 @@ export default function MatchmakingView({ fighters, matchups, setMatchups }) {
     if (c1.key === c2.key) return null;
     return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${c1.label}, ${r.age}a) vs ${b.fullName} (${c2.label}, ${b.age}a)` };
   }).filter(Boolean), [matchups, fighters]);
-  function autoM() { const m = autoMatchAll(fighters); setMatchups(m); save("bm_matchups_v3", m); }
-  function rmM(id) { const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
-  function clearAll() { setMatchups([]); save("bm_matchups_v3", []); }
-  function notaChange(id, nota) { const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
+  // Igual que el Super 4: no escribir la cartelera antes de recibir su primer
+  // valor de la nube, o se pisan peleas armadas en otro dispositivo.
+  function checkReady() {
+    if (ready) return true;
+    alert("Sincronizando la cartelera con la nube… intenta de nuevo en unos segundos.");
+    return false;
+  }
+  function autoM() { if (!checkReady()) return; const m = autoMatchAll(fighters); setMatchups(m); save("bm_matchups_v3", m); }
+  function rmM(id) { if (!checkReady()) return; const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
+  function clearAll() { if (!checkReady()) return; setMatchups([]); save("bm_matchups_v3", []); }
+  function notaChange(id, nota) { if (!checkReady()) return; const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
   // La planilla imprimible vive ahora en la pestaña Cartelera (FightCardView).
   function runSorteo() {
+    if (!checkReady()) return;
     setSorting(true);
     setMatchups([]);
     let count = 0;
