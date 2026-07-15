@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { analyzeMatch, getScore, autoMatchAll, sorteoMatch } from "../matchmaking.js";
+import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, experienceOk } from "../matchmaking.js";
 import { getWeightCategory, getCategoryInfo } from "../../constants.js";
 
 function makeFighter(overrides) {
@@ -291,6 +291,56 @@ describe("regla dura: nunca emparejar dos de la misma escuela", () => {
     const fighters = [
       makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
       makeFighter({ id: "a2", gym: "Escuela X", weightKg: 62 }),
+    ];
+    for (let i = 0; i < 30; i++) expect(sorteoMatch(fighters).length).toBe(0);
+  });
+});
+
+describe("regla dura: diferencia de experiencia (máx 3 peleas, salvo ambos pro 15+)", () => {
+  it("experienceOk: diferencia de 3 o menos → permitido", () => {
+    expect(experienceOk({ fightCount: 2 }, { fightCount: 5 })).toBe(true);
+    expect(experienceOk({ fightCount: 0 }, { fightCount: 3 })).toBe(true);
+  });
+  it("experienceOk: diferencia mayor a 3 sin ser ambos pro → bloqueado", () => {
+    expect(experienceOk({ fightCount: 3 }, { fightCount: 15 })).toBe(false);
+    expect(experienceOk({ fightCount: 4 }, { fightCount: 10 })).toBe(false);
+  });
+  it("experienceOk: ambos con 15+ peleas → permitido aunque la diferencia sea grande", () => {
+    expect(experienceOk({ fightCount: 15 }, { fightCount: 25 })).toBe(true);
+    expect(experienceOk({ fightCount: 40 }, { fightCount: 16 })).toBe(true);
+  });
+  it("experienceOk: 12 peleas NO cuenta como pro", () => {
+    expect(experienceOk({ fightCount: 12 }, { fightCount: 20 })).toBe(false);
+  });
+
+  it("Auto VS: NO empareja un principiante (3 peleas) con un pro (15) — el caso de la captura", () => {
+    const fighters = [
+      makeFighter({ id: "prin", age: 18, weightKg: 60, gym: "Iron Punches", fightCount: 3, experienceLevel: "principiante" }),
+      makeFighter({ id: "pro", age: 18, weightKg: 60, gym: "Carlos Molina", fightCount: 15, experienceLevel: "profesional" }),
+    ];
+    expect(autoMatchAll(fighters).length).toBe(0);
+  });
+
+  it("Auto VS: dos amateurs de la misma categoría pero con 6 peleas de diferencia → no se emparejan", () => {
+    const fighters = [
+      makeFighter({ id: "a4", age: 25, weightKg: 60, gym: "Gym A", fightCount: 4, experienceLevel: "amateur" }),
+      makeFighter({ id: "a10", age: 25, weightKg: 60, gym: "Gym B", fightCount: 10, experienceLevel: "amateur" }),
+    ];
+    expect(autoMatchAll(fighters).length).toBe(0);
+  });
+
+  it("Auto VS: dos pros (20 vs 25 peleas) SÍ se emparejan pese a los 5 de diferencia", () => {
+    const fighters = [
+      makeFighter({ id: "p20", age: 25, weightKg: 60, gym: "Gym A", fightCount: 20, experienceLevel: "profesional" }),
+      makeFighter({ id: "p25", age: 25, weightKg: 60, gym: "Gym B", fightCount: 25, experienceLevel: "profesional" }),
+    ];
+    expect(autoMatchAll(fighters).length).toBe(1);
+  });
+
+  it("Sorteo: tampoco cruza principiante con pro (múltiples corridas)", () => {
+    const fighters = [
+      makeFighter({ id: "prin", age: 18, weightKg: 60, gym: "Iron Punches", fightCount: 3, experienceLevel: "principiante" }),
+      makeFighter({ id: "pro", age: 18, weightKg: 60, gym: "Carlos Molina", fightCount: 15, experienceLevel: "profesional" }),
     ];
     for (let i = 0; i < 30; i++) expect(sorteoMatch(fighters).length).toBe(0);
   });
