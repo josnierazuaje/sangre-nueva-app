@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
+import { getCategoryInfo, getExperienceInfo, getAgeCategory, genId } from "../constants.js";
 import { save } from "../lib/storage.js";
-import { autoMatchAll, sorteoMatch, experienceOk } from "../lib/matchmaking.js";
+import { autoMatchAll, sorteoMatch, experienceOk, analyzeMatch } from "../lib/matchmaking.js";
 import { super4FighterIds } from "../lib/super4.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
@@ -13,10 +13,12 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   const [showUn, setShowUn] = useState(false);
   const [sorting, setSorting] = useState(false);
   const [sortCount, setSortCount] = useState(0);
+  const [pairPick, setPairPick] = useState(null); // 1er atleta elegido para emparejar a mano
   // Los atletas que ya están en una llave del Super 4 no pueden estar también
   // en la cartelera VS: se excluyen del universo de emparejamiento.
   const super4Ids = useMemo(() => super4FighterIds(super4), [super4]);
   const elegibles = useMemo(() => fighters.filter(f => !super4Ids.has(f.id)), [fighters, super4Ids]);
+  const byId = useMemo(() => { const m = {}; fighters.forEach(f => { m[f.id] = f; }); return m; }, [fighters]);
   const matched = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
   const unmatched = elegibles.filter(f => !matched.has(f.id));
   // Los emparejamientos guardados traen sus advertencias congeladas al
@@ -59,6 +61,30 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   function rmM(id) { if (!checkReady()) return; const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
   function clearAll() { if (!checkReady()) return; setMatchups([]); save("bm_matchups_v3", []); }
   function notaChange(id, nota) { if (!checkReady()) return; const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
+  // Emparejamiento MANUAL desde "Sin pelea": el operador elige dos atletas. Si
+  // el cruce rompe una regla dura, se avisa exactamente cuál y se pide
+  // confirmación (el criterio humano puede aceptar, p.ej., un par de kg de más).
+  function hardRuleIssues(a, b) {
+    const issues = [];
+    if (getAgeCategory(a.age).key !== getAgeCategory(b.age).key) issues.push("categorías de edad distintas (World Boxing no lo permite)");
+    if ((a.sexo || "M") !== (b.sexo || "M")) issues.push("sexos distintos");
+    if ((a.gym || "").trim().toLowerCase() === (b.gym || "").trim().toLowerCase()) issues.push("misma escuela");
+    if (!experienceOk(a, b)) issues.push("más de 3 peleas de diferencia (sin ser ambos 15+)");
+    return issues;
+  }
+  function pickForPair(id) {
+    if (!checkReady()) return;
+    if (pairPick === id) { setPairPick(null); return; }   // tocar de nuevo = deseleccionar
+    if (!pairPick) { setPairPick(id); return; }             // primer atleta elegido
+    const a = byId[pairPick], b = byId[id];
+    if (!a || !b) { setPairPick(null); return; }
+    const issues = hardRuleIssues(a, b);
+    if (issues.length && !confirm(`⚠️ Esta pelea rompe: ${issues.join("; ")}.\n\n${a.fullName} (esquina roja) vs ${b.fullName} (esquina azul)\n\n¿Crear la pelea igual?`)) return;
+    const nueva = { id: genId(), fighterRedId: pairPick, fighterBlueId: id, roundNumber: matchups.length + 1, warnings: analyzeMatch(a, b), createdAt: new Date().toISOString() };
+    const u = [...matchups, nueva];
+    setPairPick(null);
+    setMatchups(u); save("bm_matchups_v3", u);
+  }
   // La planilla imprimible vive ahora en la pestaña Cartelera (FightCardView).
   function runSorteo() {
     if (!checkReady()) return;
@@ -142,8 +168,15 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
 
       {!matchups.length && !sorting && <div className="border border-dashed border-boxing-lineBright p-4 text-center"><p className="text-boxing-muted text-sm">Usa <span className="text-red-400 font-bold">EMPAREJAMIENTO</span> para emparejamientos aleatorios<br />o <span className="text-boxing-cream font-semibold">Auto VS</span> para emparejamiento inteligente</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría · nivel · escuela</p></div>}
       <div className="space-y-3">{matchups.map((m, i) => <VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM} onNotaChange={notaChange} />)}</div>
-      {unmatched.length > 0 && matchups.length > 0 && <div><button onClick={() => setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform " + (showUn ? "rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>Sin pelea ({unmatched.length})</button>
-        {showUn && <div className="mt-2 space-y-1.5">{unmatched.map(f => { const c = getCategoryInfo(f.weightCategory); const e = getExperienceInfo(f.experienceLevel); return <div key={f.id} className="bg-boxing-panel border border-boxing-line px-3 py-2 flex items-center justify-between fade-in"><div><span className="text-boxing-cream text-sm">{f.fullName}</span><span className="text-boxing-muted text-xs ml-2">{c?.label} · {f.weightKg}kg</span></div><Badge color={e?.color}>{e?.label}</Badge></div>; })}</div>}</div>}
+      {unmatched.length > 0 && <div><button onClick={() => setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform " + (showUn ? "rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>Sin pelea ({unmatched.length})</button>
+        {showUn && <div className="mt-2 space-y-1.5">
+          <p className="text-[11px] text-boxing-muted leading-snug">Toca dos atletas para emparejarlos a mano.{pairPick && byId[pairPick] ? <> Elegido: <b className="text-boxing-cream">{byId[pairPick].fullName}</b> — toca su rival o <button type="button" onClick={() => setPairPick(null)} className="text-red-400 underline">cancela</button>.</> : ""}</p>
+          {unmatched.map(f => { const c = getCategoryInfo(f.weightCategory); const e = getExperienceInfo(f.experienceLevel); const sel = pairPick === f.id;
+            return <button key={f.id} type="button" onClick={() => pickForPair(f.id)} className={"w-full text-left px-3 py-2 flex items-center justify-between fade-in border transition-colors " + (sel ? "bg-boxing-crimson/25 border-red-500/60" : "bg-boxing-panel border-boxing-line hover:border-boxing-goldDim")}>
+              <div className="flex items-center gap-2 min-w-0"><span className={"text-[9px] w-4 h-4 flex items-center justify-center rounded-sm flex-shrink-0 " + (sel ? "bg-boxing-crimson text-white" : "border border-boxing-lineBright text-boxing-muted")}>{sel ? "1" : "+"}</span><span className="text-boxing-cream text-sm truncate">{f.fullName}</span><span className="text-boxing-muted text-xs whitespace-nowrap">{c?.label} · {f.weightKg}kg · {f.fightCount || 0}p</span></div>
+              <Badge color={e?.color}>{e?.label}</Badge>
+            </button>; })}
+        </div>}</div>}
     </div>
   );
 }
