@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
 import { save } from "../lib/storage.js";
-import { autoMatchAll, sorteoMatch } from "../lib/matchmaking.js";
+import { autoMatchAll, sorteoMatch, experienceOk } from "../lib/matchmaking.js";
 import { super4FighterIds } from "../lib/super4.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
@@ -39,6 +39,14 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     const b = fighters.find(f => f.id === m.fighterBlueId);
     if (!r || !b || (r.gym || "").trim().toLowerCase() !== (b.gym || "").trim().toLowerCase()) return null;
     return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} vs ${b.fullName} — ${r.gym}` };
+  }).filter(Boolean), [matchups, fighters]);
+  // Peleas con demasiada diferencia de experiencia (más de 3 peleas, salvo que
+  // ambos sean pro 15+). Protege al menos experimentado.
+  const expConflicts = useMemo(() => matchups.map(m => {
+    const r = fighters.find(f => f.id === m.fighterRedId);
+    const b = fighters.find(f => f.id === m.fighterBlueId);
+    if (!r || !b || experienceOk(r, b)) return null;
+    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${r.fightCount || 0} peleas) vs ${b.fullName} (${b.fightCount || 0} peleas)` };
   }).filter(Boolean), [matchups, fighters]);
   // Igual que el Super 4: no escribir la cartelera antes de recibir su primer
   // valor de la nube, o se pisan peleas armadas en otro dispositivo.
@@ -99,6 +107,13 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
         <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {sameGymConflicts.length} pelea{sameGymConflicts.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
         <div className="space-y-0.5">{sameGymConflicts.map(v => <p key={v.n} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
+      </div>}
+
+      {/* Peleas con demasiada diferencia de experiencia (regla dura: máx 3 peleas, salvo ambos pro 15+) */}
+      {expConflicts.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+        <p className="text-red-400 font-bold text-sm">{"⚠️"} {expConflicts.length} pelea{expConflicts.length !== 1 ? "s" : ""} con demasiada diferencia de experiencia</p>
+        <div className="space-y-0.5">{expConflicts.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Máximo 3 peleas de diferencia (salvo que ambos tengan 15+). Vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
       </div>}
 
       {/* Botón Sorteo destacado */}

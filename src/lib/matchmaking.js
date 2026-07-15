@@ -7,6 +7,19 @@ function sameGym(a, b) {
   return (a.gym || "").trim().toLowerCase() === (b.gym || "").trim().toLowerCase();
 }
 
+// Diferencia máxima de peleas entre rivales (regla DURA de seguridad): un
+// atleta no puede cruzarse con otro que le lleve más de MAX_FIGHT_DIFF peleas
+// de experiencia. Única excepción: si AMBOS son pro avanzados (PRO_FIGHTS+
+// peleas), donde el cruce ya no importa. Así, un principiante de 3 peleas
+// nunca se empareja con un peleador de 15.
+const MAX_FIGHT_DIFF = 3;
+const PRO_FIGHTS = 15;
+export function experienceOk(a, b) {
+  const fa = a.fightCount || 0, fb = b.fightCount || 0;
+  if (Math.abs(fa - fb) <= MAX_FIGHT_DIFF) return true;
+  return fa >= PRO_FIGHTS && fb >= PRO_FIGHTS;
+}
+
 // ============================================
 // MATCHMAKING ALGORITHM
 // ============================================
@@ -52,16 +65,17 @@ export function autoMatchAll(fighters) {
   fighters.forEach(f => { const k = (f.sexo || "M") + "_" + f.weightCategory + "_" + f.experienceLevel + "_" + getAgeCategory(f.age).key; if (!groups[k]) groups[k] = []; groups[k].push(f); });
   Object.values(groups).forEach(g => {
     g.sort((a, b) => a.weightKg - b.weightKg);
-    for (let i = 0; i < g.length - 1; i += 2) {
-      if (used.has(g[i].id) || used.has(g[i + 1].id)) continue;
-      let f1 = g[i], f2 = g[i + 1];
-      if (sameGym(f1, f2)) {
-        // Misma escuela: busca un rival de OTRA escuela dentro del grupo.
-        let alt = null;
-        for (let j = i + 2; j < g.length; j++) { if (!used.has(g[j].id) && !sameGym(g[j], f1)) { alt = g[j]; break; } }
-        if (!alt) continue; // sin rival de otra escuela: no emparejar (queda para la fase de resto)
-        f2 = alt;
+    for (let i = 0; i < g.length; i++) {
+      if (used.has(g[i].id)) continue;
+      const f1 = g[i];
+      // Rival más cercano en peso que cumpla las reglas duras: otra escuela y
+      // diferencia de peleas válida (edad/sexo/división ya son iguales en el grupo).
+      let f2 = null;
+      for (let j = i + 1; j < g.length; j++) {
+        if (used.has(g[j].id)) continue;
+        if (!sameGym(f1, g[j]) && experienceOk(f1, g[j])) { f2 = g[j]; break; }
       }
+      if (!f2) continue; // sin rival válido en el grupo: queda para la fase de resto
       used.add(f1.id); used.add(f2.id);
       matchups.push({ id: genId(), fighterRedId: f1.id, fighterBlueId: f2.id, roundNumber: matchups.length + 1, warnings: analyzeMatch(f1, f2), createdAt: new Date().toISOString() });
     }
@@ -75,6 +89,7 @@ export function autoMatchAll(fighters) {
       if (getAgeCategory(rem[i].age).key !== getAgeCategory(rem[j].age).key) continue;
       if ((rem[i].sexo || "M") !== (rem[j].sexo || "M")) continue;
       if (sameGym(rem[i], rem[j])) continue; // regla dura: nunca misma escuela
+      if (!experienceOk(rem[i], rem[j])) continue; // regla dura: máx 3 peleas de diferencia (salvo ambos pro 15+)
       const sc = getScore(rem[i], rem[j]); if (sc > bs) { bs = sc; best = rem[j]; }
     }
     if (best && bs >= 30) {
@@ -100,13 +115,17 @@ export function sorteoMatch(fighters) {
   fighters.forEach(f => { const k = (f.sexo || "M") + "_" + f.weightCategory + "_" + f.experienceLevel + "_" + getAgeCategory(f.age).key; if (!groups[k]) groups[k] = []; groups[k].push(f); });
   Object.values(groups).forEach(g => {
     const sh = shuffle(g.filter(f => !used.has(f.id)));
-    for (let i = 0; i < sh.length - 1; i += 2) {
-      let f1 = sh[i], f2 = sh[i + 1];
-      if (sameGym(f1, f2)) {
-        let swapped = false;
-        for (let j = i + 2; j < sh.length; j++) { if (!used.has(sh[j].id) && !sameGym(sh[j], f1)) { [sh[i + 1], sh[j]] = [sh[j], sh[i + 1]]; f2 = sh[i + 1]; swapped = true; break; } }
-        if (!swapped) continue; // sin rival de otra escuela: no emparejar
+    for (let i = 0; i < sh.length; i++) {
+      if (used.has(sh[i].id)) continue;
+      const f1 = sh[i];
+      // En orden aleatorio, el primer rival que cumpla las reglas duras (otra
+      // escuela y diferencia de peleas válida).
+      let f2 = null;
+      for (let j = i + 1; j < sh.length; j++) {
+        if (used.has(sh[j].id)) continue;
+        if (!sameGym(f1, sh[j]) && experienceOk(f1, sh[j])) { f2 = sh[j]; break; }
       }
+      if (!f2) continue;
       used.add(f1.id); used.add(f2.id);
       matchups.push({ id: genId(), fighterRedId: f1.id, fighterBlueId: f2.id, roundNumber: matchups.length + 1, warnings: analyzeMatch(f1, f2), createdAt: new Date().toISOString() });
     }
@@ -118,6 +137,7 @@ export function sorteoMatch(fighters) {
     if (getAgeCategory(rem[i].age).key !== getAgeCategory(rem[i + 1].age).key) continue;
     if ((rem[i].sexo || "M") !== (rem[i + 1].sexo || "M")) continue;
     if (sameGym(rem[i], rem[i + 1])) continue; // regla dura: nunca misma escuela
+    if (!experienceOk(rem[i], rem[i + 1])) continue; // regla dura: máx 3 peleas de diferencia (salvo ambos pro 15+)
     const sc = getScore(rem[i], rem[i + 1]);
     if (sc >= 20) {
       used.add(rem[i].id); used.add(rem[i + 1].id);
