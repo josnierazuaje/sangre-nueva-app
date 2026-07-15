@@ -179,14 +179,14 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // ---------- Impresión de las llaves ----------
   function printSuper4() {
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
-    const det = fid => { const f = byId[fid]; return f ? escapeHtml(`${f.gym} · ${f.weightKg}kg · ${f.age}a`) : ""; };
+    const det = fid => { const f = byId[fid]; return f ? escapeHtml(`${(f.gym || "").toUpperCase()} · ${f.weightKg}kg · ${f.age}a`) : ""; };
     const fila = (fid, lado, winner, placeholder) => {
-      if (!fid) return `<div class="r ph"><span class="sq ${lado}"></span><span class="rn"><i>${escapeHtml(placeholder)}</i></span></div>`;
+      if (!fid) return `<div class="r ph"><span class="sq ${lado}"></span><span class="rn ${lado}"><i>${escapeHtml(placeholder)}</i></span></div>`;
       const ganador = winner === fid;
       const perdio = winner && winner !== fid;
       return `<div class="r ${ganador ? "g" : ""} ${perdio ? "p" : ""}">
         <span class="sq ${lado}"></span>
-        <span class="rtx"><span class="rn">${escapeHtml(nombre(fid))}</span><span class="rd">${det(fid)}</span></span>
+        <span class="rtx"><span class="rn ${lado}">${escapeHtml(nombre(fid))}</span><span class="rd">${det(fid)}</span></span>
         ${ganador ? '<span class="wk">✓</span>' : ""}
       </div>`;
     };
@@ -249,6 +249,8 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       .sq.azul { background:#2980b9; }
       .rtx { display:flex; flex-direction:column; min-width:0; }
       .rn { font-size:12px; font-weight:bold; }
+      .rn.rojo { color:#c0392b; text-transform:uppercase; }
+      .rn.azul { color:#2980b9; text-transform:uppercase; }
       .rd { font-size:8.5px; color:#777; }
       .r.p .rn { color:#999; font-weight:normal; }
       .r.p .rd { color:#bbb; }
