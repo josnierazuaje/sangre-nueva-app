@@ -47,6 +47,11 @@ export const AGE_CATEGORIES = [
   { key: "juvenil", label: "U19", minAge: 17, maxAge: 18, formato: "3R × 3min", color: "#EF4444" },
   { key: "adulto", label: "Elite", minAge: 19, maxAge: 40, formato: "3R × 3min", color: "#9CA3AF" },
 ];
+// Equivalencia FECHIBOX (nomenclatura chilena) de cada categoría de edad
+// World Boxing: U15=Escolar (13-14), U17=Cadete (15-16), U19=Juvenil (17-18),
+// Elite=Adulto/Elite (19-40). Se muestra junto al nombre World Boxing en las
+// planillas impresas para que se entienda con ambas nomenclaturas.
+export const FECHIBOX_LABEL = { escolar: "Escolar", cadete: "Cadete", juvenil: "Juvenil", adulto: "Adulto/Elite" };
 export function getAgeCategory(age) {
   const c = AGE_CATEGORIES.find(c => age >= c.minAge && age <= c.maxAge);
   if (c) return c;

@@ -1,4 +1,4 @@
-import { getCategoryInfo, getAgeCategory } from "../constants.js";
+import { getCategoryInfo, getAgeCategory, FECHIBOX_LABEL } from "../constants.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -38,8 +38,9 @@ export default function FightCardView({ matchups, fighters }) {
     const rows = AGE_GROUP_ORDER.filter(k => groups[k]).map(k => {
       const list = groups[k].sort((x1, x2) => (x1.r.weightKg + x1.b.weightKg) - (x2.r.weightKg + x2.b.weightKg));
       const cat = k === "mixta" ? null : getAgeCategory(list[0].r.age);
+      const fechibox = cat ? FECHIBOX_LABEL[cat.key] : null;
       const headerText = cat
-        ? `${cat.label} · ${cat.formato}`.toUpperCase()
+        ? `${cat.label}${fechibox ? " · " + fechibox : ""} · ${cat.formato}`.toUpperCase()
         : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (WORLD BOXING NO PERMITE ESTE CRUCE)";
       const headerRow = `<tr><td colspan="8" class="${k === "mixta" ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
       const groupRows = list.map((x, i) => {
