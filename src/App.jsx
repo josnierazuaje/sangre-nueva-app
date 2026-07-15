@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
@@ -141,6 +141,9 @@ export default function App() {
   // la nube podría pisar llaves ya armadas en otro dispositivo (misma
   // carrera de sincronización que la reconciliación de arriba).
   const super4Ready = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.super4);
+  // Mismo guard para la cartelera (VS): escribir bm_matchups_v3 antes de recibir
+  // su primer valor de la nube pisaría peleas armadas en otro dispositivo.
+  const matchupsReady = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups);
 
   // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
   // registrando atletas de corrido (la confirmación la muestra el propio
@@ -157,7 +160,18 @@ export default function App() {
   // antes de la Fase 5 el export manual no incluía las boletas reales, con
   // lo cual no servía como respaldo de ellas.
   function handleExport() { const d = { fighters, matchups, super4, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { setSuper4(d.super4); save("bm_super4_v1", d.super4); } } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { setSuper4(d.super4); save("bm_super4_v1", d.super4); } restoreTicketsFromImport(d.ticketsNew); } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  // Las boletas viven en nodos individuales en la nube (no en el blob), así que
+  // se restauran aparte: requieren conexión y se agregan por id a las
+  // existentes; watchTickets refresca la UI al confirmarse la escritura.
+  function restoreTicketsFromImport(ticketsNew) {
+    if (!Array.isArray(ticketsNew) || !ticketsNew.length) return;
+    if (!FB.ready) { alert("El respaldo trae " + ticketsNew.length + " boleta(s), pero restaurarlas requiere conexión a internet. Vuelve a importar el archivo con conexión."); return; }
+    if (!confirm("¿Restaurar también " + ticketsNew.length + " boleta(s) del respaldo? Se agregan (por número) a las que ya existan.")) return;
+    restoreTicketsFromBackup(ticketsNew)
+      .then(n => alert("Se restauraron " + n + " boleta(s) del respaldo."))
+      .catch(err => { console.error("No se pudieron restaurar las boletas:", err); alert("No se pudieron restaurar las boletas del respaldo.\n\nError: " + err.message); });
+  }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
@@ -245,7 +259,7 @@ export default function App() {
           {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
           {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
           {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
-          {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} />}
+          {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} ready={matchupsReady} />}
           {view === "card" && <FightCardView matchups={matchups} fighters={fighters} />}
           {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
         </Suspense>

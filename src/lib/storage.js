@@ -259,6 +259,26 @@ export function watchTickets(onChange) {
   });
 }
 
+// Pura y testeable: de un arreglo de boletas arma el mapa de escrituras
+// "tickets/{id}" (para un dbUpdate multi-ruta) y el máximo correlativo por
+// tipo. Ignora ids vacíos y los de emergencia (prefijo-XNNN, sin dígitos tras
+// el guion), que no cuentan para el correlativo. La usan la migración en
+// caliente y la restauración de un respaldo.
+export function buildTicketRestore(tickets) {
+  const ticketUpdates = {};
+  const maxByType = {};
+  (tickets || []).forEach(t => {
+    if (!t || !t.id) return;
+    ticketUpdates["tickets/" + t.id] = t;
+    const m = /^[A-Za-z]+-(\d+)$/.exec(t.id);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > (maxByType[t.ticketType] || 0)) maxByType[t.ticketType] = n;
+    }
+  });
+  return { ticketUpdates, maxByType };
+}
+
 // Migración en caliente, una sola vez: si sangre_nueva/tickets todavía no
 // existe pero el arreglo viejo (bm_tickets_v4) sí tiene datos, copia cada
 // boleta a su nodo individual e inicializa los contadores desde el máximo
@@ -275,16 +295,10 @@ export async function migrateTicketsIfNeeded() {
     const oldSnap = await get(ref(FB.db, fbPath("bm_tickets_v4")));
     const oldTickets = oldSnap.val();
     if (!Array.isArray(oldTickets) || !oldTickets.length) return;
-    const updates = {};
-    const maxByType = {};
-    oldTickets.forEach(t => {
-      updates["tickets/" + t.id] = t;
-      const m = /^[A-Za-z]+-(\d+)$/.exec(t.id || "");
-      if (m) {
-        const n = parseInt(m[1], 10);
-        if (!maxByType[t.ticketType] || n > maxByType[t.ticketType]) maxByType[t.ticketType] = n;
-      }
-    });
+    // Los contadores aún no existen (primera migración), así que van en el
+    // mismo dbUpdate atómico que las boletas.
+    const { ticketUpdates, maxByType } = buildTicketRestore(oldTickets);
+    const updates = { ...ticketUpdates };
     Object.entries(maxByType).forEach(([tipo, n]) => { updates["counters/" + tipo] = n; });
     await dbUpdate(ref(FB.db, fbPath("")), updates);
     console.info("Migración de boletas a nodos individuales completada (" + oldTickets.length + " boletas).");
@@ -292,6 +306,25 @@ export async function migrateTicketsIfNeeded() {
     migrationAttempted = false; // permite reintentar en el próximo inicio si falló
     console.error("No se pudo migrar las boletas a nodos individuales:", e);
   }
+}
+
+// Restaura boletas desde un respaldo (JSON importado) a sus nodos individuales.
+// Escribe las boletas en un dbUpdate atómico y luego SUBE cada contador al
+// máximo correlativo restaurado con una transacción — nunca lo baja, así
+// respeta la regla .validate de contador no-decreciente y no reasigna
+// correlativos si ya se vendió más desde que se hizo el respaldo. Devuelve
+// cuántas boletas escribió. Requiere conexión (los nodos de boletas viven solo
+// en la nube); si no hay FB, no hace nada y devuelve 0.
+export async function restoreTicketsFromBackup(tickets) {
+  if (!FB.ready || !Array.isArray(tickets) || !tickets.length) return 0;
+  const { ticketUpdates, maxByType } = buildTicketRestore(tickets);
+  const n = Object.keys(ticketUpdates).length;
+  if (!n) return 0;
+  await dbUpdate(ref(FB.db, fbPath("")), ticketUpdates);
+  await Promise.all(Object.entries(maxByType).map(([tipo, max]) =>
+    runTransaction(ref(FB.db, fbPath("counters/" + tipo)), cur => Math.max(cur || 0, max))
+  ));
+  return n;
 }
 
 export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); }

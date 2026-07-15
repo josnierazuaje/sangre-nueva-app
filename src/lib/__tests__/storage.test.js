@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -60,5 +60,41 @@ describe("applyRemoveFighter", () => {
   });
   it("ignora entradas nulas sin romper", () => {
     expect(applyRemoveFighter([A, null, B], "a")).toEqual([B]);
+  });
+});
+
+describe("buildTicketRestore", () => {
+  const t = (id, ticketType) => ({ id, ticketType, price: 7000, status: "activo" });
+
+  it("mapea cada boleta a tickets/{id}", () => {
+    const { ticketUpdates } = buildTicketRestore([t("PRE-0001", "preventa"), t("PUE-0002", "puerta")]);
+    expect(ticketUpdates).toEqual({
+      "tickets/PRE-0001": t("PRE-0001", "preventa"),
+      "tickets/PUE-0002": t("PUE-0002", "puerta"),
+    });
+  });
+  it("calcula el máximo correlativo por tipo", () => {
+    const { maxByType } = buildTicketRestore([
+      t("PRE-0003", "preventa"), t("PRE-0010", "preventa"), t("PRE-0007", "preventa"),
+      t("PUE-0002", "puerta"),
+    ]);
+    expect(maxByType).toEqual({ preventa: 10, puerta: 2 });
+  });
+  it("ignora ids de emergencia (sin dígitos tras el guion) para el contador", () => {
+    const { maxByType, ticketUpdates } = buildTicketRestore([
+      t("PRE-0005", "preventa"), t("PRE-XK3J9", "preventa"),
+    ]);
+    // la boleta de emergencia sí se restaura, pero no cuenta para el correlativo
+    expect(ticketUpdates["tickets/PRE-XK3J9"]).toBeTruthy();
+    expect(maxByType).toEqual({ preventa: 5 });
+  });
+  it("ignora entradas nulas o sin id", () => {
+    const { ticketUpdates, maxByType } = buildTicketRestore([null, { ticketType: "preventa" }, t("PRE-0001", "preventa")]);
+    expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0001"]);
+    expect(maxByType).toEqual({ preventa: 1 });
+  });
+  it("lista vacía o nula → objetos vacíos", () => {
+    expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {} });
+    expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {} });
   });
 });
