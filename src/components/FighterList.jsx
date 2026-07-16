@@ -1,10 +1,7 @@
 import { useState, useMemo } from "react";
 import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, FECHIBOX_LABEL, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
-
-function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+import { escapeHtml } from "../lib/html.js";
 
 // ============================================
 // COMPONENTE: LISTA PELEADORES

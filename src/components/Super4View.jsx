@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
 import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, weightRangeLabel } from "../constants.js";
 import { dupKey } from "../lib/dedup.js";
+import { escapeHtml } from "../lib/html.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights, bracketPrintTitle } from "../lib/super4.js";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
@@ -18,10 +19,6 @@ function fightsOptionLabel(v) {
 }
 // Migración del selector anterior (por nivel) al nuevo (por número de peleas).
 const LEGACY_TIER_TO_FIGHTS = { debutante: "0", principiante: "3", amateur: "10" };
-
-function escapeHtml(s) {
-  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 // ============================================
 // SUPER 4 — llaves de campeonato por cinturón
