@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { TICKET_TYPES_V2, fmt$ } from "../constants.js";
 import Badge from "./Badge.jsx";
+import { normName } from "../lib/dedup.js";
 
 export default function HistoryView({ tickets, onDelete }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -10,7 +11,9 @@ export default function HistoryView({ tickets, onDelete }) {
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
   const filtered = useMemo(() => {
     let r = [...tickets].reverse();
-    if (searchQuery.trim()) { const s = searchQuery.toLowerCase(); r = r.filter(t => t.attendeeName.toLowerCase().includes(s) || t.id.toLowerCase().includes(s)); }
+    // Búsqueda de asistentes insensible a acentos/mayúsculas/espacios (normName),
+    // igual que en la lista de peleadores: "jose" encuentra a "José".
+    if (searchQuery.trim()) { const s = normName(searchQuery); r = r.filter(t => normName(t.attendeeName).includes(s) || (t.id || "").toLowerCase().includes(s)); }
     if (typeFilter !== "all") r = r.filter(t => t.ticketType === typeFilter);
     if (statusFilter !== "all") r = r.filter(t => t.status === statusFilter);
     return r;

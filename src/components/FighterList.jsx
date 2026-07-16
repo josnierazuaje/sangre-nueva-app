@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, FECHIBOX_LABEL, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
 import { escapeHtml } from "../lib/html.js";
+import { normName } from "../lib/dedup.js";
 
 // ============================================
 // COMPONENTE: LISTA PELEADORES
@@ -23,7 +24,11 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     if (sexFilter !== "all") r = r.filter(f => (f.sexo || "M") === sexFilter);
     if (ageFilter === "invalid") r = r.filter(f => { const k = getAgeCategory(f.age).key; return k === "infantil" || k === "veterano"; });
     else if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
-    if (searchQuery.trim()) { const s = searchQuery.toLowerCase(); r = r.filter(f => f.fullName.toLowerCase().includes(s) || f.gym.toLowerCase().includes(s)); }
+    // Búsqueda insensible a acentos/mayúsculas/espacios: usa normName (la MISMA
+    // normalización que la deduplicación) para que buscar "joaquin paz"
+    // encuentre a "Joaquín Paz". Antes usaba toLowerCase() a secas y no hallaba
+    // nombres con tilde aunque el dedup sí los detectaba como existentes.
+    if (searchQuery.trim()) { const s = normName(searchQuery); r = r.filter(f => normName(f.fullName).includes(s) || normName(f.gym).includes(s)); }
     if (categoryFilter !== "all") r = r.filter(f => f.weightCategory === categoryFilter);
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
     switch (sortBy) { case "name": r.sort((a, b) => a.fullName.localeCompare(b.fullName)); break; case "weight": r.sort((a, b) => a.weightKg - b.weightKg); break; case "experience": r.sort((a, b) => b.fightCount - a.fightCount); break; default: r.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
