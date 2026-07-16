@@ -18,6 +18,12 @@ describe("EVENT_DATES / EVENT_LABELS", () => {
     expect(EVENT_LABELS.finalWd).toBe(`${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day}`);
     expect(EVENT_LABELS.semiLong).toBe(`${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} de ${EVENT_DATES.semis.monthName}`);
     expect(EVENT_LABELS.finalLong).toBe(`${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName}`);
+    expect(EVENT_LABELS.rango).toBe(`${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} y ${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName} de ${EVENT_DATES.final.year}`);
+  });
+
+  it("rango incluye ambos días, el mes y el año (para encabezado y WhatsApp)", () => {
+    expect(EVENT_LABELS.rango).toContain(" y ");
+    expect(EVENT_LABELS.rango).toMatch(new RegExp(`${EVENT_DATES.final.year}$`));
   });
 
   it("formatos: abreviado 'Abrev DD', con día de semana 'diasemana DD', largo '… de mes'", () => {

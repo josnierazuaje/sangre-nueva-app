@@ -84,6 +84,9 @@ export const EVENT_LABELS = {
   finalWd: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day}`,                                      // "domingo 02"
   semiLong: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} de ${EVENT_DATES.semis.monthName}`,   // "sábado 01 de agosto"
   finalLong: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName}`,  // "domingo 02 de agosto"
+  // Rango completo de los dos días CON año, para encabezados y compartir por
+  // WhatsApp (asume mismo mes/año para ambos días, que es el caso del evento).
+  rango: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} y ${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName} de ${EVENT_DATES.final.year}`, // "sábado 01 y domingo 02 de agosto de 2026"
 };
 
 export const EXPERIENCE_LEVELS = [

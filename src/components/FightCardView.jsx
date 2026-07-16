@@ -1,4 +1,4 @@
-import { getCategoryInfo } from "../constants.js";
+import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
 import { buildCarteleraHtml } from "../lib/printCartelera.js";
 
 // ============================================
@@ -6,7 +6,8 @@ import { buildCarteleraHtml } from "../lib/printCartelera.js";
 // ============================================
 export default function FightCardView({ matchups, fighters }) {
   if (!matchups.length) return <div className="text-center py-16"><div className="text-5xl mb-4">{"\u{1F4CB}"}</div><p className="text-gray-400">Primero crea los VS</p></div>;
-  const eventDate = new Date().toLocaleDateString("es-CL", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  // Fecha REAL del evento (dos días), no la de hoy. Fuente única: EVENT_DATES.
+  const eventDate = EVENT_LABELS.rango;
   function shareWA() {
     const text = "*CARTELERA DE BOXEO*\n" + eventDate + "\n\n" + matchups.map(m => { const r = fighters.find(f => f.id === m.fighterRedId); const b = fighters.find(f => f.id === m.fighterBlueId); const c = getCategoryInfo(r?.weightCategory); return `*Pelea ${m.roundNumber}* (${c?.label})\n${r?.fullName} _(${r?.weightKg}kg, ${r?.gym})_\nVS\n${b?.fullName} _(${b?.weightKg}kg, ${b?.gym})_`; }).join("\n\n");
     window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
