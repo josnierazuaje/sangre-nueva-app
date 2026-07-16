@@ -1,5 +1,6 @@
 import { escapeHtml } from "./html.js";
 import { bracketPrintTitle, bracketMaxFights } from "./super4.js";
+import { EVENT_LABELS } from "../constants.js";
 
 // Genera el HTML imprimible del torneo Super 4 (llaves con semifinales y final).
 // Función pura y testeable: recibe las llaves (super4), el índice de peleadores
@@ -30,12 +31,12 @@ export function buildSuper4Html(super4, byId, fecha = "") {
         <div class="cat">🏆 ${escapeHtml(bracketPrintTitle(b))} <span class="regla">${escapeHtml(b.regla)}</span></div>
         <div class="bracket">
           <div class="col semis">
-            ${match("Sáb 01 · Semifinal 1", b.semis[0].red, b.semis[0].blue, b.semis[0].winner)}
-            ${match("Sáb 01 · Semifinal 2", b.semis[1].red, b.semis[1].blue, b.semis[1].winner)}
+            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 1`, b.semis[0].red, b.semis[0].blue, b.semis[0].winner)}
+            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 2`, b.semis[1].red, b.semis[1].blue, b.semis[1].winner)}
           </div>
           <div class="conn"><i class="lt"></i><i class="lb"></i><i class="lv"></i><i class="lm"></i></div>
           <div class="col colfinal">
-            ${match("Dom 02 · FINAL", finalistas[0], finalistas[1], b.finalWinner, "Ganador Semifinal 1", "Ganador Semifinal 2")}
+            ${match(`${EVENT_LABELS.finalAbbr} · FINAL`, finalistas[0], finalistas[1], b.finalWinner, "Ganador Semifinal 1", "Ganador Semifinal 2")}
             ${b.finalWinner ? `<div class="camp">🏆 Campeón: ${escapeHtml(nombre(b.finalWinner))}</div>` : ""}
           </div>
         </div>
@@ -89,7 +90,7 @@ export function buildSuper4Html(super4, byId, fecha = "") {
       @media print { body { padding:8px; } }
     </style></head><body>
       <div class="doc-header"><h1>TORNEO SUPER 4 — SANGRE NUEVA</h1><p>La Velada · Disputa de cinturones</p></div>
-      <div class="sub">Semifinales: sábado 01 de agosto · Finales por el cinturón: domingo 02 de agosto</div>
+      <div class="sub">Semifinales: ${EVENT_LABELS.semiLong} · Finales por el cinturón: ${EVENT_LABELS.finalLong}</div>
       ${topeNota}
       ${llaves}
       ${pendientes}

@@ -61,6 +61,31 @@ export function getAgeCategory(age) {
   return { key: "veterano", label: "+40 (fuera de rango oficial)", formato: "—", color: "#6B7280" };
 }
 
+// ============================================
+// FECHAS DEL EVENTO
+// ============================================
+// La Velada se disputa en dos días: el Super 4 juega las semifinales el
+// sábado 1 de agosto de 2026 y las finales (por el cinturón) el domingo 2.
+// Estas son las fechas REALES del evento, centralizadas aquí: al cambiar la
+// fecha se edita SOLO este bloque y se actualizan planillas y vistas.
+// (El "bm_event_label" editable es un título libre aparte; NINGUNA fecha se
+// deriva de él.) Ojo: `day` va como string de 2 dígitos ("01"/"02") para
+// conservar el cero a la izquierda que muestran las planillas.
+export const EVENT_DATES = {
+  semis: { weekdayFull: "sábado", weekdayAbbr: "Sáb", day: "01", monthName: "agosto", year: 2026 },
+  final: { weekdayFull: "domingo", weekdayAbbr: "Dom", day: "02", monthName: "agosto", year: 2026 },
+};
+// Etiquetas ya compuestas desde EVENT_DATES (única fuente de verdad). El
+// comentario de cada línea muestra la salida exacta con la fecha actual.
+export const EVENT_LABELS = {
+  semiAbbr: `${EVENT_DATES.semis.weekdayAbbr} ${EVENT_DATES.semis.day}`,                                     // "Sáb 01"
+  finalAbbr: `${EVENT_DATES.final.weekdayAbbr} ${EVENT_DATES.final.day}`,                                    // "Dom 02"
+  semiWd: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day}`,                                       // "sábado 01"
+  finalWd: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day}`,                                      // "domingo 02"
+  semiLong: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} de ${EVENT_DATES.semis.monthName}`,   // "sábado 01 de agosto"
+  finalLong: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName}`,  // "domingo 02 de agosto"
+};
+
 export const EXPERIENCE_LEVELS = [
   { key: "debutante", label: "Debutante", minFights: 0, maxFights: 0, color: "#22C55E" },
   { key: "principiante", label: "Principiante", minFights: 1, maxFights: 3, color: "#3B82F6" },

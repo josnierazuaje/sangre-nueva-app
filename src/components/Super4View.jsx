@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
-import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, weightRangeLabel } from "../constants.js";
+import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weightRangeLabel } from "../constants.js";
 import { dupKey } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
@@ -351,7 +351,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar llaves</button>}
 
       {!super4.length && <div className="border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
-        <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">sábado 01</span> y la final el <span className="text-boxing-goldFight font-semibold">domingo 02</span>.</p>
+        <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
           {resultado.brackets.length === 0 && resultado.faltantes.length === 0 && <p>Con los filtros actuales no hay atletas para armar llaves. Ajusta la experiencia, la edad o los pesos.</p>}
           {resultado.brackets.map(b => <p key={b.catKey}>✅ <span className="text-boxing-cream">{b.catLabel}</span> — listo (4+)</p>)}
@@ -377,7 +377,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               <div className="grid items-stretch" style={{ gridTemplateColumns: "1fr 18px 1fr" }}>
                 <div className="flex flex-col justify-between gap-3">
                   {b.semis.map((s, i) => (
-                    <Tarjeta key={i} dia={`Sáb 01 · Semi ${i + 1}`} decidido={!!s.winner}>
+                    <Tarjeta key={i} dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
                       <Fila fid={s.red} winner={s.winner} lado="rojo" onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
                       <Fila fid={s.blue} winner={s.winner} lado="azul" onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
                     </Tarjeta>
@@ -385,7 +385,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                 </div>
                 <Conector />
                 <div className="flex flex-col justify-center">
-                  <Tarjeta dia="Dom 02 · Final" decidido={!!campeon} destacada>
+                  <Tarjeta dia={`${EVENT_LABELS.finalAbbr} · Final`} decidido={!!campeon} destacada>
                     <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onWin={() => marcarFinal(b.id, finalistas[0])} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
                     <Fila fid={finalistas[1]} winner={campeon} lado="azul" onWin={() => marcarFinal(b.id, finalistas[1])} placeholder="Ganador Semi 2" bloqueada={!(finalistas[0] && finalistas[1])} />
                   </Tarjeta>

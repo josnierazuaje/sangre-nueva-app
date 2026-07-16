@@ -22,8 +22,9 @@ export function eligibleForDivision(ageKey, divKey, fighters) {
 
 // ============================================
 // TORNEO SUPER 4 — llaves de 4 atletas por cinturón
-// Semifinales el sábado 01 y final el domingo 02. Las categorías en
-// disputa salen del afiche oficial del campeonato de novatos.
+// Semifinales el primer día y final el segundo (fechas en EVENT_DATES,
+// constants.js). Las categorías en disputa salen del afiche oficial del
+// campeonato de novatos.
 // ============================================
 
 // Filtra un grupo de peleadores por número MÁXIMO de peleas: deja solo a los
