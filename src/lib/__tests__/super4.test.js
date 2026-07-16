@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds, bracketPrintTitle } from "../super4.js";
 import { dupKey } from "../dedup.js";
 
 let n = 0;
@@ -409,5 +409,22 @@ describe("super4FighterIds", () => {
     expect(super4FighterIds([]).size).toBe(0);
     expect(super4FighterIds([{ id: "x" }]).size).toBe(0);
     expect(super4FighterIds([{ semis: [{ red: null, blue: null }] }]).size).toBe(0);
+  });
+});
+
+describe("bracketPrintTitle (World Boxing + FECHIBOX + división)", () => {
+  it("desde ageKey/divKey: incluye nombre World Boxing y FECHIBOX de la edad", () => {
+    expect(bracketPrintTitle({ ageKey: "cadete", divKey: "m_superwelter" })).toBe("U17 · Cadete · Superwélter (M)");
+    expect(bracketPrintTitle({ ageKey: "adulto", divKey: "f_welter" })).toBe("Elite · Adulto/Elite · Wélter (F)");
+  });
+  it("reconstruye parseando el catKey si faltan ageKey/divKey", () => {
+    expect(bracketPrintTitle({ catKey: "adulto__m_ligero" })).toBe("Elite · Adulto/Elite · Ligero (M)");
+  });
+  it("cae al catLabel guardado si no puede reconstruir (cinturón legacy)", () => {
+    expect(bracketPrintTitle({ catKey: "cadete71", catLabel: "Cadetes 71kg" })).toBe("Cadetes 71kg");
+  });
+  it("tolera bracket nulo o sin datos", () => {
+    expect(bracketPrintTitle(null)).toBe("");
+    expect(bracketPrintTitle({})).toBe("");
   });
 });

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
 import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, weightRangeLabel } from "../constants.js";
 import { dupKey } from "../lib/dedup.js";
-import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
+import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights, bracketPrintTitle } from "../lib/super4.js";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
@@ -197,7 +197,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       const finalistas = [b.semis[0].winner, b.semis[1].winner];
       return `
       <div class="llave">
-        <div class="cat">🏆 ${escapeHtml(b.catLabel)} <span class="regla">${escapeHtml(b.regla)}</span></div>
+        <div class="cat">🏆 ${escapeHtml(bracketPrintTitle(b))} <span class="regla">${escapeHtml(b.regla)}</span></div>
         <div class="bracket">
           <div class="col semis">
             ${match("Sáb 01 · Semifinal 1", b.semis[0].red, b.semis[0].blue, b.semis[0].winner)}

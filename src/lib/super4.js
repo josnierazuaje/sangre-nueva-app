@@ -1,4 +1,4 @@
-import { genId, getAgeCategory, getWeightCategory, weightRangeLabel, WEIGHT_CATEGORIES, AGE_CATEGORIES } from "../constants.js";
+import { genId, getAgeCategory, getWeightCategory, weightRangeLabel, WEIGHT_CATEGORIES, AGE_CATEGORIES, FECHIBOX_LABEL } from "../constants.js";
 import { dupKey } from "./dedup.js";
 
 // Divisiones de peso oficiales (World Boxing) disponibles para el Super 4:
@@ -192,6 +192,23 @@ export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null, 
     }
   }
   return { brackets: sortBrackets(brackets), faltantes };
+}
+
+// Título de una llave para impresión: nombre World Boxing + equivalencia
+// FECHIBOX de la edad + división (género), p.ej. "U17 · Cadete · Superwélter (M)".
+// Se reconstruye desde ageKey/divKey (o parseando el catKey "ageKey__divKey")
+// para ser consistente aunque el catLabel guardado varíe entre llaves viejas y
+// nuevas. Cinturones legacy sin catKey compuesto caen al catLabel guardado.
+export function bracketPrintTitle(b) {
+  if (!b) return "";
+  let ageKey = b.ageKey, divKey = b.divKey;
+  if ((!ageKey || !divKey) && b.catKey && b.catKey.includes("__")) [ageKey, divKey] = b.catKey.split("__");
+  const ageInfo = AGE_CATEGORIES.find(a => a.key === ageKey);
+  const div = WEIGHT_CATEGORIES.find(d => d.key === divKey);
+  if (!ageInfo || !div) return b.catLabel || "";
+  const fechibox = FECHIBOX_LABEL[ageKey];
+  const gen = div.genero === "F" ? "F" : "M";
+  return `${ageInfo.label}${fechibox ? " · " + fechibox : ""} · ${div.label} (${gen})`;
 }
 
 // Fusiona las llaves recién regeneradas con las existentes que NO se
