@@ -10,6 +10,15 @@ describe("normName", () => {
     expect(normName("  Andrés   Pérez ")).toBe("andres perez");
     expect(normName("ANDRES PEREZ")).toBe("andres perez");
   });
+  // Contrato del que depende la búsqueda de la lista (FighterList/HistoryView):
+  // buscar sin acentos debe encontrar el nombre CON acentos, para que coincida
+  // con lo que el dedup considera "la misma persona". Regresión: antes la
+  // búsqueda usaba toLowerCase() a secas y no hallaba "Joaquín Paz".
+  it("permite búsqueda por substring insensible a acentos/mayúsculas", () => {
+    expect(normName("Joaquín Paz").includes(normName("joaquin paz"))).toBe(true);
+    expect(normName("Joaquín Paz").includes(normName("PAZ"))).toBe(true);
+    expect(normName("José Muñoz").includes(normName("jose"))).toBe(true);
+  });
 });
 
 describe("dedupeFighters", () => {
