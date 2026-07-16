@@ -3,13 +3,14 @@ import { getCategoryInfo, getExperienceInfo, getAgeCategory, genId } from "../co
 import { save } from "../lib/storage.js";
 import { autoMatchAll, sorteoMatch, experienceOk, analyzeMatch } from "../lib/matchmaking.js";
 import { super4FighterIds } from "../lib/super4.js";
+import { matchupConflicts } from "../lib/conflicts.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
 
 // ============================================
 // MATCHMAKING VIEW
 // ============================================
-export default function MatchmakingView({ fighters, matchups, setMatchups, super4, ready }) {
+export default function MatchmakingView({ fighters, matchups, setMatchups, super4, ready, super4Ready }) {
   const [showUn, setShowUn] = useState(false);
   const [sorting, setSorting] = useState(false);
   const [sortCount, setSortCount] = useState(0);
@@ -21,35 +22,10 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   const byId = useMemo(() => { const m = {}; fighters.forEach(f => { m[f.id] = f; }); return m; }, [fighters]);
   const matched = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
   const unmatched = elegibles.filter(f => !matched.has(f.id));
-  // Los emparejamientos guardados traen sus advertencias congeladas al
-  // momento de crearse; esta verificación se calcula en vivo para detectar
-  // cruces de categorías de edad World Boxing en VS armados antes de la regla
-  // (o si a un peleador le editaron la edad después de emparejarlo).
-  const fechiboxViolations = useMemo(() => matchups.map(m => {
-    const r = fighters.find(f => f.id === m.fighterRedId);
-    const b = fighters.find(f => f.id === m.fighterBlueId);
-    if (!r || !b) return null;
-    const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
-    if (c1.key === c2.key) return null;
-    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${c1.label}, ${r.age}a) vs ${b.fullName} (${c2.label}, ${b.age}a)` };
-  }).filter(Boolean), [matchups, fighters]);
-  // Peleas ya guardadas que violan las reglas nuevas (armadas antes, o porque
-  // el atleta entró al Super 4 / le cambiaron la escuela después de emparejar).
-  const super4Conflicts = useMemo(() => matchups.filter(m => super4Ids.has(m.fighterRedId) || super4Ids.has(m.fighterBlueId)).map(m => m.roundNumber), [matchups, super4Ids]);
-  const sameGymConflicts = useMemo(() => matchups.map(m => {
-    const r = fighters.find(f => f.id === m.fighterRedId);
-    const b = fighters.find(f => f.id === m.fighterBlueId);
-    if (!r || !b || (r.gym || "").trim().toLowerCase() !== (b.gym || "").trim().toLowerCase()) return null;
-    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} vs ${b.fullName} — ${r.gym}` };
-  }).filter(Boolean), [matchups, fighters]);
-  // Peleas con demasiada diferencia de experiencia (más de 3 peleas, salvo que
-  // ambos sean pro 15+). Protege al menos experimentado.
-  const expConflicts = useMemo(() => matchups.map(m => {
-    const r = fighters.find(f => f.id === m.fighterRedId);
-    const b = fighters.find(f => f.id === m.fighterBlueId);
-    if (!r || !b || experienceOk(r, b)) return null;
-    return { n: m.roundNumber, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${r.fightCount || 0} peleas) vs ${b.fullName} (${b.fightCount || 0} peleas)` };
-  }).filter(Boolean), [matchups, fighters]);
+  // Revisión en vivo de todas las reglas duras sobre las peleas YA guardadas
+  // (detecta las que quedaron inválidas después de armarse). Vive en
+  // lib/conflicts.js para compartirla con la pestaña Cartelera y testearla.
+  const conflicts = useMemo(() => matchupConflicts(matchups, fighters, super4Ids), [matchups, fighters, super4Ids]);
   // Igual que el Super 4: no escribir la cartelera antes de recibir su primer
   // valor de la nube, o se pisan peleas armadas en otro dispositivo.
   function checkReady() {
@@ -58,6 +34,21 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     return false;
   }
   function autoM() { if (!checkReady()) return; const m = autoMatchAll(elegibles); setMatchups(m); save("bm_matchups_v3", m); }
+  // Quita de un toque SOLO las peleas imposibles (rival eliminado o atleta ya
+  // en el Super 4) y renumera; las demás alertas (escuela/experiencia/edad)
+  // se resuelven a criterio del organizador pelea por pelea. Exige que el
+  // Super 4 también esté hidratado desde la nube: con una copia local vieja
+  // de las llaves, "imposible" podría marcar peleas que ya son válidas y el
+  // borrado se propagaría a todos los dispositivos.
+  function quitarImposibles() {
+    if (!checkReady()) return;
+    if (!super4Ready) { alert("Sincronizando el Super 4 con la nube… intenta de nuevo en unos segundos."); return; }
+    const ids = new Set(conflicts.removibles);
+    const nums = matchups.filter(m => ids.has(m.id)).map(m => m.roundNumber);
+    if (!confirm(`Se quitará${ids.size === 1 ? "" : "n"} ${ids.size} pelea${ids.size === 1 ? "" : "s"} de la cartelera (pelea${ids.size === 1 ? "" : "s"} ${nums.join(", ")}) y se renumerará el resto.\n\n¿Continuar?`)) return;
+    const u = matchups.filter(m => !ids.has(m.id)).map((m, i) => ({ ...m, roundNumber: i + 1 }));
+    setMatchups(u); save("bm_matchups_v3", u);
+  }
   function rmM(id) { if (!checkReady()) return; const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
   function clearAll() { if (!checkReady()) return; setMatchups([]); save("bm_matchups_v3", []); }
   function notaChange(id, nota) { if (!checkReady()) return; const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
@@ -115,30 +106,44 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
         <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>
       </div>
 
-      {/* Aviso de cruces de categoría de edad World Boxing en VS ya guardados */}
-      {fechiboxViolations.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
-        <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {fechiboxViolations.length} pelea{fechiboxViolations.length !== 1 ? "s" : ""} mezcla{fechiboxViolations.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
-        <div className="space-y-1">{fechiboxViolations.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
-        <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
+      {/* Peleas IMPOSIBLES (rival eliminado / atleta en el Super 4): sin criterio humano posible, se quitan de un toque */}
+      {conflicts.huerfanas.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+        <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.huerfanas.length} pelea{conflicts.huerfanas.length !== 1 ? "s" : ""} con un rival que ya no existe</p>
+        <div className="space-y-0.5">{conflicts.huerfanas.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Su rival fue eliminado de la lista de peleadores; estas peleas no salen en la planilla impresa.</p>
       </div>}
 
       {/* Peleas con atletas que ya están en el Super 4 (no pueden estar en ambas planillas) */}
-      {super4Conflicts.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
-        <p className="text-red-400 font-bold text-sm">{"⚠️"} {super4Conflicts.length} pelea{super4Conflicts.length !== 1 ? "s" : ""} incluye{super4Conflicts.length !== 1 ? "n" : ""} atletas que ya están en el Super 4</p>
-        <p className="text-red-300/90 text-xs">Peleas: {super4Conflicts.join(", ")}. Un atleta no puede estar en la cartelera y en el Super 4 a la vez — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
+      {conflicts.super4.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+        <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.super4.length} pelea{conflicts.super4.length !== 1 ? "s" : ""} incluye{conflicts.super4.length !== 1 ? "n" : ""} atletas que ya están en el Super 4</p>
+        <div className="space-y-0.5">{conflicts.super4.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Un atleta no puede estar en la cartelera y en el Super 4 a la vez.</p>
+      </div>}
+
+      {/* Botón de limpieza de las peleas imposibles (huérfanas + Super 4). Solo
+          aparece con el Super 4 ya hidratado desde la nube (ver quitarImposibles). */}
+      {conflicts.removibles.length > 0 && super4Ready && <button onClick={quitarImposibles} disabled={sorting} className="w-full py-3 bg-red-900/40 hover:bg-red-900/60 border border-red-500/60 text-red-200 font-bold text-sm tracking-widest uppercase transition-colors">
+        {"🧹"} Quitar {conflicts.removibles.length === 1 ? "la pelea imposible" : `las ${conflicts.removibles.length} peleas imposibles`} (Super 4 / rival eliminado)
+      </button>}
+
+      {/* Aviso de cruces de categoría de edad World Boxing en VS ya guardados */}
+      {conflicts.edadMixta.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
+        <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {conflicts.edadMixta.length} pelea{conflicts.edadMixta.length !== 1 ? "s" : ""} mezcla{conflicts.edadMixta.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
+        <div className="space-y-1">{conflicts.edadMixta.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+        <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
       </div>}
 
       {/* Peleas entre atletas de la misma escuela (entrenan juntos) */}
-      {sameGymConflicts.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 space-y-1 fade-in">
-        <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {sameGymConflicts.length} pelea{sameGymConflicts.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
-        <div className="space-y-0.5">{sameGymConflicts.map(v => <p key={v.n} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
+      {conflicts.mismaEscuela.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 space-y-1 fade-in">
+        <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {conflicts.mismaEscuela.length} pelea{conflicts.mismaEscuela.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
+        <div className="space-y-0.5">{conflicts.mismaEscuela.map(v => <p key={v.id} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
       </div>}
 
       {/* Peleas con demasiada diferencia de experiencia (regla dura: máx 3 peleas, salvo ambos pro 15+) */}
-      {expConflicts.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
-        <p className="text-red-400 font-bold text-sm">{"⚠️"} {expConflicts.length} pelea{expConflicts.length !== 1 ? "s" : ""} con demasiada diferencia de experiencia</p>
-        <div className="space-y-0.5">{expConflicts.map(v => <p key={v.n} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
+      {conflicts.experiencia.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+        <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.experiencia.length} pelea{conflicts.experiencia.length !== 1 ? "s" : ""} con demasiada diferencia de experiencia</p>
+        <div className="space-y-0.5">{conflicts.experiencia.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Máximo 3 peleas de diferencia (salvo que ambos tengan 15+). Vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
       </div>}
 

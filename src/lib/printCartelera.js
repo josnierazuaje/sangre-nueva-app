@@ -38,6 +38,11 @@ export function buildCarteleraHtml(matchups, fighters) {
       const pesoDetalle = c1.key === c2.key
         ? `${c1.label} · ${c1.formato}`
         : `${c1.label} vs ${c2.label}`;
+      // El peso se muestra de menor a mayor (es el rango de la pelea, no
+      // "rojo / azul"), pedido del organizador. Number() porque un JSON
+      // importado puede traer weightKg como string (comparación lexicográfica:
+      // "100" <= "60" daría orden descendente).
+      const [wLo, wHi] = Number(r.weightKg) <= Number(b.weightKg) ? [r.weightKg, b.weightKg] : [b.weightKg, r.weightKg];
       return `<tr>
           <td>${i + 1}</td>
           <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
@@ -45,7 +50,7 @@ export function buildCarteleraHtml(matchups, fighters) {
           <td class="vs">-</td>
           <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
           <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
-          <td>${r.weightKg}kg / ${b.weightKg}kg<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
+          <td>${wLo}kg / ${wHi}kg<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
           <td>${escapeHtml(m.nota || "")}</td>
         </tr>`;
     }).join("");

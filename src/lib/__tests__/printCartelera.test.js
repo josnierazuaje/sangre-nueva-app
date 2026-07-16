@@ -36,6 +36,23 @@ describe("buildCarteleraHtml", () => {
     expect(html).not.toContain("<b>Niño</b>");
   });
 
+  it("el peso de cada pelea se muestra de menor a mayor, sin importar la esquina", () => {
+    const r = f({ id: "r", age: 14, weightKg: 63 }); // rojo MÁS pesado
+    const b = f({ id: "b", age: 14, weightKg: 60 });
+    const html = buildCarteleraHtml([vs(r, b)], [r, b]);
+    expect(html).toContain("60kg / 63kg");
+    expect(html).not.toContain("63kg / 60kg");
+  });
+
+  it("el orden de peso es numérico aunque weightKg venga como string (JSON importado)", () => {
+    // Lexicográficamente "100" <= "60", el orden debe seguir siendo numérico.
+    const r = f({ id: "r", age: 20, weightKg: "100" });
+    const b = f({ id: "b", age: 20, weightKg: "60" });
+    const html = buildCarteleraHtml([vs(r, b)], [r, b]);
+    expect(html).toContain("60kg / 100kg");
+    expect(html).not.toContain("100kg / 60kg");
+  });
+
   it("dentro de un bloque ordena de más liviano a más pesado (por suma de pesos)", () => {
     const lr = f({ id: "lr", age: 14, weightKg: 30, fullName: "LivianoRojo" });
     const lb = f({ id: "lb", age: 14, weightKg: 32 });
