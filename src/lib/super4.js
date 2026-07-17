@@ -142,7 +142,7 @@ function sortBrackets(list) {
 //   divisionKeys: divisiones de peso que participan (null = todas).
 // Solo se reportan como "faltantes" las combinaciones que tienen entre 1 y 3
 // elegibles (las de 0 se omiten para no listar decenas de combinaciones vacías).
-export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null, divisionKeys = null, reservedPersons = null) {
+export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null, divisionKeys = null, reservedPersons = null, allowIncomplete = false) {
   const pool = filterByMaxFights(fighters, maxFights);
   // null = todas (por defecto); [] = ninguna (nada que armar). Así el filtro
   // vacío no cae por error a "todas".
@@ -173,18 +173,31 @@ export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null, 
       const gen = div.genero === "F" ? "F" : "M";
       const catLabel = `${ageInfo.label} · ${div.label} (${gen})`;
       const regla = `${ageInfo.label} (${ageInfo.minAge}-${ageInfo.maxAge}) · ${div.label} ${weightRangeLabel(div)} · ${gen === "F" ? "Femenino" : "Masculino"}`;
-      if (eligibles.length < 4) {
+      // Sin 4 atletas: normalmente se reporta como "faltante" y no se arma la
+      // llave. Con allowIncomplete se arma igual una llave INCOMPLETA (con
+      // cupos vacíos que se rellenan luego con "＋ Elegir"), siempre que haya
+      // al menos 1 atleta, para poder visualizar todas las categorías del
+      // evento (p.ej. los 5 cinturones) e irlas completando.
+      if (eligibles.length < 4 && !(allowIncomplete && eligibles.length >= 1)) {
         if (eligibles.length > 0) faltantes.push({ catKey, catLabel, regla, elegibles: eligibles.length, faltan: 4 - eligibles.length });
         continue;
       }
-      const four = [...eligibles].sort((a, b) => b.weightKg - a.weightKg).slice(0, 4);
-      const [semi1, semi2] = pairSemis(four);
+      const disponibles = [...eligibles].sort((a, b) => b.weightKg - a.weightKg).slice(0, 4);
+      let s1r, s1b, s2r, s2b;
+      if (disponibles.length === 4) {
+        const [semi1, semi2] = pairSemis(disponibles);
+        [s1r, s1b, s2r, s2b] = [semi1[0].id, semi1[1].id, semi2[0].id, semi2[1].id];
+      } else {
+        // Llave incompleta: se colocan los atletas disponibles y el resto de
+        // los cupos queda en null (cupo libre) para rellenar a mano.
+        [s1r, s1b, s2r, s2b] = [disponibles[0]?.id ?? null, disponibles[1]?.id ?? null, disponibles[2]?.id ?? null, disponibles[3]?.id ?? null];
+      }
       brackets.push({
         id: genId(),
         catKey, catLabel, regla, ageKey, divKey,
         semis: [
-          { red: semi1[0].id, blue: semi1[1].id, winner: null },
-          { red: semi2[0].id, blue: semi2[1].id, winner: null },
+          { red: s1r, blue: s1b, winner: null },
+          { red: s2r, blue: s2b, winner: null },
         ],
         finalWinner: null,
         maxFights: maxFights == null ? null : maxFights,
