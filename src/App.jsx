@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
 import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup } from "./lib/storage.js";
@@ -39,6 +39,11 @@ export default function App() {
   const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
   const [editF, setEditF] = useState(null);
+  // Protección contra borrado accidental: al eliminar un peleador se guarda por
+  // unos segundos para poder DESHACER (re-crearlo con su mismo id). Un borrado
+  // se sincroniza a la nube, así que un toque errado ya no es irreversible.
+  const [undoDelete, setUndoDelete] = useState(null);
+  const undoTimerRef = useRef(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,7 +170,19 @@ export default function App() {
   // vez; onMerged aplica la lista autoritativa ya fusionada.
   function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); } else { u = [...fighters, f]; } setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged))); }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
-  function delFighter(id) { const u = fighters.filter(f => f.id !== id); setFighters(u); removeFighterTx(id, u, merged => setFighters(normalizeFighters(merged))); }
+  function delFighter(id) {
+    const victim = fighters.find(f => f.id === id);
+    const u = fighters.filter(f => f.id !== id); setFighters(u); removeFighterTx(id, u, merged => setFighters(normalizeFighters(merged)));
+    // Ofrece DESHACER durante unos segundos (guarda el registro borrado).
+    if (victim) { clearTimeout(undoTimerRef.current); setUndoDelete(victim); undoTimerRef.current = setTimeout(() => setUndoDelete(null), 8000); }
+  }
+  // Re-crea el peleador recién borrado con su MISMO id (transacción por id, no
+  // pisa a nadie). Cierra el aviso de deshacer.
+  function undoLastDelete() {
+    const f = undoDelete; if (!f) return;
+    clearTimeout(undoTimerRef.current); setUndoDelete(null);
+    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)));
+  }
   function cancel() { setEditF(null); setView("list"); }
 
   // Incluye ticketsNew (boletas reales v4) además de fighters/matchups —
@@ -370,6 +387,18 @@ export default function App() {
           ))}
         </div>
       </nav>
+
+      {/* Toast de DESHACER un borrado — fijo, visible en cualquier vista. Un
+          borrado se sincroniza a la nube, así que este "Deshacer" evita que un
+          toque errado en la papelera pierda a un peleador de forma irreversible. */}
+      {undoDelete && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md fade-in">
+        <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3">
+          <span className="text-red-400 text-lg leading-none">🗑️</span>
+          <span className="text-boxing-cream text-sm flex-1 min-w-0 truncate">Eliminaste a <b className="text-boxing-cream">{undoDelete.fullName}</b></span>
+          <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-xs font-bold tracking-widest uppercase transition-colors">Deshacer</button>
+          <button onClick={() => { clearTimeout(undoTimerRef.current); setUndoDelete(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
+        </div>
+      </div>}
     </div>
   );
 }

@@ -22,6 +22,10 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
   const [sexo, setSexo] = useState(editingFighter?.sexo || "M");
   const [errors, setErrors] = useState({});
   const [addedName, setAddedName] = useState(null);
+  // Aviso "ya estaba registrado — no se duplicó" (reemplaza al confirm() que
+  // antes ofrecía "agregar de todos modos" y creaba un registro que la
+  // reconciliación borraba en silencio, confundiendo al organizador).
+  const [dupNotice, setDupNotice] = useState(null);
   const addedTimerRef = useRef(null);
   const formRef = useRef(null);
   const nameRef = useRef(null);
@@ -67,18 +71,30 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
       const probable = guess === "M" ? "masculino" : "femenino";
       if (!confirm(`¿Deseas agregar a "${name}" como ${elegido}?\n\nEl nombre parece ${probable}. Si el sexo es correcto, continúa; si no, cancela y cámbialo antes de guardar.`)) return;
     }
-    // Previene crear un duplicado: avisa si ya existe otro peleador con el
-    // mismo nombre + sexo + peso (mismo criterio que la deduplicación
-    // automática). Solo al agregar (no al editar el mismo registro).
+    // Anti-duplicado: si ya hay un peleador con el mismo nombre + sexo + peso
+    // (el MISMO criterio con que la app deduplica), NO se agrega un segundo
+    // registro. Antes esto ofrecía "¿Agregar de todos modos?" y, al aceptar,
+    // creaba un duplicado que la reconciliación borraba en silencio —el
+    // organizador veía "lo agregué" pero luego "no aparece". Ahora se avisa
+    // claramente y no se duplica; para cambiarle datos, se edita el existente.
+    // Solo al agregar (no al editar el mismo registro).
     if (!editingFighter) {
-      const yaExiste = existingFighters.some(x => normName(x.fullName) === normName(name) && (x.sexo || "M") === sexo && x.weightKg === parsedWeight);
-      if (yaExiste && !confirm(`Ya existe un peleador "${name}" con el mismo sexo y peso (${parsedWeight}kg).\n\nSi lo agregas, la app lo tomará como duplicado y lo eliminará automáticamente. ¿Agregar de todos modos?`)) return;
+      const dup = existingFighters.find(x => normName(x.fullName) === normName(name) && (x.sexo || "M") === sexo && x.weightKg === parsedWeight);
+      if (dup) {
+        setAddedName(null);
+        setDupNotice(`"${name}" ya estaba registrado (${parsedWeight}kg${dup.gym ? " · " + dup.gym : ""}) — no se duplicó. Si necesitas cambiarle algo, edítalo desde la lista.`);
+        clearTimeout(addedTimerRef.current);
+        addedTimerRef.current = setTimeout(() => setDupNotice(null), 7000);
+        formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
     }
     // El campo de teléfono se quitó del formulario; se conserva el valor ya
     // guardado al editar peleadores antiguos que lo tenían.
     onSubmit({ id: editingFighter?.id || genId(), fullName: name, phone: editingFighter?.phone || "", sexo, gym: gym.trim().replace(/\s+/g, " "), age: parseInt(ageStr), weightKg: parsedWeight, weightCategory, experienceLevel, fightCount: parsedFightCount, createdAt: editingFighter?.createdAt || new Date().toISOString(), notes: notes.trim() || undefined });
     if (!editingFighter) {
       setFullName(""); setGym(""); setAgeStr(""); setWeightStr(""); setFightCountStr("0"); setNotes(""); setErrors({});
+      setDupNotice(null);
       setAddedName(name);
       clearTimeout(addedTimerRef.current);
       addedTimerRef.current = setTimeout(() => setAddedName(null), 4000);
@@ -104,6 +120,10 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
       {addedName && <div className="bg-green-900/20 border border-green-500/40 px-3 py-2.5 fade-in flex items-center gap-2">
         <span className="text-green-400 text-lg">✓</span>
         <span className="text-green-400 text-sm font-semibold">{addedName} fue agregado correctamente a la cartelera</span>
+      </div>}
+      {dupNotice && <div className="bg-amber-900/20 border border-amber-500/50 px-3 py-2.5 fade-in flex items-start gap-2">
+        <span className="text-amber-400 text-lg leading-none">⚠️</span>
+        <span className="text-amber-300 text-sm font-semibold">{dupNotice}</span>
       </div>}
       <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(titleCaseLive(e.target.value))} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
       <div className="grid grid-cols-2 gap-3">
