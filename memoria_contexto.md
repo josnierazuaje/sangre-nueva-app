@@ -211,9 +211,8 @@ cartelera. Estado actual del evento: 5 cinturones (U17·Superwélter incompleta 
 
 ## 6. Layout responsive de escritorio (jul 2026)
 
-**Rama:** `feat/responsive-desktop` (3 commits sobre `ba3f291`). Local y lista;
-**falta que el dueño la publique y cree el PR** desde GitHub Desktop (este entorno
-no tiene `gh` ni credenciales de push).
+**Estado: MERGEADO y desplegado** (PR #25 `feat/responsive-desktop` + fix del
+Super 4 abajo). En producción y verificado en vivo.
 
 **Objetivo:** en PC la app ya no queda confinada en una columna central de 512px
 con franjas negras a los lados. Se aprovecha el ancho con un sidebar + cuadrículas.
@@ -238,27 +237,35 @@ Cambios (`29c5d5b` sidebar+grids · `43d09f1` corte en rem+contenedor exacto ·
   `editEventLabel()`, `menuActions`, `syncBtnCls`/`syncLabel` (mismo DOM en móvil).
 - **Cuadrículas**: Peleadores `lg:grid-cols-2 xl:grid-cols-3` (búsqueda+filtros en
   una fila); VS `lg:grid-cols-2` (acciones centradas `lg:max-w-xl`); Historial de
-  entradas `lg:grid-cols-2`. Super 4 en **dos columnas** (controles `lg:w-80`
-  `xl:w-[420px]` + llaves `flex-1`). Cartelera, formulario y Entradas centrados
+  entradas `lg:grid-cols-2`. Super 4 en **dos columnas solo desde `xl`** (controles
+  `xl:w-[420px]` + llaves `xl:flex-1`); entre 1024–1279px queda en una sola columna
+  a todo el ancho — ver el fix abajo. Cartelera, formulario y Entradas centrados
   con ancho cómodo (`lg:max-w-3xl`/`2xl`/`4xl`).
 - **index.css**: la media query del anti-zoom iOS (`font-size:16px`) se acotó a
   `@media (max-width: 63.98rem)` — en **rem** para coincidir con el breakpoint
   `lg` aunque cambie la fuente base del navegador; en PC los inputs recuperan su
   tamaño de diseño.
 
-**Gotcha a 1024px justos:** la columna de llaves del Super 4 roza su ancho mínimo
-(el bracket es `grid "1fr 18px 1fr"`); por eso los controles son `lg:w-80` (no 96)
-y el padding lateral es progresivo (`lg:px-6 xl:px-10`). Si se ensancha la columna
-de controles, la tarjeta de la Final se recorta.
+**Fix del Super 4 en la banda 1024–1279px** (commit `b3aa041`, fast-forward a
+`main`). Una auditoría adversarial multi-lente del diff (4 lentes de revisión + 3
+refutadores por hallazgo, veredicto por mayoría) marcó **1 hallazgo menor**: con
+el split de dos columnas activándose en `lg`, entre 1024 y ~1279px la columna de
+llaves quedaba MÁS angosta que en móvil (bracket `grid "1fr 18px 1fr"` en ~166px
+por lado) y **truncaba el nombre del finalista a ~9 caracteres** ("Benjamín Fu…").
+Fix: el split (`Super4View.jsx`, wrappers de columnas) pasó de `lg:` a `xl:`, así
+entre 1024–1279 el Super 4 es una sola columna a todo el ancho (nombres completos)
+y solo desde `xl` (≥1280px, controles 420px) se divide. La auditoría también
+levantó y **descartó** (refutado 0/3) un supuesto "hueco" de 0.32px entre `63.98rem`
+y `64rem` en la media query del anti-zoom: no cae ningún viewport entero ahí.
 
-**Verificación:** 179/179 tests + build OK. Las 6 vistas revisadas en navegador a
-1440px y 1024px; paridad móvil a 375px confirmada pixel-idéntica contra `main`
-(Peleadores y Super 4). Para probar sin login se usó un bypass temporal
-(`dev_bypass` en localStorage) que **no** se commitea.
+**Verificación:** 179/179 tests + build OK en cada cambio. Las 6 vistas revisadas
+en navegador a 1440px y 1024px; paridad móvil a 375px confirmada pixel-idéntica
+contra `main`. El fix se verificó **en producción** a 1024px con los datos reales
+del evento: el wrapper del split es `display:block` (una columna) y **0 nombres
+truncados** en las llaves (medido por JS + captura). Para probar sin login se usó
+un bypass temporal (`dev_bypass` en localStorage) que **no** se commitea.
 
-**Mergeado (PR #25) y desplegado.** Deploy verificado en producción
-(`sangre-nueva-la-velada.pages.dev`): el CSS/JS servido contiene las clases `lg:`
-nuevas y la media query `63.98rem`; en pantalla ancha se ve el sidebar + grid de
-3 columnas, y en 375px el layout móvil queda intacto. Se confirmó el gotcha de la
-PWA: la 1ª carga tras el deploy mostró el bundle viejo (layout móvil en pantalla
-ancha) y tras **una recarga** apareció el nuevo.
+**Gotcha de la PWA (confirmado en vivo):** tras cada deploy la 1ª carga sirve el
+bundle viejo cacheado por el service worker — hay que **recargar una vez** (o
+cerrar/reabrir) para ver el bundle nuevo. La URL de producción es
+`sangre-nueva-la-velada.pages.dev` (ver §4).
