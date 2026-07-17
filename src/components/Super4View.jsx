@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
 import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weightRangeLabel } from "../constants.js";
-import { dupKey } from "../lib/dedup.js";
+import { dupKey, normName } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
 
@@ -478,7 +478,17 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {reemplazo && (() => {
         const b = super4.find(x => x.id === reemplazo.bId);
         if (!b) return null;
-        const opciones = availableReplacements(b.catKey, fighters, super4, bracketMaxFights(b));
+        // Regla: no dos peleadores de la misma escuela en la misma llave. Se
+        // ocultan los candidatos cuya escuela ya está en OTRO cupo de esta llave
+        // (se excluye el cupo que se está llenando, cuyo ocupante sale).
+        const gymsEnLlave = new Set();
+        (b.semis || []).forEach((s, si) => ["red", "blue"].forEach(l => {
+          if (si === reemplazo.semiIndex && l === reemplazo.lado) return;
+          const g = byId[s[l]] && normName(byId[s[l]].gym);
+          if (g) gymsEnLlave.add(g);
+        }));
+        const opciones = availableReplacements(b.catKey, fighters, super4, bracketMaxFights(b))
+          .filter(f => { const g = normName(f.gym); return !g || !gymsEnLlave.has(g); });
         const saleF = byId[reemplazo.saliente]; // el que sale, o undefined si el cupo ya estaba libre
         return (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4" onClick={() => setReemplazo(null)}>

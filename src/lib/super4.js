@@ -1,5 +1,5 @@
 import { genId, getAgeCategory, getWeightCategory, weightRangeLabel, WEIGHT_CATEGORIES, AGE_CATEGORIES, FECHIBOX_LABEL } from "../constants.js";
-import { dupKey } from "./dedup.js";
+import { dupKey, normName } from "./dedup.js";
 
 // Divisiones de peso oficiales (World Boxing) disponibles para el Super 4:
 // las 10 masculinas y las 10 femeninas, en su orden de peso. El género va
@@ -173,16 +173,28 @@ export function buildSuper4Brackets(fighters, maxFights = null, ageKeys = null, 
       const gen = div.genero === "F" ? "F" : "M";
       const catLabel = `${ageInfo.label} · ${div.label} (${gen})`;
       const regla = `${ageInfo.label} (${ageInfo.minAge}-${ageInfo.maxAge}) · ${div.label} ${weightRangeLabel(div)} · ${gen === "F" ? "Femenino" : "Masculino"}`;
-      // Sin 4 atletas: normalmente se reporta como "faltante" y no se arma la
-      // llave. Con allowIncomplete se arma igual una llave INCOMPLETA (con
-      // cupos vacíos que se rellenan luego con "＋ Elegir"), siempre que haya
-      // al menos 1 atleta, para poder visualizar todas las categorías del
-      // evento (p.ej. los 5 cinturones) e irlas completando.
-      if (eligibles.length < 4 && !(allowIncomplete && eligibles.length >= 1)) {
-        if (eligibles.length > 0) faltantes.push({ catKey, catLabel, regla, elegibles: eligibles.length, faltan: 4 - eligibles.length });
+      // Selección de la llave: hasta 4 atletas de ESCUELAS DISTINTAS. Dos
+      // peleadores de la misma escuela no pueden ir en la misma llave: si ambos
+      // ganan su semifinal chocarían en la final (final del mismo gimnasio, que
+      // el organizador no permite). Se prefieren los más pesados; las escuelas
+      // vacías / sin dato no bloquean (no se puede afirmar que sean la misma).
+      const usadasGym = new Set();
+      const disponibles = [];
+      for (const f of [...eligibles].sort((a, b) => b.weightKg - a.weightKg)) {
+        const g = normName(f.gym); // misma normalización que la búsqueda: sin acentos/mayúsculas/espacios extra
+        if (g && usadasGym.has(g)) continue;
+        if (g) usadasGym.add(g);
+        disponibles.push(f);
+        if (disponibles.length === 4) break;
+      }
+      // Sin 4 atletas de escuelas distintas: normalmente se reporta como
+      // "faltante" y no se arma. Con allowIncomplete se arma igual una llave
+      // INCOMPLETA (cupos vacíos que se rellenan luego con "＋ Elegir"),
+      // siempre que haya al menos 1, para visualizar todas las categorías.
+      if (!(disponibles.length >= 4 || (allowIncomplete && disponibles.length >= 1))) {
+        if (disponibles.length > 0) faltantes.push({ catKey, catLabel, regla, elegibles: disponibles.length, faltan: 4 - disponibles.length });
         continue;
       }
-      const disponibles = [...eligibles].sort((a, b) => b.weightKg - a.weightKg).slice(0, 4);
       let s1r, s1b, s2r, s2b;
       if (disponibles.length === 4) {
         const [semi1, semi2] = pairSemis(disponibles);

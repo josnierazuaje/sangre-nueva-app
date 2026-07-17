@@ -195,6 +195,48 @@ describe("buildSuper4Brackets (edad × división)", () => {
     const ids = [r.brackets[0].semis[0].red, r.brackets[0].semis[0].blue, r.brackets[0].semis[1].red, r.brackets[0].semis[1].blue];
     expect(ids.filter(x => x == null)).toHaveLength(0);
   });
+
+  it("NO pone dos peleadores de la misma escuela en la misma llave (elige el más pesado de cada una)", () => {
+    const fighters = [
+      f({ id: "c1", age: 25, weightKg: 64, gym: "Cayo Boxing" }),
+      f({ id: "c2", age: 25, weightKg: 61.5, gym: "Cayo Boxing" }), // misma escuela que c1
+      f({ id: "ta", age: 25, weightKg: 63, gym: "Team A" }),
+      f({ id: "tb", age: 25, weightKg: 62, gym: "Team B" }),
+      f({ id: "td", age: 25, weightKg: 61, gym: "Team D" }),
+    ];
+    const { brackets } = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"]);
+    expect(brackets).toHaveLength(1);
+    const ids = [brackets[0].semis[0].red, brackets[0].semis[0].blue, brackets[0].semis[1].red, brackets[0].semis[1].blue];
+    expect(ids).toContain("c1");         // el más pesado de Cayo entra
+    expect(ids).not.toContain("c2");     // el 2º de Cayo NO
+    const gyms = ids.map(id => fighters.find(x => x.id === id).gym.toLowerCase());
+    expect(new Set(gyms).size).toBe(gyms.length); // todas las escuelas distintas
+  });
+
+  it("si no hay 4 escuelas distintas, no completa la llave (faltante); con allowIncomplete queda incompleta", () => {
+    const fighters = [
+      f({ id: "c1", age: 25, weightKg: 64, gym: "Cayo Boxing" }),
+      f({ id: "c2", age: 25, weightKg: 63, gym: "Cayo Boxing" }),
+      f({ id: "c3", age: 25, weightKg: 62, gym: "Cayo Boxing" }),
+      f({ id: "ta", age: 25, weightKg: 61, gym: "Team A" }),
+    ]; // 4 elegibles pero solo 2 escuelas
+    const sin = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"]);
+    expect(sin.brackets).toHaveLength(0);
+    expect(sin.faltantes.find(x => x.catKey === "adulto__m_welter").elegibles).toBe(2); // 2 escuelas distintas
+    const con = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"], null, true);
+    expect(con.brackets).toHaveLength(1);
+    const ids = [con.brackets[0].semis[0].red, con.brackets[0].semis[0].blue, con.brackets[0].semis[1].red, con.brackets[0].semis[1].blue];
+    expect(ids.filter(x => x != null).sort()).toEqual(["c1", "ta"]); // uno por escuela
+    expect(ids.filter(x => x == null)).toHaveLength(2);
+  });
+
+  it("las escuelas vacías / sin dato NO bloquean (no se puede afirmar que sean la misma)", () => {
+    const fighters = [64, 63, 62, 61].map((w, i) => f({ id: "s" + i, age: 25, weightKg: w, gym: "" }));
+    const { brackets } = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"]);
+    expect(brackets).toHaveLength(1);
+    const ids = [brackets[0].semis[0].red, brackets[0].semis[0].blue, brackets[0].semis[1].red, brackets[0].semis[1].blue];
+    expect(ids.filter(x => x != null)).toHaveLength(4);
+  });
 });
 
 describe("progresión de ganadores", () => {
