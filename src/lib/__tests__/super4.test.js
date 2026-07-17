@@ -102,6 +102,23 @@ describe("buildSuper4Brackets (edad × división)", () => {
     expect(keys).toContain("adulto__f_welter");
   });
 
+  it("devuelve las llaves en orden determinista (edad y luego peso); cortar las primeras N es seguro", () => {
+    // Base para el selector "Cantidad de llaves": el tope arma las primeras N
+    // en este orden, y cortar no puede dejar a nadie en dos llaves.
+    const fighters = [
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "cw" + i, age: 15, weightKg: w })), // cadete m_welter
+      ...[56, 57, 58, 59].map((w, i) => f({ id: "al" + i, age: 25, weightKg: w })), // adulto m_ligero
+      ...[61, 62, 63, 64].map((w, i) => f({ id: "aw" + i, age: 25, weightKg: w })), // adulto m_welter
+    ];
+    const { brackets } = buildSuper4Brackets(fighters);
+    // Orden: menor edad primero (cadete antes que adulto), luego menor peso.
+    expect(brackets.map(b => b.catKey)).toEqual(["cadete__m_welter", "adulto__m_ligero", "adulto__m_welter"]);
+    const primeras = brackets.slice(0, 2); // lo que hace el tope de cantidad
+    expect(primeras.map(b => b.catKey)).toEqual(["cadete__m_welter", "adulto__m_ligero"]);
+    const ids = primeras.flatMap(b => [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue]);
+    expect(new Set(ids).size).toBe(ids.length); // ningún peleador repetido entre llaves
+  });
+
   it("solo arma llaves de las categorías de edad seleccionadas", () => {
     const fighters = [
       ...[61, 62, 63, 64].map((w, i) => f({ id: "c" + i, age: 15, weightKg: w })), // cadetes m_welter
@@ -387,6 +404,23 @@ describe("mergeRegenerated (no destructivo)", () => {
   it("ordena por edad primero: una llave femenina de cadete va ANTES que una masculina de juvenil", () => {
     const merged = mergeRegenerated([], [{ catKey: "juvenil__m_ligero" }, { catKey: "cadete__f_welter" }]);
     expect(merged.map(b => b.catKey)).toEqual(["cadete__f_welter", "juvenil__m_ligero"]);
+  });
+
+  it("con clearKeys (tope de cantidad): limpia las llaves viejas de categorías ELEGIDAS que quedaron fuera del resultado; conserva legacy y no elegidas", () => {
+    const existing = [
+      { catKey: "adulto__m_ligero", finalWinner: "camp-lig" }, // elegida, fuera del tope → se limpia
+      { catKey: "adulto__m_welter", finalWinner: null },       // elegida, regenerada → reemplazada
+      { catKey: "adulto67", finalWinner: "camp-legacy" },      // legacy (no elegida) → se conserva
+    ];
+    const regenerated = [{ catKey: "adulto__m_welter", nuevo: true }];
+    const scope = new Set(["adulto__m_ligero", "adulto__m_welter"]); // = regenKeys (toda la selección)
+    const merged = mergeRegenerated(existing, regenerated, scope);
+    const keys = merged.map(b => b.catKey);
+    expect(keys).toContain("adulto__m_welter"); // regenerada
+    expect(keys).toContain("adulto67");         // legacy conservado
+    expect(keys).not.toContain("adulto__m_ligero"); // elegida pero fuera del tope → limpiada
+    expect(merged.find(b => b.catKey === "adulto__m_welter").nuevo).toBe(true);
+    expect(merged.find(b => b.catKey === "adulto67").finalWinner).toBe("camp-legacy");
   });
 });
 

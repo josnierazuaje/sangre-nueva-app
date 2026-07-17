@@ -99,14 +99,14 @@ export function patchSuper4Bracket(fullList, bracketId, fields) {
 // arreglo local que puede estar atrasado (lo que borraría en silencio una
 // llave o un resultado creado en otro dispositivo). Actualiza el estado local
 // primero de forma optimista y luego con el resultado real de la transacción.
-export function mergeSuper4Tx(existingLocal, newBrackets, onMerged) {
-  const optimista = mergeRegenerated(existingLocal || [], newBrackets);
+export function mergeSuper4Tx(existingLocal, newBrackets, onMerged, clearKeys = null) {
+  const optimista = mergeRegenerated(existingLocal || [], newBrackets, clearKeys);
   localStorage.setItem("bm_super4_v1", JSON.stringify(optimista));
   onMerged(optimista);
   if (!FB.ready) return;
   const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
   const clean = JSON.parse(JSON.stringify(newBrackets));
-  runTransaction(nodeRef, cur => mergeRegenerated(nodeToArray(cur), clean))
+  runTransaction(nodeRef, cur => mergeRegenerated(nodeToArray(cur), clean, clearKeys))
     .then(res => {
       if (!res.committed) return;
       const list = nodeToArray(res.snapshot.val());

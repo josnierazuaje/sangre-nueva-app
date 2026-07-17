@@ -217,9 +217,15 @@ export function bracketPrintTitle(b) {
 // ni pisa las demás (ni sus campeones ya coronados). Para quitar categorías
 // está "Limpiar llaves". Conserva las llaves viejas de cinturón que el nuevo
 // sistema de divisiones no reemplaza.
-export function mergeRegenerated(existing, regenerated) {
+export function mergeRegenerated(existing, regenerated, clearKeys = null) {
   const regenKeys = new Set((regenerated || []).map(b => b.catKey));
-  const conservadas = (existing || []).filter(b => !regenKeys.has(b.catKey));
+  // clearKeys: combos que el usuario pidió (re)generar pero que quedaron fuera
+  // del resultado (p.ej. recortados por el tope "cantidad de llaves"). Sus
+  // llaves viejas NO se conservan: mantenerlas dejaría una referencia obsoleta
+  // (un peleador que cambió de división quedaría en dos llaves) y contradiría el
+  // tope. Sin clearKeys el comportamiento es el de antes (conservar el resto).
+  const drop = clearKeys instanceof Set ? clearKeys : new Set(clearKeys || []);
+  const conservadas = (existing || []).filter(b => !regenKeys.has(b.catKey) && !drop.has(b.catKey));
   return sortBrackets([...(regenerated || []), ...conservadas]);
 }
 

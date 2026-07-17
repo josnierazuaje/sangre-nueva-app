@@ -20,6 +20,12 @@ function fightsOptionLabel(v) {
 // Migración del selector anterior (por nivel) al nuevo (por número de peleas).
 const LEGACY_TIER_TO_FIGHTS = { debutante: "0", principiante: "3", amateur: "10" };
 
+// Opciones del selector "cantidad de llaves": cuántas llaves arma como máximo
+// GENERAR LLAVES. "all" = todas las combinaciones listas (comportamiento
+// anterior); 1 a 5 = tope de llaves a generar.
+const CANTIDAD_OPTIONS = ["all", "1", "2", "3", "4", "5"];
+function cantidadLabel(v) { return v === "all" ? "Todas las posibles" : `${v} llave${v === "1" ? "" : "s"}`; }
+
 // ============================================
 // SUPER 4 — llaves de campeonato por cinturón
 // Formato bracket de eliminación directa: las dos semifinales del sábado a
@@ -40,6 +46,10 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     return (oldTier && LEGACY_TIER_TO_FIGHTS[oldTier]) || "all";
   });
   const fightsCeil = maxFightsSel === "all" ? null : Number(maxFightsSel);
+  // Cantidad máxima de llaves a generar (se recuerda localmente). "all" = sin
+  // tope (todas las combinaciones listas); 1 a 5 = se arman como mucho esas.
+  const [cantidadLlaves, setCantidadLlaves] = useState(() => load("bm_super4_cantidad", "all"));
+  const llavesCap = cantidadLlaves === "all" ? null : Number(cantidadLlaves);
   // Categorías de edad que participan (se recuerdan localmente). Por defecto,
   // todas las que el Super 4 cubre — así el comportamiento no cambia.
   const [selectedAges, setSelectedAges] = useState(() => {
@@ -72,6 +82,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   const [agesOpen, setAgesOpen] = useState(true);
   const [divsOpen, setDivsOpen] = useState(true);
   function cambiarMaxFights(v) { setMaxFightsSel(v); save("bm_super4_maxfights", v); }
+  function cambiarCantidad(v) { setCantidadLlaves(v); save("bm_super4_cantidad", v); }
   function toggleAge(k) {
     setSelectedAges(prev => {
       const next = prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k];
@@ -122,14 +133,23 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         if (fr) reserved.add(dupKey(fr));
       }));
     });
-    const { brackets, faltantes } = buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs, reserved);
+    const { brackets: listas, faltantes } = buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs, reserved);
     const tope = fightsCeil != null ? ` con el tope de ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"}` : "";
-    if (!brackets.length) { alert("No hay 4 peleadores libres en ninguna combinación de edad y peso elegida" + tope + " para armar una llave."); return; }
-    // Fusión no destructiva contra el estado real del servidor (transacción):
-    // solo se rearman las combinaciones elegidas; las demás llaves se
-    // conservan (incluidos sus campeones), sin pisar otro dispositivo.
-    mergeSuper4Tx(super4, brackets, setSuper4);
-    if (faltantes.length) alert("Se armaron " + brackets.length + " llave(s). Con atletas pero sin completar 4" + tope + ":\n\n" + faltantes.slice(0, 12).map(f => `• ${f.catLabel}: hay ${f.elegibles}, faltan ${f.faltan}`).join("\n") + (faltantes.length > 12 ? `\n…y ${faltantes.length - 12} más.` : ""));
+    if (!listas.length) { alert("No hay 4 peleadores libres en ninguna combinación de edad y peso elegida" + tope + " para armar una llave."); return; }
+    // Tope de cantidad de llaves: se arman las primeras N en orden (menor edad
+    // y peso primero). Cada peleador es elegible para una sola combinación
+    // edad×división, así que recortar no deja a nadie en dos llaves.
+    const brackets = llavesCap != null ? listas.slice(0, llavesCap) : listas;
+    // Las categorías ELEGIDAS (regenKeys) se reemplazan por su resultado: las
+    // que quedan fuera del tope se limpian (no se conservan llaves viejas), así
+    // el tope realmente topa y no queda un peleador que cambió de división en
+    // dos llaves. Las categorías NO elegidas y los cinturones legacy (catKey sin
+    // "__") se conservan intactos. Transacción para no pisar otro dispositivo.
+    mergeSuper4Tx(super4, brackets, setSuper4, regenKeys);
+    const notas = [];
+    if (llavesCap != null && listas.length > llavesCap) notas.push(`Se armaron ${brackets.length} de ${listas.length} llaves posibles con las categorías elegidas (tope: ${llavesCap}). Sube "Cantidad de llaves" para armar más.`);
+    if (faltantes.length) notas.push("Con atletas pero sin completar 4" + tope + ":\n" + faltantes.slice(0, 12).map(f => `• ${f.catLabel}: hay ${f.elegibles}, faltan ${f.faltan}`).join("\n") + (faltantes.length > 12 ? `\n…y ${faltantes.length - 12} más.` : ""));
+    if (notas.length) alert("Se armaron " + brackets.length + " llave(s).\n\n" + notas.join("\n\n"));
   }
   function limpiar() {
     if (!checkReady()) return;
@@ -309,6 +329,17 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {fightsCeil != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Solo entran a la llave los peleadores con {fightsCeil} pelea{fightsCeil === 1 ? "" : "s"} como máximo. Toca GENERAR LLAVES para aplicarlo.</p>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+        <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Cantidad de llaves del Super 4</p>
+        <label className="flex items-center gap-2">
+          <span className="text-[12px] text-boxing-cream whitespace-nowrap">Cantidad de llaves:</span>
+          <select value={cantidadLlaves} onChange={e => cambiarCantidad(e.target.value)} className="flex-1 bg-black border border-boxing-lineBright text-boxing-cream text-sm px-2 py-1.5 focus:border-boxing-goldDim outline-none">
+            {CANTIDAD_OPTIONS.map(v => <option key={v} value={v}>{cantidadLabel(v)}</option>)}
+          </select>
+        </label>
+      </div>
+      {llavesCap != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Se arman como máximo {llavesCap} llave{llavesCap === 1 ? "" : "s"} de las categorías elegidas (menor edad y peso primero). Toca GENERAR LLAVES para aplicarlo.</p>}
+
+      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <button type="button" onClick={() => setAgesOpen(o => !o)} className="w-full flex items-center justify-between gap-2">
           <span className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</span>
           <span className="flex items-center gap-2">
@@ -370,7 +401,8 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
           {resultado.brackets.length === 0 && resultado.faltantes.length === 0 && <p>Con los filtros actuales no hay atletas para armar llaves. Ajusta la experiencia, la edad o los pesos.</p>}
-          {resultado.brackets.map(b => <p key={b.catKey}>✅ <span className="text-boxing-cream">{b.catLabel}</span> — listo (4+)</p>)}
+          {(llavesCap != null ? resultado.brackets.slice(0, llavesCap) : resultado.brackets).map(b => <p key={b.catKey}>✅ <span className="text-boxing-cream">{b.catLabel}</span> — listo (4+)</p>)}
+          {llavesCap != null && resultado.brackets.length > llavesCap && <p>…y {resultado.brackets.length - llavesCap} llave(s) lista(s) que el tope de cantidad deja fuera.</p>}
           {resultado.faltantes.slice(0, 10).map(f => <p key={f.catKey}>⚠️ {f.catLabel} — hay {f.elegibles}, faltan {f.faltan}</p>)}
           {resultado.faltantes.length > 10 && <p>…y {resultado.faltantes.length - 10} combinación(es) más con 1-3 atletas.</p>}
         </div>
