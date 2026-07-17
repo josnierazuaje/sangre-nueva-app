@@ -1,6 +1,6 @@
-# Memoria de contexto — Cartelera: nomenclatura FECHIBOX + impresión
+# Memoria de contexto — Cartelera + Super 4
 
-_Última actualización: 2026-07-15 · rama base: `main` (commit `b9ae3fe`)_
+_Última actualización: 2026-07-17 · rama base: `main` (commit `ba3f291`)_
 
 Resumen técnico de los cambios recientes en la **pestaña Cartelera** (nombres
 FECHIBOX en el título de categoría al imprimir + reubicación de botones) y de
@@ -166,3 +166,40 @@ cambio dejó "a medio camino" (ahora existe la fuente canónica en `constants.js
 - **Reglas de emparejamiento (duras, en `src/lib/matchmaking.js`):** no mezclar
   categoría de edad World Boxing ni sexo; no parear misma escuela; máx. 3 peleas
   de diferencia salvo ambos 15+; atletas del Super 4 excluidos de la cartelera.
+
+---
+
+## 5. Ronda Super 4 + búsqueda (jul 2026)
+
+Stack: **React 18 + Tailwind 4 + Vite 6**, **Firebase Realtime Database**, **PWA**
+(vite-plugin-pwa), tests con **Vitest**. Deploy en **Cloudflare Pages** (auto al
+push a `main`). 179 tests.
+
+Cambios (cada uno en su rama → PR → merge → deploy):
+
+- **Búsqueda sin acentos** (`701f185`). La lista de Peleadores y el historial de
+  entradas ahora buscan con `normName` (sin acentos/mayúsculas/espacios), igual
+  que la deduplicación → "joaquin" encuentra a "Joaquín".
+
+- **Super 4 · botón "＋ Elegir"** (`a926345`). Un cupo vacío o con "peleador
+  eliminado" muestra un botón que abre el selector de peleadores elegibles de la
+  categoría, para rellenarlo sin regenerar la llave.
+
+- **Super 4 · "Cantidad de llaves"** (`b62538d`). Selector Todas/1–5 que topa
+  cuántas llaves arma GENERAR. El tope realmente reemplaza las categorías
+  elegidas (limpia las que quedan fuera; conserva legacy y no elegidas).
+
+- **Super 4 · "Armar aunque falten peleadores"** (`1a0703a`). Interruptor que
+  arma llaves INCOMPLETAS (categorías con ≥1 atleta) con cupos "＋ Elegir", para
+  visualizar todas las categorías del evento (p.ej. los 5 cinturones) e irlas
+  completando. El ✓ de una semi se bloquea hasta tener sus 2 peleadores reales.
+
+- **Super 4 · regla de escuela** (`ba3f291`). No pueden ir dos peleadores de la
+  misma escuela en la misma llave (si ambos ganan su semi chocarían en la final).
+  Se aplica al generar y al rellenar con "＋ Elegir". Comparación de escuela con
+  `normName` (insensible a acentos); escuelas vacías no bloquean.
+
+Reglas duras vigentes del Super 4: tope de experiencia (novatos, ≤3 peleas por
+defecto), 1 atleta por escuela por llave, atletas del Super 4 excluidos de la
+cartelera. Estado actual del evento: 5 cinturones (U17·Superwélter incompleta +
+4 Elite), sin violaciones de escuela ni duplicados.
