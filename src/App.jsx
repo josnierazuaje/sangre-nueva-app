@@ -248,7 +248,7 @@ export default function App() {
     // Móvil (por defecto): columna centrada de 512px (max-w-lg), idéntica a
     // siempre. Escritorio (lg, ≥1024px): la app ocupa todo el ancho y se
     // reparte en fila — sidebar fijo a la izquierda + contenido fluido.
-    <div className="app-root max-w-lg mx-auto flex flex-col overflow-hidden lg:max-w-none lg:flex-row">
+    <div className="app-root max-w-[512px] mx-auto flex flex-col overflow-hidden lg:max-w-none lg:flex-row">
       {/* ===== Sidebar de escritorio (≥1024px) — no existe en móvil ===== */}
       <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 border-r border-boxing-line relative overflow-hidden" style={{ background: "rgba(16,13,16,0.55)" }}>
         <div style={{ position: "absolute", top: "-60px", left: "50%", transform: "translateX(-50%)", width: "300px", height: "180px", background: "radial-gradient(ellipse, rgba(155,26,42,0.22) 0%, transparent 70%)", pointerEvents: "none" }} />

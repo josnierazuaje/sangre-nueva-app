@@ -102,10 +102,12 @@ input[type="number"] { -moz-appearance:textfield; }
 /* Mobile viewport fix */
 :root { --app-h: 100vh; }
 .app-root { height: var(--app-h); }
-/* Prevent iOS input zoom — solo hasta 1023px (móvil/tablet chica): en
-   escritorio no hay zoom automático y los inputs respetan su tamaño de
-   diseño (text-sm, etc.). El layout móvil no cambia. */
-@media (max-width: 1023.98px) {
+/* Prevent iOS input zoom — solo en móvil/tablet chica: en escritorio no hay
+   zoom automático y los inputs respetan su tamaño de diseño (text-sm, etc.).
+   El límite va en rem (63.98 ≈ 64rem = breakpoint lg de Tailwind v4, que
+   compila a min-width:64rem) para que ambos lados del corte coincidan aunque
+   el navegador use otro tamaño de fuente base. El layout móvil no cambia. */
+@media (max-width: 63.98rem) {
   input, select, textarea { font-size: 16px !important; }
 }
 /* Safe area for notched phones */
