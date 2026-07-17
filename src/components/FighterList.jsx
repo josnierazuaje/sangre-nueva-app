@@ -147,8 +147,11 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
         <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
       </div>}
-      <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors" />
-      <div className="flex gap-2">
+      {/* Móvil: búsqueda arriba y filtros abajo, como siempre. Escritorio
+          (lg): todo en una sola fila-herramienta para liberar alto visual. */}
+      <div className="space-y-3 lg:space-y-0 lg:flex lg:gap-2 lg:items-stretch">
+      <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors lg:flex-1" />
+      <div className="flex gap-2 lg:flex-shrink-0">
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors">
           <option value="all">Todas categorías</option>
           <optgroup label="Hombres">{WEIGHT_CATEGORIES_M.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
@@ -157,8 +160,11 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
         <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="px-3 py-2 bg-black border border-boxing-goldDim text-boxing-goldFight text-sm transition-colors hover:bg-boxing-goldDim/10">🖨️</button>
       </div>
-      <div className="space-y-2">
-        {!filtered.length ? <p className="text-boxing-muted text-center py-8 text-sm">Sin resultados</p> : filtered.map(f => {
+      </div>
+      {/* Móvil: lista vertical de siempre. Escritorio: cuadrícula de 2
+          columnas (lg) o 3 (xl) para aprovechar el ancho disponible. */}
+      <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3">
+        {!filtered.length ? <p className="text-boxing-muted text-center py-8 text-sm lg:col-span-full">Sin resultados</p> : filtered.map(f => {
           const cat = getCategoryInfo(f.weightCategory); const exp = getExperienceInfo(f.experienceLevel);
           return (<div key={f.id} className="bg-boxing-panel border border-boxing-line p-3 space-y-2 fade-in transition-colors hover:border-boxing-lineBright" style={{ borderLeft: "3px solid " + (exp?.color || "#4B5563") }}>
             <div className="flex items-start justify-between">

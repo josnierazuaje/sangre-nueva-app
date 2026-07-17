@@ -35,7 +35,8 @@ export default function HistoryView({ tickets, onDelete }) {
         </select>
       </div>
       <p className="text-[11px] text-gray-500">{filtered.length} entrada{filtered.length !== 1 ? "s" : ""}</p>
-      <div className="space-y-2">
+      {/* Móvil: lista vertical. Escritorio: 2 columnas de boletas. */}
+      <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
         {filtered.map(t => {
           const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
           return (
