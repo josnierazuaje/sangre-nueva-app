@@ -214,16 +214,32 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // reemplazan a mano), así que onRemove llega sólo en las semifinales.
   function Fila({ fid, winner, onWin, onRemove, lado, placeholder, bloqueada }) {
     const cuadro = <span className="rounded-sm flex-shrink-0" style={{ width: 11, height: 11, background: lado === "rojo" ? "#c0392b" : "#2980b9" }} />;
+    const f = fid ? byId[fid] : null;
+    const inexistente = !!fid && !f; // el id apunta a un peleador borrado / no sincronizado
+    // Cupo LIBRE (vacío o con peleador eliminado) de una SEMIFINAL: se puede
+    // rellenar sin regenerar toda la llave. Se ofrece un botón claro "Elegir"
+    // que abre el selector de peleadores elegibles para la categoría. onRemove
+    // solo llega en las semifinales; la final toma a sus atletas de las semis,
+    // así que ahí este botón no aparece (se conserva el placeholder).
+    if ((!fid || inexistente) && onRemove) return (
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        {cuadro}
+        <span className="flex flex-col min-w-0 flex-1">
+          <span className="text-[11.5px] text-boxing-muted italic truncate">Cupo libre</span>
+          {inexistente && <span className="text-[8.5px] text-boxing-muted/70 truncate">peleador eliminado</span>}
+        </span>
+        <button type="button" onClick={onRemove} title="Elegir un peleador para este cupo" className="px-2.5 h-7 flex items-center justify-center gap-1 rounded border border-green-500/60 text-green-300 hover:bg-green-600/25 text-[11px] font-bold tracking-wide flex-shrink-0 transition-colors">{"＋"} Elegir</button>
+      </div>
+    );
+    // Cupo vacío que NO se rellena aquí (placeholder de la final): solo texto.
     if (!fid) return (
       <div className="flex items-center gap-2 px-2.5 py-2 opacity-50">
         {cuadro}
         <span className="text-[11px] text-boxing-muted italic truncate">{placeholder}</span>
       </div>
     );
-    const f = byId[fid];
     const esGanador = winner === fid;
     const perdio = winner && winner !== fid;
-    const inexistente = !f; // eliminado o aún no sincronizado
     // El ✓ se bloquea si el atleta ya no existe o si la final aún no tiene a
     // sus dos finalistas (no se puede coronar con una sola semi decidida).
     const winBloqueado = inexistente || bloqueada;
@@ -404,12 +420,13 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         const b = super4.find(x => x.id === reemplazo.bId);
         if (!b) return null;
         const opciones = availableReplacements(b.catKey, fighters, super4, bracketMaxFights(b));
+        const saleF = byId[reemplazo.saliente]; // el que sale, o undefined si el cupo ya estaba libre
         return (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4" onClick={() => setReemplazo(null)}>
             <div className="w-full max-w-md bg-boxing-panel border border-boxing-goldDim/50 rounded-xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-boxing-line">
-                <p className="text-boxing-cream font-bold" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.05em" }}>Reemplazar peleador</p>
-                <p className="text-[11px] text-boxing-muted">{b.catLabel} · sale <span className="text-boxing-cream font-semibold">{nombre(reemplazo.saliente)}</span></p>
+                <p className="text-boxing-cream font-bold" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.05em" }}>{saleF ? "Reemplazar peleador" : "Elegir peleador"}</p>
+                <p className="text-[11px] text-boxing-muted">{b.catLabel}{saleF ? <> · sale <span className="text-boxing-cream font-semibold">{saleF.fullName}</span></> : " · cupo libre"}</p>
               </div>
               <div className="max-h-[50vh] overflow-y-auto">
                 {opciones.length === 0
