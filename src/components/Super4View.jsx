@@ -299,7 +299,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           columnas — controles/filtros fijos a la izquierda y las llaves a la
           derecha, para ver varias sin scroll infinito. */}
       <div className="space-y-4 lg:space-y-0 lg:flex lg:gap-6 lg:items-start">
-      <div className="space-y-4 lg:w-96 xl:w-[420px] lg:flex-shrink-0">
+      <div className="space-y-4 lg:w-80 xl:w-[420px] lg:flex-shrink-0">
       <div className="flex gap-2">
         <button onClick={generar} className="flex-1 py-4 font-black tracking-widest bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream border border-red-500/30 active:scale-95 transition-all" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
           GENERAR LLAVES

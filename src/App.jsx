@@ -336,7 +336,7 @@ export default function App() {
       {/* En móvil el padding y el scroll son los mismos de siempre (16px, 80px
           abajo para la barra de navegación). En escritorio se amplía el
           respiro y el contenido se topa en un ancho cómodo (max-w-6xl). */}
-      <main className="flex-1 min-w-0 overflow-y-auto px-4 pt-4 pb-20 lg:px-10 lg:pt-8 lg:pb-12" style={{ WebkitOverflowScrolling: "touch" }}>
+      <main className="flex-1 min-w-0 overflow-y-auto px-4 pt-4 pb-20 lg:px-6 lg:pt-8 lg:pb-12 xl:px-10" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="lg:max-w-6xl lg:mx-auto">
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
             {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
