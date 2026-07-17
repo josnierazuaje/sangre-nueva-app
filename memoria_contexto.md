@@ -161,6 +161,9 @@ cambio dejó "a medio camino" (ahora existe la fuente canónica en `constants.js
   emparejamientos VS, torneo Super 4, cartelera, venta/check-in de entradas).
 - **Stack:** React 18 + Vite 6, Firebase Realtime Database, PWA. Deploy en
   **Cloudflare Pages** (auto-deploy al push a `main`).
+- **URL de producción:** `https://sangre-nueva-la-velada.pages.dev` (el subdominio
+  `pages.dev` es el nombre del proyecto en Cloudflare, **no** el del repo
+  `sangre-nueva-app`). Fuente: `README.md` §Despliegue.
 - **Gotcha de deploy:** la PWA (`registerType: autoUpdate`) sirve el bundle viejo
   en la 1ª carga tras un deploy — **recargar una vez** para ver los cambios.
 - **Reglas de emparejamiento (duras, en `src/lib/matchmaking.js`):** no mezclar
@@ -252,3 +255,10 @@ de controles, la tarjeta de la Final se recorta.
 1440px y 1024px; paridad móvil a 375px confirmada pixel-idéntica contra `main`
 (Peleadores y Super 4). Para probar sin login se usó un bypass temporal
 (`dev_bypass` en localStorage) que **no** se commitea.
+
+**Mergeado (PR #25) y desplegado.** Deploy verificado en producción
+(`sangre-nueva-la-velada.pages.dev`): el CSS/JS servido contiene las clases `lg:`
+nuevas y la media query `63.98rem`; en pantalla ancha se ve el sidebar + grid de
+3 columnas, y en 375px el layout móvil queda intacto. Se confirmó el gotcha de la
+PWA: la 1ª carga tras el deploy mostró el bundle viejo (layout móvil en pantalla
+ancha) y tras **una recarga** apareció el nuevo.
