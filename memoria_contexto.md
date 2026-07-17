@@ -1,6 +1,6 @@
 # Memoria de contexto — Cartelera + Super 4
 
-_Última actualización: 2026-07-17 · rama base: `main` (commit `ba3f291`)_
+_Última actualización: 2026-07-17 · rama base: `main` (commit `ba3f291`) · última ronda: layout responsive de escritorio (§6)_
 
 Resumen técnico de los cambios recientes en la **pestaña Cartelera** (nombres
 FECHIBOX en el título de categoría al imprimir + reubicación de botones) y de
@@ -203,3 +203,52 @@ Reglas duras vigentes del Super 4: tope de experiencia (novatos, ≤3 peleas por
 defecto), 1 atleta por escuela por llave, atletas del Super 4 excluidos de la
 cartelera. Estado actual del evento: 5 cinturones (U17·Superwélter incompleta +
 4 Elite), sin violaciones de escuela ni duplicados.
+
+---
+
+## 6. Layout responsive de escritorio (jul 2026)
+
+**Rama:** `feat/responsive-desktop` (3 commits sobre `ba3f291`). Local y lista;
+**falta que el dueño la publique y cree el PR** desde GitHub Desktop (este entorno
+no tiene `gh` ni credenciales de push).
+
+**Objetivo:** en PC la app ya no queda confinada en una columna central de 512px
+con franjas negras a los lados. Se aprovecha el ancho con un sidebar + cuadrículas.
+
+**Regla ESTRICTA (del organizador):** el diseño y la funcionalidad en **móvil
+(<1024px) no se tocan ni un pixel**. Todo lo nuevo va detrás de la variante `lg:`
+(Tailwind v4, `min-width: 64rem`) — mobile-first puro. Se eligió el corte en
+**1024px (lg)** y no 768px para que teléfonos en horizontal y tablets chicas sigan
+viendo el diseño móvil intacto.
+
+Cambios (`29c5d5b` sidebar+grids · `43d09f1` corte en rem+contenedor exacto ·
+`7cd9102` fix llave a 1024px):
+
+- **Contenedor fluido** (`App.jsx`). La raíz pasa de `max-w-[512px]` (móvil, =
+  el `maxWidth:512px` inline original, exacto) a `lg:max-w-none lg:flex-row`; el
+  contenido se topa en `lg:max-w-6xl` centrado. Adiós franjas negras.
+- **Sidebar fijo izquierdo** (`hidden lg:flex`, `w-64`/`xl:w-72`): branding+logo,
+  las 6 pestañas en vertical, y al pie la fecha del evento (editable), el botón
+  ☁ Nube y el menú ⋮ del dueño. El `<header>`, la barra de fecha y el `<nav>`
+  inferior quedan `lg:hidden` (solo móvil). La navegación de ambas vive en una
+  sola constante `NAV_ITEMS` (nunca se desalinean); helpers compartidos `go()`,
+  `editEventLabel()`, `menuActions`, `syncBtnCls`/`syncLabel` (mismo DOM en móvil).
+- **Cuadrículas**: Peleadores `lg:grid-cols-2 xl:grid-cols-3` (búsqueda+filtros en
+  una fila); VS `lg:grid-cols-2` (acciones centradas `lg:max-w-xl`); Historial de
+  entradas `lg:grid-cols-2`. Super 4 en **dos columnas** (controles `lg:w-80`
+  `xl:w-[420px]` + llaves `flex-1`). Cartelera, formulario y Entradas centrados
+  con ancho cómodo (`lg:max-w-3xl`/`2xl`/`4xl`).
+- **index.css**: la media query del anti-zoom iOS (`font-size:16px`) se acotó a
+  `@media (max-width: 63.98rem)` — en **rem** para coincidir con el breakpoint
+  `lg` aunque cambie la fuente base del navegador; en PC los inputs recuperan su
+  tamaño de diseño.
+
+**Gotcha a 1024px justos:** la columna de llaves del Super 4 roza su ancho mínimo
+(el bracket es `grid "1fr 18px 1fr"`); por eso los controles son `lg:w-80` (no 96)
+y el padding lateral es progresivo (`lg:px-6 xl:px-10`). Si se ensancha la columna
+de controles, la tarjeta de la Final se recorta.
+
+**Verificación:** 179/179 tests + build OK. Las 6 vistas revisadas en navegador a
+1440px y 1024px; paridad móvil a 375px confirmada pixel-idéntica contra `main`
+(Peleadores y Super 4). Para probar sin login se usó un bypass temporal
+(`dev_bypass` en localStorage) que **no** se commitea.
