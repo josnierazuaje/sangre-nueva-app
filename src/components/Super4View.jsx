@@ -295,11 +295,13 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{super4.length} llave{super4.length !== 1 ? "s" : ""}</span>
       </div>
 
-      {/* Móvil: todo en una sola columna, como siempre. Escritorio (lg): dos
-          columnas — controles/filtros fijos a la izquierda y las llaves a la
-          derecha, para ver varias sin scroll infinito. */}
-      <div className="space-y-4 lg:space-y-0 lg:flex lg:gap-6 lg:items-start">
-      <div className="space-y-4 lg:w-80 xl:w-[420px] lg:flex-shrink-0">
+      {/* Móvil y lg (1024–1279px): una sola columna a todo el ancho, como
+          siempre. El split en dos columnas (controles + llaves) se activa solo
+          en XL (≥1280px): entre 1024 y 1279 la columna de llaves quedaba más
+          angosta que en móvil y truncaba el nombre del finalista (~9 chars);
+          a partir de xl la columna de controles (420px) deja aire de sobra. */}
+      <div className="space-y-4 xl:space-y-0 xl:flex xl:gap-6 xl:items-start">
+      <div className="space-y-4 xl:w-[420px] xl:flex-shrink-0">
       <div className="flex gap-2">
         <button onClick={generar} className="flex-1 py-4 font-black tracking-widest bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream border border-red-500/30 active:scale-95 transition-all" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
           GENERAR LLAVES
@@ -423,8 +425,9 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar llaves</button>}
       </div>
 
-      {/* Columna de llaves (en móvil sigue el flujo normal bajo los controles) */}
-      <div className="space-y-4 lg:flex-1 lg:min-w-0">
+      {/* Columna de llaves (en móvil y lg fluye normal bajo los controles;
+          solo en xl se separa a la derecha del split) */}
+      <div className="space-y-4 xl:flex-1 xl:min-w-0">
       {!super4.length && <div className="border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
         <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
