@@ -94,7 +94,9 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
   const ic = "w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim focus:bg-boxing-raised text-base transition-colors";
   const lbl = "block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase";
   return (
-    <form ref={formRef} onSubmit={submit} className="space-y-4 bg-boxing-panel border border-boxing-line p-5">
+    // En escritorio el formulario se centra con un ancho cómodo (los campos
+    // no se estiran a todo el ancho de la pantalla) y gana algo de respiro.
+    <form ref={formRef} onSubmit={submit} className="space-y-4 bg-boxing-panel border border-boxing-line p-5 lg:max-w-2xl lg:mx-auto lg:p-8">
       <h2 className="flex items-center gap-3 text-boxing-cream" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "26px", letterSpacing: "0.05em" }}>
         <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
         {editingFighter ? "Editar" : "Agregar"} Peleador

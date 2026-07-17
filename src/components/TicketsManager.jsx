@@ -45,7 +45,9 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
   }
   const tabs = [{ k: "sell", label: "Vender", e: "🎫" }, { k: "history", label: "Historial", e: "📋" }, { k: "checkin", label: "Check-in", e: "✅" }];
   return (
-    <div className="space-y-4">
+    // En escritorio se centra con un ancho controlado: los KPIs y las
+    // sub-vistas (vender/historial/check-in) no se estiran de más.
+    <div className="space-y-4 lg:max-w-4xl lg:mx-auto">
       <h2 className="text-xl font-black text-white" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>🎫 ENTRADAS</h2>
       <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <div className="flex justify-between items-center">
