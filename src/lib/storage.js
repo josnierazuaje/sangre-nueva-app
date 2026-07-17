@@ -120,6 +120,41 @@ export function loadFighters() {
   return load("bm_fighters_v4", []);
 }
 
+// Lee el valor AUTORITATIVO de un nodo-arreglo directo desde la nube (una sola
+// lectura, no un listener). Lo usa el auto-reparo: si un guardado falló y quedó
+// un registro "fantasma" solo en este dispositivo (existe local pero no en la
+// nube), comparar contra este snapshot permite quitarlo. Devuelve null si no
+// hay conexión o la lectura falla (el llamador NO debe tocar nada en ese caso,
+// para no borrar datos por una lectura fallida). "__EMPTY__" → [] (vaciado a
+// propósito); nodo ausente → null (desconocido, no se toca).
+// Pura y testeable: quita de la lista LOCAL los peleadores cuyo id NO está en
+// la copia de la nube (fantasmas de un guardado que falló y quedó solo en este
+// dispositivo). Devuelve { cleaned, removedIds }. Reglas de seguridad:
+//  - Si la nube es nula o un arreglo VACÍO, no quita nada (nunca se vacía la
+//    lista local por una lectura dudosa/transitoria).
+//  - Solo QUITA por id; jamás agrega ni modifica registros existentes.
+export function stripLocalGhosts(local, cloud) {
+  const L = Array.isArray(local) ? local : [];
+  if (!Array.isArray(cloud) || cloud.length === 0) return { cleaned: L, removedIds: [] };
+  const cloudIds = new Set(cloud.map(f => f && f.id));
+  const cleaned = L.filter(f => f && cloudIds.has(f.id));
+  const removedIds = L.filter(f => f && !cloudIds.has(f.id)).map(f => f.id);
+  return { cleaned, removedIds };
+}
+
+export async function fetchCloudArray(key) {
+  if (!FB.ready || !FB.db) return null;
+  try {
+    const snap = await get(ref(FB.db, fbPath(key)));
+    const val = snap.val();
+    if (val === null || val === undefined) return null; // nodo ausente: no concluir "vacío"
+    return nodeToArray(val); // maneja arreglo/objeto/"__EMPTY__"
+  } catch (e) {
+    console.error("No se pudo leer " + key + " de la nube para el auto-reparo:", e);
+    return null;
+  }
+}
+
 // Alta/edición y baja de peleadores de forma TRANSACCIONAL: la fusión (por id)
 // se aplica sobre el estado más fresco del servidor dentro de runTransaction,
 // no sobre el arreglo local que puede estar atrasado. Así, el día del pesaje

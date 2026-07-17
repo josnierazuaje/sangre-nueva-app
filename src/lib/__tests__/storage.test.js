@@ -1,9 +1,41 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
 const C = { id: "c", fullName: "Caro" };
+
+describe("stripLocalGhosts (auto-reparo)", () => {
+  it("quita el registro local cuyo id NO está en la nube (fantasma)", () => {
+    const local = [A, B, { id: "ghost", fullName: "Fantasma" }];
+    const { cleaned, removedIds } = stripLocalGhosts(local, [A, B, C]);
+    expect(cleaned).toEqual([A, B]);
+    expect(removedIds).toEqual(["ghost"]);
+  });
+  it("no quita nada si todos los locales están en la nube", () => {
+    const { cleaned, removedIds } = stripLocalGhosts([A, B], [A, B, C]);
+    expect(cleaned).toEqual([A, B]);
+    expect(removedIds).toEqual([]);
+  });
+  it("SEGURIDAD: nube vacía → no quita nada (no se vacía por lectura dudosa)", () => {
+    const { cleaned, removedIds } = stripLocalGhosts([A, B], []);
+    expect(cleaned).toEqual([A, B]);
+    expect(removedIds).toEqual([]);
+  });
+  it("SEGURIDAD: nube nula → no quita nada", () => {
+    expect(stripLocalGhosts([A, B], null).removedIds).toEqual([]);
+    expect(stripLocalGhosts([A, B], undefined).cleaned).toEqual([A, B]);
+  });
+  it("varios fantasmas a la vez", () => {
+    const local = [A, { id: "g1" }, B, { id: "g2" }];
+    const { cleaned, removedIds } = stripLocalGhosts(local, [A, B]);
+    expect(cleaned).toEqual([A, B]);
+    expect(removedIds).toEqual(["g1", "g2"]);
+  });
+  it("local vacío → cleaned vacío, nada que quitar", () => {
+    expect(stripLocalGhosts([], [A]).cleaned).toEqual([]);
+  });
+});
 
 describe("nodeToArray", () => {
   it("null y undefined → []", () => {

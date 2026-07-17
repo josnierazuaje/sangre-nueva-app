@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
@@ -60,6 +60,18 @@ export default function App() {
   async function logout() {
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
+    location.reload();
+  }
+  // "Recargar desde la nube": arreglo de un clic para el usuario. Borra los
+  // datos locales de este dispositivo y recarga, así la app vuelve a bajar la
+  // copia limpia de la nube (la fuente compartida). Sirve cuando un guardado
+  // falló y quedó un registro "fantasma" solo aquí (aparece al registrar como
+  // "ya existe" pero no sale en la lista). No toca la nube ni a otros
+  // dispositivos: solo reemplaza lo local por lo remoto.
+  function reloadFromCloud() {
+    if (cloudMode !== true || !FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
+    if (!confirm("¿Recargar los datos desde la nube?\n\nSe reemplazan los datos de ESTE dispositivo con la copia compartida en la nube. Útil si ves algo que no cuadra (por ejemplo, un peleador que aparece al registrar pero no en la lista).\n\nNo afecta la nube ni a otros dispositivos.")) return;
+    clearLocalEventData();
     location.reload();
   }
   function keyReady(k) {
@@ -153,6 +165,35 @@ export default function App() {
     if (matchupsChanged) { setMatchups(cleanedMatchups); save("bm_matchups_v3", cleanedMatchups); }
     if (super4Changed) { setSuper4(cleanedSuper4); save("bm_super4_v1", cleanedSuper4); }
   }, [fighters, matchups, super4, reconcileEnabled]);
+
+  // AUTO-REPARO de "fantasmas": una sola vez por sesión, al conectar y recibir
+  // el primer valor de peleadores desde la nube, se lee la copia AUTORITATIVA
+  // de la nube y se quitan de este dispositivo los peleadores que existen SOLO
+  // aquí (un guardado que falló y nunca llegó a la nube). Ese fantasma no sale
+  // en la lista sincronizada pero sí hace saltar el aviso de "ya registrado" al
+  // intentar agregarlo — justo el síntoma reportado.
+  //
+  // Seguridad: (a) corre UNA vez, tras la hidratación y ANTES de que el usuario
+  // agregue nada, y solo quita los ids detectados en ese instante (un alta
+  // posterior que aún se sincroniza NO se toca); (b) NO hace nada si la nube
+  // devuelve nulo o vacío (podría ser un estado transitorio — nunca se vacía la
+  // lista local por una lectura dudosa).
+  const autoRepairDoneRef = useRef(false);
+  useEffect(() => {
+    if (autoRepairDoneRef.current) return;
+    if (cloudMode !== true || !hydrated.fighters) return;
+    autoRepairDoneRef.current = true;
+    fetchCloudArray("bm_fighters_v4").then(cloud => {
+      // stripLocalGhosts NO quita nada si la nube es nula o vacía (seguridad).
+      const { removedIds } = stripLocalGhosts(fighters, cloud);
+      if (!removedIds.length) return;
+      const ghostIds = new Set(removedIds); // solo estos ids (un alta posterior NO se toca)
+      setFighters(prev => normalizeFighters(prev.filter(f => !ghostIds.has(f.id))));
+      const cur = load("bm_fighters_v4", []);
+      localStorage.setItem("bm_fighters_v4", JSON.stringify(cur.filter(f => f && !ghostIds.has(f.id))));
+      console.info("Auto-reparo: se quitaron " + ghostIds.size + " registro(s) local(es) que no estaban en la nube.");
+    });
+  }, [cloudMode, hydrated.fighters]);
 
   // Escribir en las llaves del Super 4 antes de recibir su primer valor de
   // la nube podría pisar llaves ya armadas en otro dispositivo (misma
@@ -248,10 +289,11 @@ export default function App() {
   // Acciones del menú del dueño (⋮), compartidas por el header móvil y el
   // pie del sidebar de escritorio.
   const menuActions = [
-    { label: "Reiniciar evento", danger: true, run: resetEvent },
+    { label: "Recargar desde la nube", danger: false, run: reloadFromCloud },
     { label: "Importar", danger: false, run: handleImport },
     { label: "Exportar", danger: false, run: handleExport },
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },
+    { label: "Reiniciar evento", danger: true, run: resetEvent },
   ];
   const menuItemCls = (danger) => "block w-full text-left text-[11px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");
   // Botón de sincronización (☁): mismas clases y texto en móvil y escritorio.
