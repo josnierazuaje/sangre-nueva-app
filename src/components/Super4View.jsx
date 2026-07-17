@@ -50,6 +50,10 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // tope (todas las combinaciones listas); 1 a 5 = se arman como mucho esas.
   const [cantidadLlaves, setCantidadLlaves] = useState(() => load("bm_super4_cantidad", "all"));
   const llavesCap = cantidadLlaves === "all" ? null : Number(cantidadLlaves);
+  // Armar llaves aunque falten peleadores (llaves incompletas con cupos vacíos
+  // que se rellenan con "＋ Elegir"). Sirve para dejar visibles todas las
+  // categorías del evento (p.ej. los 5 cinturones) e irlas completando.
+  const [incompletas, setIncompletas] = useState(() => load("bm_super4_incompletas", false));
   // Categorías de edad que participan (se recuerdan localmente). Por defecto,
   // todas las que el Super 4 cubre — así el comportamiento no cambia.
   const [selectedAges, setSelectedAges] = useState(() => {
@@ -83,6 +87,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   const [divsOpen, setDivsOpen] = useState(true);
   function cambiarMaxFights(v) { setMaxFightsSel(v); save("bm_super4_maxfights", v); }
   function cambiarCantidad(v) { setCantidadLlaves(v); save("bm_super4_cantidad", v); }
+  function cambiarIncompletas(v) { setIncompletas(v); save("bm_super4_incompletas", v); }
   function toggleAge(k) {
     setSelectedAges(prev => {
       const next = prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k];
@@ -133,9 +138,11 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         if (fr) reserved.add(dupKey(fr));
       }));
     });
-    const { brackets: listas, faltantes } = buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs, reserved);
+    const { brackets: listas, faltantes } = buildSuper4Brackets(fighters, fightsCeil, selectedAges, selectedDivs, reserved, incompletas);
     const tope = fightsCeil != null ? ` con el tope de ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"}` : "";
-    if (!listas.length) { alert("No hay 4 peleadores libres en ninguna combinación de edad y peso elegida" + tope + " para armar una llave."); return; }
+    if (!listas.length) { alert(incompletas
+      ? "Ninguna categoría elegida tiene atletas" + tope + " para armar una llave (ni siquiera incompleta). Registra al menos uno en la pestaña Agregar."
+      : "No hay 4 peleadores libres en ninguna combinación de edad y peso elegida" + tope + " para armar una llave. Activa \"Armar aunque falten peleadores\" para armarlas incompletas."); return; }
     // Tope de cantidad de llaves: se arman las primeras N en orden (menor edad
     // y peso primero). Cada peleador es elegible para una sola combinación
     // edad×división, así que recortar no deja a nadie en dos llaves.
@@ -146,8 +153,10 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     // dos llaves. Las categorías NO elegidas y los cinturones legacy (catKey sin
     // "__") se conservan intactos. Transacción para no pisar otro dispositivo.
     mergeSuper4Tx(super4, brackets, setSuper4, regenKeys);
+    const incompletasArmadas = brackets.filter(b => [b.semis[0].red, b.semis[0].blue, b.semis[1].red, b.semis[1].blue].some(id => id == null)).length;
     const notas = [];
     if (llavesCap != null && listas.length > llavesCap) notas.push(`Se armaron ${brackets.length} de ${listas.length} llaves posibles con las categorías elegidas (tope: ${llavesCap}). Sube "Cantidad de llaves" para armar más.`);
+    if (incompletasArmadas > 0) notas.push(`${incompletasArmadas} llave(s) quedaron INCOMPLETAS: usa el botón "＋ Elegir" en los cupos libres para completarlas.`);
     if (faltantes.length) notas.push("Con atletas pero sin completar 4" + tope + ":\n" + faltantes.slice(0, 12).map(f => `• ${f.catLabel}: hay ${f.elegibles}, faltan ${f.faltan}`).join("\n") + (faltantes.length > 12 ? `\n…y ${faltantes.length - 12} más.` : ""));
     if (notas.length) alert("Se armaron " + brackets.length + " llave(s).\n\n" + notas.join("\n\n"));
   }
@@ -339,6 +348,17 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </div>
       {llavesCap != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Se arman como máximo {llavesCap} llave{llavesCap === 1 ? "" : "s"} de las categorías elegidas (menor edad y peso primero). Toca GENERAR LLAVES para aplicarlo.</p>}
 
+      <button type="button" onClick={() => cambiarIncompletas(!incompletas)} className="w-full bg-black/40 border border-boxing-lineBright px-3 py-2.5 flex items-center justify-between gap-3 transition-colors hover:bg-white/5">
+        <span className="text-left min-w-0">
+          <span className="text-[12px] text-boxing-cream block">Armar aunque falten peleadores</span>
+          <span className="text-[10px] text-boxing-muted block">Crea llaves incompletas (cupos "＋ Elegir") para ver todas las categorías e irlas completando.</span>
+        </span>
+        <span className={"flex-shrink-0 w-11 h-6 rounded-full p-0.5 transition-colors " + (incompletas ? "bg-green-600" : "bg-boxing-lineBright")}>
+          <span className={"block w-5 h-5 rounded-full bg-white transition-transform " + (incompletas ? "translate-x-5" : "")} />
+        </span>
+      </button>
+      {incompletas && <p className="text-[10px] text-boxing-goldFight -mt-2">Se armarán las categorías elegidas con al menos 1 atleta, aunque no lleguen a 4. Los cupos vacíos se llenan con "＋ Elegir".</p>}
+
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <button type="button" onClick={() => setAgesOpen(o => !o)} className="w-full flex items-center justify-between gap-2">
           <span className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</span>
@@ -424,12 +444,19 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
             <div className="p-3">
               <div className="grid items-stretch" style={{ gridTemplateColumns: "1fr 18px 1fr" }}>
                 <div className="flex flex-col justify-between gap-3">
-                  {b.semis.map((s, i) => (
-                    <Tarjeta key={i} dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
-                      <Fila fid={s.red} winner={s.winner} lado="rojo" onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
-                      <Fila fid={s.blue} winner={s.winner} lado="azul" onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
-                    </Tarjeta>
-                  ))}
+                  {b.semis.map((s, i) => {
+                    // El ✓ se bloquea hasta que la semifinal tenga sus DOS
+                    // peleadores reales (en llaves incompletas un lado puede ser
+                    // un cupo vacío o un peleador eliminado): no se marca ganador
+                    // por walkover; primero se llena el cupo con "＋ Elegir".
+                    const semiLista = !!byId[s.red] && !!byId[s.blue];
+                    return (
+                      <Tarjeta key={i} dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
+                        <Fila fid={s.red} winner={s.winner} lado="rojo" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
+                        <Fila fid={s.blue} winner={s.winner} lado="azul" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
+                      </Tarjeta>
+                    );
+                  })}
                 </div>
                 <Conector />
                 <div className="flex flex-col justify-center">
@@ -462,7 +489,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               </div>
               <div className="max-h-[50vh] overflow-y-auto">
                 {opciones.length === 0
-                  ? <p className="p-4 text-sm text-boxing-muted text-center">No hay más atletas elegibles para esta categoría.<br />Registra uno nuevo (pestaña Agregar) o libera un cupo de otra llave.</p>
+                  ? <p className="p-4 text-sm text-boxing-muted text-center">No existen peleadores con estas características.<br />Regístralos en la pestaña Agregar o libera un cupo de otra llave.</p>
                   : opciones.map(f => (
                     <button key={f.id} onClick={() => hacerReemplazo(f.id)} className="w-full text-left px-4 py-2.5 border-b border-boxing-line/50 hover:bg-white/5 transition-colors">
                       <span className="text-boxing-cream font-semibold text-sm block truncate">{f.fullName}</span>

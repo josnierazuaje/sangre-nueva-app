@@ -165,6 +165,36 @@ describe("buildSuper4Brackets (edad × división)", () => {
     expect(brackets).toHaveLength(0);
     expect(faltantes.find(x => x.catKey === "adulto__m_welter").elegibles).toBe(2);
   });
+
+  it("allowIncomplete arma llaves INCOMPLETAS (1-3 atletas) con los cupos faltantes en null", () => {
+    const fighters = [f({ id: "w1", age: 25, weightKg: 61 }), f({ id: "w2", age: 25, weightKg: 63 })]; // 2 en m_welter
+    // Sin allowIncomplete: no se arma, va a faltantes.
+    const sin = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"]);
+    expect(sin.brackets).toHaveLength(0);
+    expect(sin.faltantes.find(x => x.catKey === "adulto__m_welter").elegibles).toBe(2);
+    // Con allowIncomplete: se arma 1 llave con 2 cupos llenos y 2 en null.
+    const con = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"], null, true);
+    expect(con.brackets).toHaveLength(1);
+    const ids = [con.brackets[0].semis[0].red, con.brackets[0].semis[0].blue, con.brackets[0].semis[1].red, con.brackets[0].semis[1].blue];
+    expect(ids.filter(x => x != null).sort()).toEqual(["w1", "w2"]);
+    expect(ids.filter(x => x == null)).toHaveLength(2);
+    // No la reporta como faltante (ya está armada, aunque incompleta).
+    expect(con.faltantes.some(x => x.catKey === "adulto__m_welter")).toBe(false);
+  });
+
+  it("allowIncomplete NO arma llave para una categoría con 0 atletas", () => {
+    const fighters = [f({ id: "a", age: 25, weightKg: 61 })]; // adulto m_welter
+    const r = buildSuper4Brackets(fighters, null, ["adulto"], ["m_pesado"], null, true); // m_pesado: 0 atletas
+    expect(r.brackets).toHaveLength(0);
+  });
+
+  it("una llave COMPLETA (4) se arma igual con allowIncomplete, sin cupos null", () => {
+    const fighters = [61, 62, 63, 64].map((w, i) => f({ id: "w" + i, age: 25, weightKg: w }));
+    const r = buildSuper4Brackets(fighters, null, ["adulto"], ["m_welter"], null, true);
+    expect(r.brackets).toHaveLength(1);
+    const ids = [r.brackets[0].semis[0].red, r.brackets[0].semis[0].blue, r.brackets[0].semis[1].red, r.brackets[0].semis[1].blue];
+    expect(ids.filter(x => x == null)).toHaveLength(0);
+  });
 });
 
 describe("progresión de ganadores", () => {
