@@ -1,6 +1,6 @@
 # Memoria de contexto — Cartelera + Super 4
 
-_Última actualización: 2026-07-17 · rama base: `main` (commit `ba3f291`) · última ronda: layout responsive de escritorio (§6)_
+_Última actualización: 2026-07-17 · rama base: `main` (commit `ee2ac10`) · última ronda: fantasmas + confirmaciones de alta (§7)_
 
 Resumen técnico de los cambios recientes en la **pestaña Cartelera** (nombres
 FECHIBOX en el título de categoría al imprimir + reubicación de botones) y de
@@ -269,3 +269,74 @@ un bypass temporal (`dev_bypass` en localStorage) que **no** se commitea.
 bundle viejo cacheado por el service worker — hay que **recargar una vez** (o
 cerrar/reabrir) para ver el bundle nuevo. La URL de producción es
 `sangre-nueva-la-velada.pages.dev` (ver §4).
+
+---
+
+## 7. Peleadores "fantasma" + confirmaciones de alta (jul 2026)
+
+**Estado: MERGEADO y desplegado** (3 PRs fast-forward a main: `d5e9b11`,
+`26e1129`, `ee2ac10`; bundle verificado en producción).
+
+### 7.1 El bug: un peleador que "no aparece pero sí existe"
+
+**Síntoma reportado:** al buscar a "Matias Marin" en Peleadores → "Sin
+resultados"; pero al intentar agregarlo de nuevo → alerta "Ya existe un peleador
+con el mismo sexo y peso". Contradicción total, con sesión fresca y sincronizada.
+
+**Diagnóstico (contra los datos reales de producción, no contra supuestos):**
+- La búsqueda NUNCA estuvo rota: los 87 peleadores de la nube eran encontrables
+  por su nombre (auditado con la misma `normName` del código). Los primeros
+  intentos de "arreglar acentos/mayúsculas" atacaban algo sano.
+- La nube NO tenía a "Matias Marin" (verificado con lectura autoritativa
+  `get()` + estado 100% limpio). El registro vivía **solo en el localStorage del
+  dispositivo del dueño**: un alta cuya escritura a Firebase FALLÓ y quedó
+  atascada local — un **fantasma**. La lista sincronizada muestra la verdad de
+  la nube (no está), pero el chequeo de duplicados del formulario lee el arreglo
+  local (sí está) → la contradicción exacta.
+- Se reprodujo el mecanismo en vivo (con un peleador de prueba en producción,
+  luego eliminado): el doble-registro NO borra al original ni rompe la búsqueda;
+  el fantasma requiere un guardado fallido.
+
+**Lección de diagnóstico:** si "no aparece en la lista pero sí en el chequeo de
+duplicados" → comparar **localStorage vs nube** (`get()` directo a
+`sangre_nueva/bm_fighters_v4`). No asumir bug de UI.
+
+**Limpieza manual del fantasma** (solo hizo falta una vez, antes del auto-reparo):
+borrar los datos del sitio. Ojo: el dueño usa la app **instalada como PWA**
+(ventana sin barra de direcciones) — hay que "Abrir en Chrome" y desde ahí
+Configuración de sitios → Borrar datos, o `chrome://settings/content/all`.
+
+### 7.2 Lo que quedó en la app (todo en main, desplegado y verificado)
+
+- **Auto-reparo de fantasmas** (`26e1129`, App.jsx + storage.js). Una vez por
+  sesión, al conectar y tras hidratar, lee la copia autoritativa de la nube
+  (`fetchCloudArray`) y quita los peleadores locales cuyo id no está en ella.
+  Lógica pura `stripLocalGhosts(local, cloud)` con 6 tests: **nunca borra
+  reales**, y con nube nula/vacía **no toca nada** (una lectura dudosa jamás
+  vacía la lista). Verificado en producción: fantasma inyectado solo-local →
+  recarga → eliminado (87 reales intactos).
+- **Botón "Recargar desde la nube"** (menú ⋮): borra lo local y recarga desde la
+  copia compartida — arreglo de un clic sin tocar la nube ni otros dispositivos.
+  "Reiniciar evento" (destructivo) se movió al final del menú.
+- **Anti-duplicado sin trampa** (`d5e9b11`, FighterForm). El confirm
+  "¿Agregar de todos modos?" creaba un registro que la reconciliación borraba en
+  silencio ("lo agregué pero no aparece"). Ahora: banner ámbar visible
+  «"X" ya estaba registrado (peso · escuela) — no se duplicó» y NO se crea nada.
+- **Deshacer borrado** (`d5e9b11`, App). Toast fijo "Eliminaste a X ·
+  Deshacer" (8s); Deshacer re-crea con el MISMO id (transacción por id). Un
+  toque errado en la papelera ya no es irreversible.
+- **Confirmación de alta imposible de perder** (`ee2ac10`). El banner verde del
+  formulario dura 7s (antes 4s, se perdía registrando de corrido) y además un
+  **toast verde fijo** abajo al centro ("✓ X fue agregado a la base de datos",
+  6s, cierre manual) confirma cada alta en cualquier vista/scroll. Comparte
+  contenedor con el toast de Deshacer (se apilan). Un duplicado NO dispara el
+  toast verde (solo el banner ámbar). **Señal rápida de alta exitosa: el
+  formulario se limpia.**
+
+### 7.3 Cómo verificar un alta si hay dudas
+
+1. Al agregar: deben verse el banner verde (form) y el toast verde (abajo), y el
+   formulario queda vacío.
+2. En la nube: el contador de "Peleadores (N)" sube; la búsqueda lo encuentra.
+3. Si algo no cuadra: menú ⋮ → "Recargar desde la nube" (o simplemente recargar:
+   el auto-reparo corre solo al conectar).
