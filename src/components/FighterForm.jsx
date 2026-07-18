@@ -97,7 +97,8 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
       setDupNotice(null);
       setAddedName(name);
       clearTimeout(addedTimerRef.current);
-      addedTimerRef.current = setTimeout(() => setAddedName(null), 4000);
+      // 7s (antes 4): registrando de corrido es fácil perderse la confirmación.
+      addedTimerRef.current = setTimeout(() => setAddedName(null), 7000);
       // El scroll vive en el <main> de la app (no en window), así que se
       // sube al inicio del formulario para que la confirmación quede visible.
       formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });

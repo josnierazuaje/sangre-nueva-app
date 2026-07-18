@@ -44,6 +44,12 @@ export default function App() {
   // se sincroniza a la nube, así que un toque errado ya no es irreversible.
   const [undoDelete, setUndoDelete] = useState(null);
   const undoTimerRef = useRef(null);
+  // Confirmación de alta SIEMPRE visible: además del banner verde del
+  // formulario, un toast fijo abajo confirma cada peleador agregado (pedido
+  // del organizador: registrando de corrido, la confirmación no puede
+  // pasar desapercibida).
+  const [addedToast, setAddedToast] = useState(null);
+  const addedToastTimerRef = useRef(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -209,7 +215,19 @@ export default function App() {
   // Alta/edición y baja escriben de forma transaccional (fusión por id contra
   // el servidor) para no pisar peleadores que otro dispositivo registró a la
   // vez; onMerged aplica la lista autoritativa ya fusionada.
-  function addFighter(f) { let u; if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); } else { u = [...fighters, f]; } setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged))); }
+  function addFighter(f) {
+    let u;
+    if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); }
+    else {
+      u = [...fighters, f];
+      // Toast verde de confirmación (6s), visible aunque el banner del
+      // formulario quede fuera de vista.
+      clearTimeout(addedToastTimerRef.current);
+      setAddedToast(f.fullName);
+      addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
+    }
+    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)));
+  }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
   function delFighter(id) {
     const victim = fighters.find(f => f.id === id);
@@ -430,16 +448,23 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Toast de DESHACER un borrado — fijo, visible en cualquier vista. Un
-          borrado se sincroniza a la nube, así que este "Deshacer" evita que un
-          toque errado en la papelera pierda a un peleador de forma irreversible. */}
-      {undoDelete && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md fade-in">
-        <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3">
+      {/* Toasts fijos (abajo al centro), visibles en cualquier vista y a
+          cualquier altura del scroll. Se apilan si coinciden:
+          — verde: confirmación de peleador agregado;
+          — rojo: DESHACER un borrado (un toque errado en la papelera se
+            sincroniza a la nube; sin esto sería irreversible). */}
+      {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
+        {addedToast && <div className="flex items-center gap-3 bg-boxing-panel border border-green-500/60 shadow-lg px-4 py-3 fade-in">
+          <span className="text-green-400 text-lg leading-none">✓</span>
+          <span className="text-green-400 text-sm font-semibold flex-1 min-w-0 truncate"><b>{addedToast}</b> fue agregado a la base de datos</span>
+          <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
+        </div>}
+        {undoDelete && <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3 fade-in">
           <span className="text-red-400 text-lg leading-none">🗑️</span>
           <span className="text-boxing-cream text-sm flex-1 min-w-0 truncate">Eliminaste a <b className="text-boxing-cream">{undoDelete.fullName}</b></span>
           <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-xs font-bold tracking-widest uppercase transition-colors">Deshacer</button>
           <button onClick={() => { clearTimeout(undoTimerRef.current); setUndoDelete(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
-        </div>
+        </div>}
       </div>}
     </div>
   );
