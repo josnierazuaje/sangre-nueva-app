@@ -69,6 +69,13 @@ export default function App() {
   // no debe conservarlos legibles sin login) y recarga para partir de un estado
   // limpio en el próximo inicio (evita listeners de sync colgados tras re-login).
   async function logout() {
+    // El outbox garantiza la entrega SOLO mientras sobreviva en este
+    // dispositivo. Cerrar sesión lo borra (clearLocalEventData) — así que si
+    // hay altas aún sin subir a la nube (típico sin conexión), avisamos antes
+    // de que se pierdan en silencio. Sin este guard, el "✓ guardado" inmediato
+    // podría mentir: se dio por guardado algo que este borrado destruiría.
+    const pend = outboxList().length;
+    if (pend && !confirm(`Tienes ${pend} registro(s) que AÚN NO se guardaron en la nube (parece que estás sin conexión).\n\nSi cierras sesión ahora, se PERDERÁN.\n\nPara no perderlos: revisa tu internet, espera a que arriba diga "Sincronizado" y recién cierra sesión.\n\n¿Cerrar sesión de todos modos?`)) return;
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
     location.reload();
@@ -81,6 +88,10 @@ export default function App() {
   // dispositivos: solo reemplaza lo local por lo remoto.
   function reloadFromCloud() {
     if (cloudMode !== true || !FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
+    // Igual que en logout: recargar desde la nube BORRA lo local (incluido el
+    // outbox), así que unas altas sin subir se perderían. Avisamos primero.
+    const pend = outboxList().length;
+    if (pend && !confirm(`Tienes ${pend} registro(s) que AÚN NO se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que esos ${pend} registro(s) se PERDERÍAN.\n\nMejor espera a que arriba diga "Sincronizado" y luego recarga. ¿Recargar de todos modos?`)) return;
     if (!confirm("¿Recargar los datos desde la nube?\n\nSe reemplazan los datos de ESTE dispositivo con la copia compartida en la nube. Útil si ves algo que no cuadra (por ejemplo, un peleador que aparece al registrar pero no en la lista).\n\nNo afecta la nube ni a otros dispositivos.")) return;
     clearLocalEventData();
     location.reload();
@@ -284,9 +295,13 @@ export default function App() {
       // outbox GARANTIZA la entrega —el registro queda en localStorage y en la
       // cola, y se re-sincroniza aunque se recargue la app o se esté sin
       // conexión (por eso el fantasma ya no puede pasar)—, así que dar el visto
-      // bueno al instante es honesto y hace el registro fluido. El estado de
-      // conexión lo muestra el chip de sincronización. Si la nube RECHAZA de
-      // verdad (permiso/token/dato inválido), reportAddError lo pasa a rojo.
+      // bueno al instante es honesto y hace el registro fluido. Esa garantía se
+      // PROTEGE: logout y "Recargar desde la nube" —los únicos que borran el
+      // outbox— avisan si hay pendientes, para que un "guardado" nunca se
+      // destruya en silencio. El estado de conexión lo muestra el chip. Si la
+      // nube RECHAZA de verdad (permiso/token/dato inválido), reportAddError lo
+      // pasa a rojo. Texto "guardado" (no "…en la base de datos"): sin conexión
+      // el registro está guardado y en cola, aún no confirmado en la nube.
       setAddedToast({ name: f.fullName, phase: "saved" });
       addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
     }
@@ -533,7 +548,7 @@ export default function App() {
           <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "error" ? "text-red-300" : "text-green-400")}>
             {addedToast.phase === "error"
               ? <>No se pudo guardar a <b>{addedToast.name}</b> en la nube — revisa tu conexión o permisos. Quedó en cola y se reintentará al reabrir la app.</>
-              : <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
+              : <><b>{addedToast.name}</b> guardado</>}
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
