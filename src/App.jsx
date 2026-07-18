@@ -51,10 +51,9 @@ export default function App() {
   const [addedToast, setAddedToast] = useState(null);
   const addedToastTimerRef = useRef(null);
   // Dueño actual del toast de alta (id del último peleador agregado). El slot
-  // y su timer son únicos: sin este guard, la confirmación de un alta ANTERIOR
-  // pisaría el "Guardando…" del alta más reciente y le robaría el timer de 20s
-  // que vigila el aviso de "quedó pendiente" (registrando de corrido con
-  // conexión intermitente, el último registro jamás mostraría su estado real).
+  // es único: sin este guard, un rechazo tardío o la confirmación de un alta
+  // ANTERIOR pisaría el aviso del alta más reciente (registrando de corrido,
+  // el último registro debe mandar sobre el aviso).
   const addedToastOwnerRef = useRef(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
@@ -250,16 +249,12 @@ export default function App() {
   // Alta/edición y baja escriben de forma transaccional (fusión por id contra
   // el servidor) para no pisar peleadores que otro dispositivo registró a la
   // vez; onMerged aplica la lista autoritativa ya fusionada.
-  // Toast HONESTO de guardado: verde solo cuando la NUBE confirmó el commit
-  // (antes salía verde de inmediato y, si la escritura moría —p.ej. recargando
-  // la app justo después—, confirmaba un guardado que nunca ocurrió).
-  // También RESCATA el estado "pendiente": si el commit tardó más que el umbral
-  // y el toast ya pasó a ⏱️ pendiente, esta confirmación tardía lo pisa y lo
-  // deja en verde "✓ guardado" — el pendiente nunca se queda colgado si la
-  // escritura sí terminó.
+  // Confirmación verde para la RECUPERACIÓN del outbox: cuando al reabrir la app
+  // se re-suben los registros que habían quedado pendientes, este callback
+  // muestra "✓ guardado" del último recuperado al confirmarlo la nube (el alta
+  // normal ya confirma al instante, así que NO usa esto). Solo el DUEÑO del
+  // toast lo actualiza.
   function confirmSaved(f) {
-    // Solo el DUEÑO del toast lo actualiza: las confirmaciones de altas
-    // anteriores son silenciosas (su salida del outbox ya ocurrió en storage).
     if (addedToastOwnerRef.current !== f.id) return;
     clearTimeout(addedToastTimerRef.current);
     setAddedToast({ name: f.fullName, phase: "saved" });
@@ -285,24 +280,20 @@ export default function App() {
       u = [...fighters, f];
       addedToastOwnerRef.current = f.id;
       clearTimeout(addedToastTimerRef.current);
-      if (cloudMode === true) {
-        // "Guardando…" hasta la confirmación real (confirmSaved). Si en 20s no
-        // confirma, pasa a "pendiente" (no a "error"): el outbox lo re-sube
-        // solo, incluso si se recarga la app. El umbral es alto a propósito —
-        // en conexiones lentas el commit tarda, y avisar antes daba falsas
-        // alarmas. Si la confirmación llega DESPUÉS del umbral, confirmSaved
-        // igual pisa el "pendiente" y lo pone en verde "✓ guardado".
-        setAddedToast({ name: f.fullName, phase: "saving" });
-        addedToastTimerRef.current = setTimeout(() => {
-          setAddedToast(t => t && t.phase === "saving" ? { ...t, phase: "pending" } : t);
-        }, 20000);
-      } else {
-        // Modo solo-local: no hay nube que confirmar, lo local es la verdad.
-        setAddedToast({ name: f.fullName, phase: "saved" });
-        addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
-      }
+      // Confirmación INMEDIATA "✓ guardado": ya no se espera a la nube. El
+      // outbox GARANTIZA la entrega —el registro queda en localStorage y en la
+      // cola, y se re-sincroniza aunque se recargue la app o se esté sin
+      // conexión (por eso el fantasma ya no puede pasar)—, así que dar el visto
+      // bueno al instante es honesto y hace el registro fluido. El estado de
+      // conexión lo muestra el chip de sincronización. Si la nube RECHAZA de
+      // verdad (permiso/token/dato inválido), reportAddError lo pasa a rojo.
+      setAddedToast({ name: f.fullName, phase: "saved" });
+      addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
     }
-    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), editF ? undefined : confirmSaved, editF ? undefined : reportAddError);
+    // onCommitted va vacío en el alta: el verde ya se mostró (no hace falta
+    // esperar el commit para confirmar, y así una confirmación lenta no re-abre
+    // el aviso ya cerrado). onError sí, para pasar a rojo ante un rechazo real.
+    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), undefined, editF ? undefined : reportAddError);
   }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
   function delFighter(id) {
@@ -316,9 +307,13 @@ export default function App() {
   function undoLastDelete() {
     const f = undoDelete; if (!f) return;
     clearTimeout(undoTimerRef.current); setUndoDelete(null);
-    // El restaurado pasa a ser el dueño del toast: su confirmación se muestra.
+    // El restaurado pasa a ser el dueño del toast y confirma al instante (mismo
+    // criterio que el alta: el outbox garantiza el re-guardado).
     addedToastOwnerRef.current = f.id;
-    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved, reportAddError);
+    setAddedToast({ name: f.fullName, phase: "saved" });
+    clearTimeout(addedToastTimerRef.current);
+    addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
+    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), undefined, reportAddError);
   }
   function cancel() { setEditF(null); setView("list"); }
 
@@ -528,18 +523,17 @@ export default function App() {
 
       {/* Toasts fijos (abajo al centro), visibles en cualquier vista y a
           cualquier altura del scroll. Se apilan si coinciden:
-          — alta (addedToast): ⏳ guardando → ✓ verde (confirmado) / ⏱️ ámbar
-            (tarda, sigue en curso) / ⚠️ rojo (rechazado — honesto, en cola);
+          — alta (addedToast): ✓ verde "guardado" al instante (el outbox
+            garantiza la entrega) / ⚠️ rojo solo si la nube RECHAZA de verdad;
           — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
-        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "saved" ? "border-green-500/60" : addedToast.phase === "saving" ? "border-boxing-goldDim/70" : addedToast.phase === "error" ? "border-red-500/60" : "border-amber-500/60")}>
-          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : addedToast.phase === "error" ? "text-red-400" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : addedToast.phase === "error" ? "⚠️" : "⏱️"}</span>
-          <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-cream" : addedToast.phase === "error" ? "text-red-300" : "text-amber-300")}>
-            {addedToast.phase === "saved" && <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
-            {addedToast.phase === "saving" && <>Guardando a <b>{addedToast.name}</b> en la nube…</>}
-            {addedToast.phase === "pending" && <>Guardando a <b>{addedToast.name}</b>… tarda más de lo normal, pero se completará solo. No cierres sesión.</>}
-            {addedToast.phase === "error" && <>No se pudo guardar a <b>{addedToast.name}</b> en la nube — revisa tu conexión o permisos. Quedó en cola y se reintentará al reabrir la app.</>}
+        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "error" ? "border-red-500/60" : "border-green-500/60")}>
+          <span className={"text-lg leading-none " + (addedToast.phase === "error" ? "text-red-400" : "text-green-400")}>{addedToast.phase === "error" ? "⚠️" : "✓"}</span>
+          <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "error" ? "text-red-300" : "text-green-400")}>
+            {addedToast.phase === "error"
+              ? <>No se pudo guardar a <b>{addedToast.name}</b> en la nube — revisa tu conexión o permisos. Quedó en cola y se reintentará al reabrir la app.</>
+              : <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
