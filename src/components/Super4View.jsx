@@ -83,9 +83,11 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   }, [fighters, super4, fightsCeil, byId]);
   // Cupo que se está reemplazando vía el botón ✕ (null = ningún modal abierto).
   const [reemplazo, setReemplazo] = useState(null);
-  // Colapso de los bloques de filtros (para llegar antes al fondo sin scroll).
-  const [agesOpen, setAgesOpen] = useState(true);
-  const [divsOpen, setDivsOpen] = useState(true);
+  // Panel de configuración (experiencia, cantidad, incompletas, categorías y
+  // pesos): vive arriba —bajo "Posibles llaves"— y arranca COLAPSADO, con un
+  // botón grande e inconfundible para abrirlo. Al entrar a la pestaña, el
+  // protagonismo es de las llaves, no de los filtros.
+  const [configOpen, setConfigOpen] = useState(false);
   function cambiarMaxFights(v) { setMaxFightsSel(v); save("bm_super4_maxfights", v); }
   function cambiarCantidad(v) { setCantidadLlaves(v); save("bm_super4_cantidad", v); }
   function cambiarIncompletas(v) { setIncompletas(v); save("bm_super4_incompletas", v); }
@@ -290,24 +292,20 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     <div className="space-y-4">
       <PageHeader kicker="Torneo por cinturón" title="Super 4" right={<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{super4.length} llave{super4.length !== 1 ? "s" : ""}</span>} />
 
-      {/* Móvil y lg (1024–1279px): una sola columna a todo el ancho, como
-          siempre. El split en dos columnas (controles + llaves) se activa solo
-          en XL (≥1280px): entre 1024 y 1279 la columna de llaves quedaba más
-          angosta que en móvil y truncaba el nombre del finalista (~9 chars);
-          a partir de xl la columna de controles (420px) deja aire de sobra. */}
-      <div className="space-y-4 xl:space-y-0 xl:flex xl:gap-6 xl:items-start">
-      <div className="space-y-4 xl:w-[420px] xl:flex-shrink-0">
-      <div className="flex gap-2">
+      {/* Estructura de la pestaña: arriba las acciones (GENERAR, posibles
+          llaves y el panel de configuración COLAPSADO); abajo, a todo el
+          ancho, lo que importa: las llaves del Super 4. */}
+      <div className="flex gap-2 w-full lg:max-w-xl lg:mx-auto">
         <button onClick={generar} className="btn-primary flex-1 py-4 font-black tracking-widest" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
           GENERAR LLAVES
         </button>
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
       </div>
 
-      <button onClick={() => setShowPosibles(o => !o)} className="w-full py-2.5 bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
-        Posibles llaves{posibles.length ? ` (${posibles.length})` : ""} <span className="text-xs">{showPosibles ? "▾" : "▸"}</span>
+      <button onClick={() => setShowPosibles(o => !o)} className="w-full lg:max-w-xl lg:mx-auto py-2.5 bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
+        Posibles llaves{posibles.length ? ` (${posibles.length})` : ""} <span className={"text-base leading-none transition-transform " + (showPosibles ? "rotate-180" : "")}>▾</span>
       </button>
-      {showPosibles && <div className="border border-blue-500/30 bg-blue-950/10 p-3 space-y-2 fade-in">
+      {showPosibles && <div className="lg:max-w-3xl lg:mx-auto border border-blue-500/30 bg-blue-950/10 p-3 space-y-2 fade-in">
         <p className="text-[10px] text-boxing-muted">Combinaciones que se pueden armar con los peleadores que aún NO están en una llave{fightsCeil != null ? ` (hasta ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"})` : ""}. Toca "Agregar" en la que quieras.</p>
         {posibles.length === 0
           ? <p className="text-boxing-muted text-sm text-center py-2">No hay más llaves posibles con los peleadores libres.</p>
@@ -328,6 +326,15 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           ))}
       </div>}
 
+      {/* Botón GRANDE e inconfundible del panel de configuración (pedido del
+          organizador: las flechitas chicas no se veían; esto es un botón dorado
+          completo con chevron que gira). */}
+      <button type="button" onClick={() => setConfigOpen(o => !o)} className="btn-gold w-full lg:max-w-xl lg:mx-auto py-3 flex items-center justify-center gap-2.5 font-bold tracking-widest uppercase" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "17px", letterSpacing: "2px" }}>
+        <span aria-hidden="true">⚙</span> Configuración de llaves
+        <span className={"text-xl leading-none transition-transform " + (configOpen ? "rotate-180" : "")}>▾</span>
+      </button>
+
+      {configOpen && <div className="space-y-4 lg:max-w-3xl lg:mx-auto fade-in">
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Experiencia de peleadores en el Super 4</p>
         <label className="flex items-center gap-2">
@@ -362,14 +369,8 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {incompletas && <p className="text-[10px] text-boxing-goldFight -mt-2">Se armarán las categorías elegidas con al menos 1 atleta, aunque no lleguen a 4. Los cupos vacíos se llenan con "＋ Elegir".</p>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
-        <button type="button" onClick={() => setAgesOpen(o => !o)} className="w-full flex items-center justify-between gap-2">
-          <span className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</span>
-          <span className="flex items-center gap-2">
-            {!agesOpen && <span className="text-[9px] text-boxing-goldFight">{selectedAges.length} elegida{selectedAges.length !== 1 ? "s" : ""}</span>}
-            <span className="text-boxing-muted text-sm leading-none">{agesOpen ? "▾" : "▸"}</span>
-          </span>
-        </button>
-        {agesOpen && <div className="flex flex-wrap gap-1.5">
+        <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</p>
+        <div className="flex flex-wrap gap-1.5">
           {AGE_OPTIONS.map(a => {
             const on = selectedAges.includes(a.key);
             return (
@@ -382,25 +383,20 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               </button>
             );
           })}
-        </div>}
+        </div>
       </div>
       {!selectedAges.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos una categoría de edad.</p>}
 
       <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <button type="button" onClick={() => setDivsOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-            <span className="text-[11px] text-boxing-muted tracking-wide uppercase truncate">Peso oficial de peleadores en el Super 4</span>
-            <span className="text-boxing-muted text-sm leading-none flex-shrink-0">{divsOpen ? "▾" : "▸"}</span>
-          </button>
-          {divsOpen
-            ? <span className="text-[9px] flex-shrink-0">
-                <button type="button" onClick={() => setDivsAll(true)} className="text-boxing-goldFight hover:underline">Todos</button>
-                <span className="text-boxing-muted"> · </span>
-                <button type="button" onClick={() => setDivsAll(false)} className="text-boxing-muted hover:underline">Ninguno</button>
-              </span>
-            : <span className="text-[9px] text-boxing-goldFight flex-shrink-0">{selectedDivs.length} elegido{selectedDivs.length !== 1 ? "s" : ""}</span>}
+          <p className="text-[11px] text-boxing-muted tracking-wide uppercase truncate">Peso oficial de peleadores en el Super 4</p>
+          <span className="text-[11px] flex-shrink-0">
+            <button type="button" onClick={() => setDivsAll(true)} className="text-boxing-goldFight hover:underline">Todos</button>
+            <span className="text-boxing-muted"> · </span>
+            <button type="button" onClick={() => setDivsAll(false)} className="text-boxing-muted hover:underline">Ninguno</button>
+          </span>
         </div>
-        {divsOpen && <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {DIVISION_OPTIONS.map(d => {
             const on = selectedDivs.includes(d.key);
             return (
@@ -413,17 +409,16 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               </button>
             );
           })}
-        </div>}
+        </div>
       </div>
       {!selectedDivs.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos un peso.</p>}
 
       {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar llaves</button>}
-      </div>
+      </div>}
 
-      {/* Columna de llaves (en móvil y lg fluye normal bajo los controles;
-          solo en xl se separa a la derecha del split) */}
-      <div className="space-y-4 xl:flex-1 xl:min-w-0">
-      {!super4.length && <div className="border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
+      {/* ===== Las llaves, a todo el ancho: el protagonista de la pestaña ===== */}
+      <div className="space-y-4 lg:space-y-6">
+      {!super4.length && <div className="lg:max-w-2xl lg:mx-auto border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
         <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
           {resultado.brackets.length === 0 && resultado.faltantes.length === 0 && <p>Con los filtros actuales no hay atletas para armar llaves. Ajusta la experiencia, la edad o los pesos.</p>}
@@ -447,32 +442,38 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
               </div>
               <span className="text-[8.5px] text-boxing-muted flex-shrink-0 text-right leading-tight"><span className="text-green-400">✓</span> gana · <span className="text-red-400">✕</span> cambia</span>
             </div>
-            <div className="p-3">
-              <div className="grid items-stretch" style={{ gridTemplateColumns: "1fr 18px 1fr" }}>
-                <div className="flex flex-col justify-between gap-3">
-                  {b.semis.map((s, i) => {
-                    // El ✓ se bloquea hasta que la semifinal tenga sus DOS
-                    // peleadores reales (en llaves incompletas un lado puede ser
-                    // un cupo vacío o un peleador eliminado): no se marca ganador
-                    // por walkover; primero se llena el cupo con "＋ Elegir".
-                    const semiLista = !!byId[s.red] && !!byId[s.blue];
-                    return (
-                      <Tarjeta key={i} dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
+            <div className="p-3 xl:p-6">
+              {/* Layout de la llave (.s4-bracket, index.css). Móvil/lg: el
+                  compacto de siempre (semis a la izquierda, conector, final a
+                  la derecha). XL: estilo torneo — Semi 1 | línea | FINAL al
+                  centro | línea | Semi 2, con el campeón centrado debajo. */}
+              <div className="s4-bracket">
+                {b.semis.map((s, i) => {
+                  // El ✓ se bloquea hasta que la semifinal tenga sus DOS
+                  // peleadores reales (en llaves incompletas un lado puede ser
+                  // un cupo vacío o un peleador eliminado): no se marca ganador
+                  // por walkover; primero se llena el cupo con "＋ Elegir".
+                  const semiLista = !!byId[s.red] && !!byId[s.blue];
+                  return (
+                    <div key={i} className={i === 0 ? "s4-s1" : "s4-s2"}>
+                      <Tarjeta dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
                         <Fila fid={s.red} winner={s.winner} lado="rojo" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
                         <Fila fid={s.blue} winner={s.winner} lado="azul" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
                       </Tarjeta>
-                    );
-                  })}
-                </div>
-                <Conector />
-                <div className="flex flex-col justify-center">
+                    </div>
+                  );
+                })}
+                <div className="s4-conn"><Conector /></div>
+                <div className="s4-line s4-line1" />
+                <div className="s4-line s4-line2" />
+                <div className="s4-final">
                   <Tarjeta dia={`${EVENT_LABELS.finalAbbr} · Final`} decidido={!!campeon} destacada>
                     <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onWin={() => marcarFinal(b.id, finalistas[0])} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
                     <Fila fid={finalistas[1]} winner={campeon} lado="azul" onWin={() => marcarFinal(b.id, finalistas[1])} placeholder="Ganador Semi 2" bloqueada={!(finalistas[0] && finalistas[1])} />
                   </Tarjeta>
                 </div>
               </div>
-              {campeon && <div className="mt-3 border border-boxing-goldFight/50 bg-boxing-goldDim/10 px-3 py-2.5 text-center fade-in">
+              {campeon && <div className="mt-3 xl:mt-5 xl:max-w-md xl:mx-auto border border-boxing-goldFight/50 bg-boxing-goldDim/10 px-3 py-2.5 text-center fade-in">
                 <p className="text-[10px] tracking-widest uppercase text-boxing-goldFight">Campeón {b.catLabel}</p>
                 <p className="text-boxing-cream font-black" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.05em" }}>{"🏆"} {nombre(campeon)}</p>
               </div>}
@@ -480,7 +481,6 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           </div>
         );
       })}
-      </div>
       </div>
 
       {reemplazo && (() => {

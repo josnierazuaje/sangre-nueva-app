@@ -170,6 +170,35 @@ input[type="number"] { -moz-appearance:textfield; }
 }
 .btn-gold:active:not(:disabled) { transform:translateY(1px); }
 .btn-gold:disabled { opacity:.5; }
+/* Llave del Super 4 (.s4-bracket). Móvil y lg: el layout compacto de siempre
+   (semis apiladas a la izquierda, conector de llaves, final a la derecha).
+   XL (≥80rem): estilo torneo tipo Red Bull — Semi 1 a la izquierda, la FINAL
+   al centro y Semi 2 a la derecha, unidas por líneas doradas al centro. */
+.s4-bracket {
+  display:grid;
+  grid-template-columns:1fr 18px 1fr;
+  grid-template-areas:"s1 conn final" "s2 conn final";
+  row-gap:12px;
+  align-items:stretch;
+}
+.s4-s1 { grid-area:s1; min-width:0; }
+.s4-s2 { grid-area:s2; min-width:0; }
+.s4-conn { grid-area:conn; position:relative; }
+.s4-final { grid-area:final; align-self:center; min-width:0; }
+.s4-line { display:none; }
+@media (min-width:80rem) {
+  .s4-bracket {
+    grid-template-columns:1fr 44px minmax(300px,400px) 44px 1fr;
+    grid-template-areas:"s1 line1 final line2 s2";
+    align-items:center;
+    row-gap:0;
+  }
+  .s4-conn { display:none; }
+  .s4-s1, .s4-s2 { align-self:center; }
+  .s4-line { display:block; height:2px; border-radius:1px; }
+  .s4-line1 { grid-area:line1; background:linear-gradient(90deg, rgba(200,160,74,0.12), #c8a04a); }
+  .s4-line2 { grid-area:line2; background:linear-gradient(270deg, rgba(200,160,74,0.12), #c8a04a); }
+}
 /* Tile de KPI (Entradas). Acento por --c: borde y lavado sutil del color del
    indicador (ingresos=oro, check-in=verde, capacidad=crimson). */
 .kpi-tile {
