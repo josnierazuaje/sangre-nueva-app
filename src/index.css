@@ -99,6 +99,28 @@ input[type="number"] { -moz-appearance:textfield; }
 .scale-in { animation:scaleIn .3s ease-out; }
 .no-scrollbar::-webkit-scrollbar { display:none; }
 .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+/* Chips de filtro (lista de Peleadores). El color de cada categoría llega por
+   la variable --c; así una sola clase da la profundidad, el hover y el estado
+   activo sin repetir estilos por color. color-mix ya lo usa Tailwind v4, así
+   que el soporte de navegador está garantizado. */
+.filter-chip {
+  --c: #E5C76B;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-width:66px; padding:7px 12px; border-radius:3px;
+  border:1px solid color-mix(in srgb, var(--c) 26%, transparent);
+  background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.22));
+  transition:border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .08s ease;
+}
+.filter-chip:hover { border-color:color-mix(in srgb, var(--c) 55%, transparent); background:color-mix(in srgb, var(--c) 9%, #0b090b); }
+.filter-chip:active { transform:translateY(1px); }
+.filter-chip.on {
+  border-color:var(--c);
+  background:color-mix(in srgb, var(--c) 16%, #0b090b);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent), 0 3px 14px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.filter-chip .n { font-size:15px; font-weight:700; line-height:1; color:var(--c); }
+.filter-chip .l { font-size:9px; margin-top:3px; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; color:color-mix(in srgb, var(--c) 62%, #8a7d88); }
+.filter-chip.on .l { color:var(--c); }
 /* Mobile viewport fix */
 :root { --app-h: 100vh; }
 .app-root { height: var(--app-h); }

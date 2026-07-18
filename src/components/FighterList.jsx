@@ -5,6 +5,19 @@ import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
 import { normName } from "../lib/dedup.js";
 
+// Chip de filtro: número (en el color de la categoría) + etiqueta, con estado
+// activo destacado. El look (profundidad, hover, resplandor activo) vive en la
+// clase .filter-chip de index.css; aquí solo se pasa el color por la variable
+// CSS --c y se marca "on" cuando el filtro está activo.
+function FilterChip({ n, label, color, active, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className={"filter-chip flex-shrink-0" + (active ? " on" : "")} style={{ "--c": color }}>
+      <span className="n">{n}</span>
+      <span className="l">{label}</span>
+    </button>
+  );
+}
+
 // ============================================
 // COMPONENTE: LISTA PELEADORES
 // ============================================
@@ -113,34 +126,13 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     <div className="space-y-3">
       <PageHeader kicker="Base de datos de atletas" title="Peleadores" count={fighters.length} />
       <div className="flex flex-wrap gap-2">
-        <button onClick={verTodos} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: sinFiltros ? "#E5C76B" : "#E5C76B40" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: "#E5C76B" }}>{fighters.length}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#E5C76B" }}>Todos</span>
-        </button>
-        {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; return <button key={e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: experienceFilter === e.key ? e.color : e.color + "40" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: e.color }}>{c}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: e.color }}>{e.label}</span>
-        </button>; })}
-        {faltantesCount > 0 && <button onClick={() => setShowFaltantes(!showFaltantes)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: showFaltantes ? "#F97316" : "#F9731640" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: "#F97316" }}>{faltantesCount}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#F97316" }}>Faltante</span>
-        </button>}
-        <button onClick={() => setSexFilter(sexFilter === "M" ? "all" : "M")} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: sexFilter === "M" ? "#3B82F6" : "#3B82F640" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: "#3B82F6" }}>{sexCounts.M}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#3B82F6" }}>Masculino</span>
-        </button>
-        <button onClick={() => setSexFilter(sexFilter === "F" ? "all" : "F")} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: sexFilter === "F" ? "#EC4899" : "#EC489940" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: "#EC4899" }}>{sexCounts.F}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#EC4899" }}>Femenino</span>
-        </button>
-        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <button key={a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: ageFilter === a.key ? a.color : a.color + "40" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: a.color }}>{c}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: a.color }}>{a.label} · {FECHIBOX_LABEL[a.key] || a.label}</span>
-        </button>; })}
-        {invalidCount > 0 && <button onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: ageFilter === "invalid" ? "#DC2626" : "#DC262640" }}>
-          <span className="text-sm font-bold leading-none" style={{ color: "#DC2626" }}>{invalidCount}</span>
-          <span className="text-[9px] mt-0.5 tracking-widest uppercase" style={{ color: "#DC2626" }}>Inválidos</span>
-        </button>}
+        <FilterChip n={fighters.length} label="Todos" color="#E5C76B" active={sinFiltros} onClick={verTodos} />
+        {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; return <FilterChip key={e.key} n={c} label={e.label} color={e.color} active={experienceFilter === e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} />; })}
+        {faltantesCount > 0 && <FilterChip n={faltantesCount} label="Faltante" color="#F97316" active={showFaltantes} onClick={() => setShowFaltantes(!showFaltantes)} />}
+        <FilterChip n={sexCounts.M} label="Masculino" color="#3B82F6" active={sexFilter === "M"} onClick={() => setSexFilter(sexFilter === "M" ? "all" : "M")} />
+        <FilterChip n={sexCounts.F} label="Femenino" color="#EC4899" active={sexFilter === "F"} onClick={() => setSexFilter(sexFilter === "F" ? "all" : "F")} />
+        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <FilterChip key={a.key} n={c} label={`${a.label} · ${FECHIBOX_LABEL[a.key] || a.label}`} color={a.color} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
+        {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
         <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
