@@ -156,21 +156,21 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
       <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3">
         {!filtered.length ? <p className="text-boxing-muted text-center py-8 text-sm lg:col-span-full">Sin resultados</p> : filtered.map(f => {
           const cat = getCategoryInfo(f.weightCategory); const exp = getExperienceInfo(f.experienceLevel);
-          return (<div key={f.id} className="bg-boxing-panel border border-boxing-line p-3 space-y-2 fade-in transition-colors hover:border-boxing-lineBright" style={{ borderLeft: "3px solid " + (exp?.color || "#4B5563") }}>
+          return (<div key={f.id} className="fighter-card p-3.5 space-y-2.5 fade-in" style={{ "--edge": exp?.color || "#4B5563" }}>
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-xs font-bold border" style={{ borderColor: (cat?.color || "#9CA3AF") + "60", color: cat?.color || "#9CA3AF" }}>{getInitials(f.fullName)}</div>
-                <div className="min-w-0 flex-1"><h3 className="text-boxing-cream font-medium text-base leading-tight truncate">{f.fullName}</h3><p className="text-boxing-muted text-xs mt-0.5 truncate tracking-wide uppercase">{f.gym}</p></div>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-[13px] font-bold rounded" style={{ background: "linear-gradient(150deg," + (cat?.color || "#9CA3AF") + "30," + (cat?.color || "#9CA3AF") + "08)", border: "1px solid " + (cat?.color || "#9CA3AF") + "59", color: cat?.color || "#9CA3AF" }}>{getInitials(f.fullName)}</div>
+                <div className="min-w-0 flex-1"><h3 className="text-boxing-cream font-semibold text-base leading-tight truncate">{f.fullName}</h3><p className="text-boxing-muted text-[11px] mt-0.5 truncate tracking-[0.12em] uppercase">{f.gym}</p></div>
               </div>
               <div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={() => onEdit(f)} className="p-2 text-boxing-muted hover:text-boxing-goldFight hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button><button onClick={() => del(f.id)} className={"p-2 transition-colors hover:bg-white/5 " + (confirmDeleteId === f.id ? "text-red-400" : "text-boxing-muted hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div></div>
-            <div className="flex flex-wrap gap-1.5 pl-11">
+            <div className="flex flex-wrap gap-1.5 pl-[52px]">
               <Badge color={cat?.color || "#F59E0B"}>{f.weightKg}kg · {cat?.label}</Badge>
               <Badge color={exp?.color}>{f.fightCount}p · {exp?.label}</Badge>
               <Badge color={getAgeCategory(f.age).color}>{f.age}a · {getAgeCategory(f.age).label.split(" ")[0]}</Badge>
               <Badge color={(f.sexo || "M") === "F" ? "#EC4899" : "#3B82F6"}>{(f.sexo || "M") === "F" ? "F" : "M"}</Badge>
             </div>
-            {f.phone && <div className="text-xs text-boxing-muted pl-11"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
-            {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-11">{"⚠️"} Toca de nuevo para eliminar</p>}
+            {f.phone && <div className="text-xs text-boxing-muted pl-[52px]"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
+            {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-[52px]">{"⚠️"} Toca de nuevo para eliminar</p>}
           </div>);
         })}
       </div>
