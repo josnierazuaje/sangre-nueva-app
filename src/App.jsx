@@ -232,7 +232,7 @@ export default function App() {
       // El último pendiente queda como dueño del toast: al confirmarse se ve
       // el "✓ guardado" de la recuperación (los demás confirman en silencio).
       addedToastOwnerRef.current = f.id;
-      upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
+      upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved, reportAddError);
     });
   }, [cloudMode, hydrated.fighters]);
 
@@ -266,11 +266,14 @@ export default function App() {
     addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
   }
   // Escritura RECHAZADA por la nube (permiso, token vencido, sin conexión…).
-  // El toast pasa a "error" HONESTO en vez de quedarse en "guardando" y saltar
-  // a un "pendiente" que promete falsamente "se completará solo". Corta el
-  // timer de los 20s para que ese pendiente engañoso nunca aparezca. El
-  // registro sigue en el outbox: se reintenta al reconectar o reabrir la app.
-  function reportAddError(f) {
+  // storage liga el PELEADOR al callback (no el error), así que `f` es el
+  // peleador y el guard de "dueño" funciona. El toast pasa a "error" HONESTO en
+  // vez de quedarse en "guardando" y saltar a un "pendiente" que promete
+  // falsamente "se completará solo". Corta el timer de los 20s para que ese
+  // pendiente engañoso nunca aparezca. El registro sigue en el outbox: se
+  // reintenta al reabrir la app.
+  function reportAddError(f, err) {
+    if (err) console.error("Escritura de peleador rechazada por la nube:", err);
     if (addedToastOwnerRef.current !== f.id) return;
     clearTimeout(addedToastTimerRef.current);
     setAddedToast({ name: f.fullName, phase: "error" });
@@ -536,7 +539,7 @@ export default function App() {
             {addedToast.phase === "saved" && <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
             {addedToast.phase === "saving" && <>Guardando a <b>{addedToast.name}</b> en la nube…</>}
             {addedToast.phase === "pending" && <>Guardando a <b>{addedToast.name}</b>… tarda más de lo normal, pero se completará solo. No cierres sesión.</>}
-            {addedToast.phase === "error" && <>No se pudo guardar a <b>{addedToast.name}</b> en la nube. Quedó en cola y se reintentará al reconectar o reabrir la app — revisa tu conexión o permisos.</>}
+            {addedToast.phase === "error" && <>No se pudo guardar a <b>{addedToast.name}</b> en la nube — revisa tu conexión o permisos. Quedó en cola y se reintentará al reabrir la app.</>}
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}

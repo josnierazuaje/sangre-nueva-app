@@ -221,7 +221,7 @@ export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted, 
       onCommitted?.(fighter);
     }
     onMerged(merged);
-  }, onError);
+  }, err => onError?.(fighter, err)); // liga el PELEADOR al callback (como onCommitted): el toast necesita su id/nombre, no el error de Firebase
 }
 export function removeFighterTx(id, optimisticList, onMerged) {
   // Un borrado explícito cancela cualquier pendiente del mismo peleador (si
