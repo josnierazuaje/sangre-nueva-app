@@ -148,7 +148,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
           <optgroup label="Mujeres">{WEIGHT_CATEGORIES_F.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
-        <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="px-3 py-2 bg-black border border-boxing-goldDim text-boxing-goldFight text-sm transition-colors hover:bg-boxing-goldDim/10">🖨️</button>
+        <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="btn-gold px-3 py-2 text-sm">🖨️</button>
       </div>
       </div>
       {/* Móvil: lista vertical de siempre. Escritorio: cuadrícula de 2

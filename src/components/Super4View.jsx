@@ -301,7 +301,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         <button onClick={generar} className="btn-primary flex-1 py-4 font-black tracking-widest" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
           GENERAR LLAVES
         </button>
-        <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="px-4 bg-black border border-boxing-goldDim text-boxing-goldFight text-xl transition-colors hover:bg-boxing-goldDim/10">🖨️</button>
+        <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
       </div>
 
       <button onClick={() => setShowPosibles(o => !o)} className="w-full py-2.5 bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">

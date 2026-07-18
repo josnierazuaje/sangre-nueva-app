@@ -159,7 +159,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
 
       {/* Botón Auto VS (secundario) */}
       <div className="flex gap-2 lg:max-w-xl lg:mx-auto">
-        <button onClick={autoM} disabled={sorting} className="flex-1 bg-transparent hover:bg-boxing-goldDim/10 border border-boxing-goldDim text-boxing-goldFight text-sm font-semibold py-2.5 flex items-center justify-center gap-2 tracking-widest uppercase transition-colors" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "16px" }}>
+        <button onClick={autoM} disabled={sorting} className="btn-gold flex-1 font-semibold py-2.5 flex items-center justify-center gap-2 tracking-widest uppercase" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "16px" }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           Auto VS
         </button>
