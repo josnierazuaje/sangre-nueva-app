@@ -253,6 +253,10 @@ export default function App() {
   // Toast HONESTO de guardado: verde solo cuando la NUBE confirmó el commit
   // (antes salía verde de inmediato y, si la escritura moría —p.ej. recargando
   // la app justo después—, confirmaba un guardado que nunca ocurrió).
+  // También RESCATA el estado "pendiente": si el commit tardó más que el umbral
+  // y el toast ya pasó a ⏱️ pendiente, esta confirmación tardía lo pisa y lo
+  // deja en verde "✓ guardado" — el pendiente nunca se queda colgado si la
+  // escritura sí terminó.
   function confirmSaved(f) {
     // Solo el DUEÑO del toast lo actualiza: las confirmaciones de altas
     // anteriores son silenciosas (su salida del outbox ya ocurrió en storage).
@@ -269,13 +273,16 @@ export default function App() {
       addedToastOwnerRef.current = f.id;
       clearTimeout(addedToastTimerRef.current);
       if (cloudMode === true) {
-        // "Guardando…" hasta la confirmación real (confirmSaved). Si en 12s no
-        // confirma, pasa a "pendiente": el outbox lo re-sube solo, incluso si
-        // se recarga la app.
+        // "Guardando…" hasta la confirmación real (confirmSaved). Si en 20s no
+        // confirma, pasa a "pendiente" (no a "error"): el outbox lo re-sube
+        // solo, incluso si se recarga la app. El umbral es alto a propósito —
+        // en conexiones lentas el commit tarda, y avisar antes daba falsas
+        // alarmas. Si la confirmación llega DESPUÉS del umbral, confirmSaved
+        // igual pisa el "pendiente" y lo pone en verde "✓ guardado".
         setAddedToast({ name: f.fullName, phase: "saving" });
         addedToastTimerRef.current = setTimeout(() => {
           setAddedToast(t => t && t.phase === "saving" ? { ...t, phase: "pending" } : t);
-        }, 12000);
+        }, 20000);
       } else {
         // Modo solo-local: no hay nube que confirmar, lo local es la verdad.
         setAddedToast({ name: f.fullName, phase: "saved" });
@@ -513,11 +520,11 @@ export default function App() {
             sincroniza a la nube; sin esto sería irreversible). */}
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
         {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "saved" ? "border-green-500/60" : addedToast.phase === "saving" ? "border-boxing-goldDim/70" : "border-amber-500/60")}>
-          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : "⚠️"}</span>
+          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : "⏱️"}</span>
           <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-cream" : "text-amber-300")}>
             {addedToast.phase === "saved" && <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
             {addedToast.phase === "saving" && <>Guardando a <b>{addedToast.name}</b> en la nube…</>}
-            {addedToast.phase === "pending" && <><b>{addedToast.name}</b> quedó pendiente — se guardará automáticamente al reconectar. No cierres sesión.</>}
+            {addedToast.phase === "pending" && <>Guardando a <b>{addedToast.name}</b>… tarda más de lo normal, pero se completará solo. No cierres sesión.</>}
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
