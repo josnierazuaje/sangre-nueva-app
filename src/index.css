@@ -139,6 +139,16 @@ input[type="number"] { -moz-appearance:textfield; }
   border-left-color:var(--edge);
   box-shadow:0 12px 26px -14px rgba(0,0,0,0.75), 0 0 0 1px color-mix(in srgb, var(--edge) 20%, transparent);
 }
+/* Tile de KPI (Entradas). Acento por --c: borde y lavado sutil del color del
+   indicador (ingresos=oro, check-in=verde, capacidad=crimson). */
+.kpi-tile {
+  --c:#c8a04a;
+  border:1px solid color-mix(in srgb, var(--c) 24%, var(--color-boxing-line));
+  border-radius:12px;
+  background:
+    linear-gradient(158deg, color-mix(in srgb, var(--c) 10%, transparent) 0%, transparent 48%),
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(16,13,16,0.55));
+}
 /* Mobile viewport fix */
 :root { --app-h: 100vh; }
 .app-root { height: var(--app-h); }
