@@ -52,7 +52,7 @@ export default function App() {
   const addedToastTimerRef = useRef(null);
   // Dueño actual del toast de alta (id del último peleador agregado). El slot
   // y su timer son únicos: sin este guard, la confirmación de un alta ANTERIOR
-  // pisaría el "Guardando…" del alta más reciente y le robaría el timer de 12s
+  // pisaría el "Guardando…" del alta más reciente y le robaría el timer de 20s
   // que vigila el aviso de "quedó pendiente" (registrando de corrido con
   // conexión intermitente, el último registro jamás mostraría su estado real).
   const addedToastOwnerRef = useRef(null);
@@ -265,6 +265,16 @@ export default function App() {
     setAddedToast({ name: f.fullName, phase: "saved" });
     addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
   }
+  // Escritura RECHAZADA por la nube (permiso, token vencido, sin conexión…).
+  // El toast pasa a "error" HONESTO en vez de quedarse en "guardando" y saltar
+  // a un "pendiente" que promete falsamente "se completará solo". Corta el
+  // timer de los 20s para que ese pendiente engañoso nunca aparezca. El
+  // registro sigue en el outbox: se reintenta al reconectar o reabrir la app.
+  function reportAddError(f) {
+    if (addedToastOwnerRef.current !== f.id) return;
+    clearTimeout(addedToastTimerRef.current);
+    setAddedToast({ name: f.fullName, phase: "error" });
+  }
   function addFighter(f) {
     let u;
     if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); }
@@ -289,7 +299,7 @@ export default function App() {
         addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
       }
     }
-    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), editF ? undefined : confirmSaved);
+    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), editF ? undefined : confirmSaved, editF ? undefined : reportAddError);
   }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
   function delFighter(id) {
@@ -305,7 +315,7 @@ export default function App() {
     clearTimeout(undoTimerRef.current); setUndoDelete(null);
     // El restaurado pasa a ser el dueño del toast: su confirmación se muestra.
     addedToastOwnerRef.current = f.id;
-    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
+    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved, reportAddError);
   }
   function cancel() { setEditF(null); setView("list"); }
 
@@ -515,16 +525,18 @@ export default function App() {
 
       {/* Toasts fijos (abajo al centro), visibles en cualquier vista y a
           cualquier altura del scroll. Se apilan si coinciden:
-          — verde: confirmación de peleador agregado;
-          — rojo: DESHACER un borrado (un toque errado en la papelera se
+          — alta (addedToast): ⏳ guardando → ✓ verde (confirmado) / ⏱️ ámbar
+            (tarda, sigue en curso) / ⚠️ rojo (rechazado — honesto, en cola);
+          — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
-        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "saved" ? "border-green-500/60" : addedToast.phase === "saving" ? "border-boxing-goldDim/70" : "border-amber-500/60")}>
-          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : "⏱️"}</span>
-          <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-cream" : "text-amber-300")}>
+        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "saved" ? "border-green-500/60" : addedToast.phase === "saving" ? "border-boxing-goldDim/70" : addedToast.phase === "error" ? "border-red-500/60" : "border-amber-500/60")}>
+          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : addedToast.phase === "error" ? "text-red-400" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : addedToast.phase === "error" ? "⚠️" : "⏱️"}</span>
+          <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-cream" : addedToast.phase === "error" ? "text-red-300" : "text-amber-300")}>
             {addedToast.phase === "saved" && <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
             {addedToast.phase === "saving" && <>Guardando a <b>{addedToast.name}</b> en la nube…</>}
             {addedToast.phase === "pending" && <>Guardando a <b>{addedToast.name}</b>… tarda más de lo normal, pero se completará solo. No cierres sesión.</>}
+            {addedToast.phase === "error" && <>No se pudo guardar a <b>{addedToast.name}</b> en la nube. Quedó en cola y se reintentará al reconectar o reabrir la app — revisa tu conexión o permisos.</>}
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}

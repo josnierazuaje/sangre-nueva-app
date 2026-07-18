@@ -207,8 +207,12 @@ function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !lo
 // `optimisticList` es el arreglo local ya actualizado; `onMerged(list)` recibe
 // la lista autoritativa fusionada del servidor (el llamador la normaliza);
 // `onCommitted(fighter)` avisa cuando la NUBE confirmó este upsert (para el
-// toast honesto y para sacar el registro del outbox).
-export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted) {
+// toast honesto y para sacar el registro del outbox); `onError(err)` avisa
+// cuando la escritura fue RECHAZADA (permiso denegado, token vencido, sin
+// conexión…) para que el toast diga la verdad en vez de prometer que "se
+// completará solo". El registro permanece en el outbox (no se saca) para que
+// el replay lo reintente al reconectar o reabrir la app.
+export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted, onError) {
   if (cloudIntended()) outboxPut(fighter);
   fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, merged => {
     // Confirmación real: el servidor devolvió la lista fusionada con el id.
@@ -217,7 +221,7 @@ export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted) 
       onCommitted?.(fighter);
     }
     onMerged(merged);
-  });
+  }, onError);
 }
 export function removeFighterTx(id, optimisticList, onMerged) {
   // Un borrado explícito cancela cualquier pendiente del mismo peleador (si
@@ -225,7 +229,7 @@ export function removeFighterTx(id, optimisticList, onMerged) {
   outboxRemove(id);
   fighterArrayTx(cur => applyRemoveFighter(cur, id), optimisticList, onMerged);
 }
-function fighterArrayTx(apply, optimisticList, onMerged) {
+function fighterArrayTx(apply, optimisticList, onMerged, onError) {
   const k = "bm_fighters_v4";
   localStorage.setItem(k, JSON.stringify(optimisticList));
   if (!FB.ready) return;
@@ -236,7 +240,12 @@ function fighterArrayTx(apply, optimisticList, onMerged) {
     return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
   }).then(res => {
     if (res.committed) onMerged(nodeToArray(res.snapshot.val()));
-  }).catch(e => reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e));
+  }).catch(e => {
+    reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e);
+    // Escritura rechazada: avisa al llamador para que el toast sea honesto. El
+    // pendiente NO se saca del outbox aquí (se reintenta en el próximo replay).
+    onError?.(e);
+  });
 }
 
 // ============================================
