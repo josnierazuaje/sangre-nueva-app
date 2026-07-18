@@ -137,7 +137,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         <button onClick={stopScan} type="button" className="absolute top-2 right-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "rgba(0,0,0,0.6)" }}>Cancelar</button>
         <p className="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/80">Apunta al código QR de la entrada</p>
       </div>}
-      {!scanning && <button onClick={startScan} type="button" className="w-full py-3.5 rounded-xl font-black text-white flex items-center justify-center gap-2 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#DC2626,#991B1B)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
+      {!scanning && <button onClick={startScan} type="button" className="btn-primary w-full py-3.5 rounded-xl font-black flex items-center justify-center gap-2" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
       {scanErr && <p className="text-red-400 text-xs text-center">{scanErr}</p>}
       <form onSubmit={search} className="rounded-xl p-4 space-y-3" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar manualmente</h3>

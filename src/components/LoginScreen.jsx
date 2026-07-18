@@ -39,7 +39,7 @@ export default function LoginScreen() {
           <input type="password" value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password" className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-base" /></div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
         {resetSent && <p className="text-green-400 text-xs">Te enviamos un correo para restablecer tu contraseña.</p>}
-        <button type="submit" disabled={loading} className="w-full bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream py-3.5 transition-colors active:scale-[0.98] disabled:opacity-60" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "20px", letterSpacing: "0.1em" }}>
+        <button type="submit" disabled={loading} className="btn-primary w-full py-3.5" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "20px", letterSpacing: "0.1em" }}>
           {loading ? "Entrando..." : "Iniciar Sesión"}
         </button>
         <button type="button" onClick={resetPw} className="w-full text-center text-boxing-muted text-xs tracking-wide hover:text-boxing-goldFight transition-colors">¿Olvidaste tu contraseña?</button>

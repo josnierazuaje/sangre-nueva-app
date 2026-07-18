@@ -143,7 +143,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
       </div>}
 
       {/* Botón Sorteo destacado */}
-      <button onClick={runSorteo} disabled={sorting} className={"w-full lg:max-w-xl lg:mx-auto py-4 font-black text-lg tracking-widest flex items-center justify-center gap-3 transition-all " + (sorting ? "bg-boxing-crimson/60 border border-red-500/50 text-red-300 cursor-not-allowed" : "bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream border border-red-500/30 active:scale-95")} style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
+      <button onClick={runSorteo} disabled={sorting} className={"btn-primary w-full lg:max-w-xl lg:mx-auto py-4 font-black text-lg tracking-widest flex items-center justify-center gap-3" + (sorting ? " cursor-not-allowed" : "")} style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
         {sorting
           ? <>EMPAREJANDO...</>
           : <>EMPAREJAMIENTO</>

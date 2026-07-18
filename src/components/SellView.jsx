@@ -57,8 +57,8 @@ export default function SellView({ onAdd }) {
             ))}
           </div>
         </div>
-        <button type="submit" disabled={submitting} className="w-full py-3.5 rounded-xl font-black text-white transition-all active:scale-95 disabled:opacity-60"
-          style={{ background: "linear-gradient(135deg,#DC2626,#991B1B)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px" }}>
+        <button type="submit" disabled={submitting} className="btn-primary w-full py-3.5 rounded-xl font-black"
+          style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px" }}>
           {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
         </button>
       </form>
