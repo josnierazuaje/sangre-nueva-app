@@ -155,6 +155,49 @@ export async function fetchCloudArray(key) {
   }
 }
 
+// ============================================
+// OUTBOX de peleadores — escrituras que SOBREVIVEN a la recarga
+// ============================================
+// El alta/edición escribe local al instante y a Firebase en segundo plano
+// (transacción). Si la página se recarga antes del commit —el flujo típico:
+// registrar y "actualizar la app" por la PWA— la transacción MUERE con la
+// página, la nube nunca recibe el registro y la sincronización (remota gana)
+// lo borra de lo local: pérdida silenciosa. El outbox cierra ese hueco: cada
+// upsert se anota como PENDIENTE y solo sale cuando la nube CONFIRMA el
+// commit; al arrancar la app, los pendientes se re-suben solos (replay).
+// Como el upsert fusiona por id contra el servidor, el replay es idempotente.
+const OUTBOX_KEY = "bm_fighters_outbox";
+// Vida útil de un pendiente: tras 48h sin poder confirmarse se descarta (evita
+// resucitar registros muy viejos, p.ej. eliminados desde otro dispositivo).
+export const OUTBOX_TTL_MS = 48 * 60 * 60 * 1000;
+
+// Puras y testeables (la lista viaja como argumento):
+export function applyOutboxPut(list, fighter, now) {
+  const L = (Array.isArray(list) ? list : []).filter(x => x && x.id !== fighter.id);
+  return [...L, { ...fighter, _queuedAt: now }];
+}
+export function applyOutboxRemove(list, id) {
+  return (Array.isArray(list) ? list : []).filter(x => x && x.id !== id);
+}
+export function pruneOutbox(list, now) {
+  return (Array.isArray(list) ? list : []).filter(x => x && typeof x._queuedAt === "number" && now - x._queuedAt < OUTBOX_TTL_MS);
+}
+// Fusiona los pendientes sobre una lista de peleadores (por id, quitando la
+// marca interna _queuedAt). Lo usa el replay para el estado optimista.
+export function mergePending(fighters, pending) {
+  let u = Array.isArray(fighters) ? fighters : [];
+  (pending || []).forEach(p => { const { _queuedAt, ...f } = p; u = applyUpsertFighter(u, f); });
+  return u;
+}
+
+// Envolturas sobre localStorage:
+export function outboxList() { return pruneOutbox(load(OUTBOX_KEY, []), Date.now()); }
+function outboxPut(f) { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(OUTBOX_KEY, []), f, Date.now()))); }
+function outboxRemove(id) { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
+// ¿Este dispositivo usa la nube? (misma condición con la que App decide el
+// modo). En modo solo-local el outbox no aplica: no hay nube que confirme.
+function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")); }
+
 // Alta/edición y baja de peleadores de forma TRANSACCIONAL: la fusión (por id)
 // se aplica sobre el estado más fresco del servidor dentro de runTransaction,
 // no sobre el arreglo local que puede estar atrasado. Así, el día del pesaje
@@ -162,11 +205,24 @@ export async function fetchCloudArray(key) {
 // desaparece porque otro dispositivo guardó su propia copia encima. Actualiza
 // localStorage de inmediato (optimista) y avisa el resultado real al confirmar.
 // `optimisticList` es el arreglo local ya actualizado; `onMerged(list)` recibe
-// la lista autoritativa fusionada del servidor (el llamador la normaliza).
-export function upsertFighterTx(fighter, optimisticList, onMerged) {
-  fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, onMerged);
+// la lista autoritativa fusionada del servidor (el llamador la normaliza);
+// `onCommitted(fighter)` avisa cuando la NUBE confirmó este upsert (para el
+// toast honesto y para sacar el registro del outbox).
+export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted) {
+  if (cloudIntended()) outboxPut(fighter);
+  fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, merged => {
+    // Confirmación real: el servidor devolvió la lista fusionada con el id.
+    if (merged.some(x => x && x.id === fighter.id)) {
+      outboxRemove(fighter.id);
+      onCommitted?.(fighter);
+    }
+    onMerged(merged);
+  });
 }
 export function removeFighterTx(id, optimisticList, onMerged) {
+  // Un borrado explícito cancela cualquier pendiente del mismo peleador (si
+  // no, el replay lo resucitaría después de eliminarlo).
+  outboxRemove(id);
   fighterArrayTx(cur => applyRemoveFighter(cur, id), optimisticList, onMerged);
 }
 function fighterArrayTx(apply, optimisticList, onMerged) {

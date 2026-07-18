@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
@@ -192,12 +192,38 @@ export default function App() {
     fetchCloudArray("bm_fighters_v4").then(cloud => {
       // stripLocalGhosts NO quita nada si la nube es nula o vacía (seguridad).
       const { removedIds } = stripLocalGhosts(fighters, cloud);
-      if (!removedIds.length) return;
-      const ghostIds = new Set(removedIds); // solo estos ids (un alta posterior NO se toca)
+      // Los PENDIENTES del outbox no son fantasmas: son escrituras aún no
+      // confirmadas que el replay va a re-subir — jamás se eliminan aquí.
+      const pendingIds = new Set(outboxList().map(x => x.id));
+      const ghostIds = new Set(removedIds.filter(id => !pendingIds.has(id)));
+      if (!ghostIds.size) return;
       setFighters(prev => normalizeFighters(prev.filter(f => !ghostIds.has(f.id))));
       const cur = load("bm_fighters_v4", []);
       localStorage.setItem("bm_fighters_v4", JSON.stringify(cur.filter(f => f && !ghostIds.has(f.id))));
       console.info("Auto-reparo: se quitaron " + ghostIds.size + " registro(s) local(es) que no estaban en la nube.");
+    });
+  }, [cloudMode, hydrated.fighters]);
+
+  // REPLAY del outbox: al conectar (tras recibir el primer valor de la nube),
+  // re-sube los registros que quedaron PENDIENTES de confirmación — el caso
+  // típico: se registró un peleador y la app se recargó con la escritura en
+  // vuelo (la transacción muere con la página y la nube nunca lo recibió).
+  // upsertFighterTx fusiona por id contra el servidor, así el replay es
+  // idempotente: si el registro sí alcanzó a llegar, solo lo re-confirma.
+  const outboxReplayDoneRef = useRef(false);
+  useEffect(() => {
+    if (outboxReplayDoneRef.current) return;
+    if (cloudMode !== true || !hydrated.fighters) return;
+    outboxReplayDoneRef.current = true;
+    const pending = outboxList();
+    if (!pending.length) return;
+    console.info("Recuperando " + pending.length + " registro(s) pendiente(s) de guardar en la nube…");
+    const u = normalizeFighters(mergePending(load("bm_fighters_v4", []), pending));
+    setFighters(u);
+    localStorage.setItem("bm_fighters_v4", JSON.stringify(u));
+    pending.forEach(p => {
+      const { _queuedAt, ...f } = p;
+      upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
     });
   }, [cloudMode, hydrated.fighters]);
 
@@ -215,18 +241,35 @@ export default function App() {
   // Alta/edición y baja escriben de forma transaccional (fusión por id contra
   // el servidor) para no pisar peleadores que otro dispositivo registró a la
   // vez; onMerged aplica la lista autoritativa ya fusionada.
+  // Toast HONESTO de guardado: verde solo cuando la NUBE confirmó el commit
+  // (antes salía verde de inmediato y, si la escritura moría —p.ej. recargando
+  // la app justo después—, confirmaba un guardado que nunca ocurrió).
+  function confirmSaved(f) {
+    clearTimeout(addedToastTimerRef.current);
+    setAddedToast({ name: f.fullName, phase: "saved" });
+    addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
+  }
   function addFighter(f) {
     let u;
     if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); }
     else {
       u = [...fighters, f];
-      // Toast verde de confirmación (6s), visible aunque el banner del
-      // formulario quede fuera de vista.
       clearTimeout(addedToastTimerRef.current);
-      setAddedToast(f.fullName);
-      addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
+      if (cloudMode === true) {
+        // "Guardando…" hasta la confirmación real (confirmSaved). Si en 12s no
+        // confirma, pasa a "pendiente": el outbox lo re-sube solo, incluso si
+        // se recarga la app.
+        setAddedToast({ name: f.fullName, phase: "saving" });
+        addedToastTimerRef.current = setTimeout(() => {
+          setAddedToast(t => t && t.phase === "saving" ? { ...t, phase: "pending" } : t);
+        }, 12000);
+      } else {
+        // Modo solo-local: no hay nube que confirmar, lo local es la verdad.
+        setAddedToast({ name: f.fullName, phase: "saved" });
+        addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
+      }
     }
-    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)));
+    setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), editF ? undefined : confirmSaved);
   }
   function editFighter(f) { setEditF(f); setView("register"); window.scrollTo(0, 0); }
   function delFighter(id) {
@@ -240,7 +283,7 @@ export default function App() {
   function undoLastDelete() {
     const f = undoDelete; if (!f) return;
     clearTimeout(undoTimerRef.current); setUndoDelete(null);
-    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)));
+    const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
   }
   function cancel() { setEditF(null); setView("list"); }
 
@@ -454,9 +497,13 @@ export default function App() {
           — rojo: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
-        {addedToast && <div className="flex items-center gap-3 bg-boxing-panel border border-green-500/60 shadow-lg px-4 py-3 fade-in">
-          <span className="text-green-400 text-lg leading-none">✓</span>
-          <span className="text-green-400 text-sm font-semibold flex-1 min-w-0 truncate"><b>{addedToast}</b> fue agregado a la base de datos</span>
+        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "saved" ? "border-green-500/60" : addedToast.phase === "saving" ? "border-boxing-goldDim/70" : "border-amber-500/60")}>
+          <span className={"text-lg leading-none " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-goldFight" : "text-amber-400")}>{addedToast.phase === "saved" ? "✓" : addedToast.phase === "saving" ? "⏳" : "⚠️"}</span>
+          <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "saved" ? "text-green-400" : addedToast.phase === "saving" ? "text-boxing-cream" : "text-amber-300")}>
+            {addedToast.phase === "saved" && <><b>{addedToast.name}</b> fue guardado en la base de datos</>}
+            {addedToast.phase === "saving" && <>Guardando a <b>{addedToast.name}</b> en la nube…</>}
+            {addedToast.phase === "pending" && <><b>{addedToast.name}</b> quedó pendiente — se guardará automáticamente al reconectar. No cierres sesión.</>}
+          </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
         {undoDelete && <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3 fade-in">

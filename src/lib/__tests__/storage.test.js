@@ -1,9 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, OUTBOX_TTL_MS } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
 const C = { id: "c", fullName: "Caro" };
+
+describe("outbox de peleadores (escrituras que sobreviven a la recarga)", () => {
+  const now = 1_000_000;
+  it("applyOutboxPut agrega con marca de tiempo y reemplaza por id (sin duplicar)", () => {
+    let l = applyOutboxPut([], A, now);
+    expect(l).toHaveLength(1);
+    expect(l[0]._queuedAt).toBe(now);
+    l = applyOutboxPut(l, { ...A, fullName: "Ana v2" }, now + 5);
+    expect(l).toHaveLength(1);
+    expect(l[0].fullName).toBe("Ana v2");
+    l = applyOutboxPut(l, B, now + 10);
+    expect(l).toHaveLength(2);
+  });
+  it("applyOutboxRemove quita solo el id confirmado", () => {
+    const l = applyOutboxPut(applyOutboxPut([], A, now), B, now);
+    expect(applyOutboxRemove(l, A.id).map(x => x.id)).toEqual([B.id]);
+  });
+  it("pruneOutbox descarta pendientes más viejos que el TTL (48h) y sin marca", () => {
+    const fresh = { ...A, _queuedAt: now };
+    const stale = { ...B, _queuedAt: now - OUTBOX_TTL_MS - 1 };
+    const sinMarca = { ...C };
+    expect(pruneOutbox([fresh, stale, sinMarca], now).map(x => x.id)).toEqual([A.id]);
+  });
+  it("mergePending fusiona por id sobre la lista (sin _queuedAt) y agrega los nuevos", () => {
+    const pending = [{ ...B, fullName: "Beto pendiente", _queuedAt: now }, { ...C, _queuedAt: now }];
+    const merged = mergePending([A, B], pending);
+    expect(merged).toHaveLength(3);
+    const beto = merged.find(x => x.id === B.id);
+    expect(beto.fullName).toBe("Beto pendiente");
+    expect(beto._queuedAt).toBeUndefined();
+  });
+  it("SEGURIDAD: mergePending con listas nulas no explota", () => {
+    expect(mergePending(null, null)).toEqual([]);
+    expect(mergePending([A], null)).toEqual([A]);
+  });
+});
 
 describe("stripLocalGhosts (auto-reparo)", () => {
   it("quita el registro local cuyo id NO está en la nube (fantasma)", () => {
