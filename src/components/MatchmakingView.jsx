@@ -6,6 +6,7 @@ import { super4FighterIds } from "../lib/super4.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import Badge from "./Badge.jsx";
 import VSCard from "./VSCard.jsx";
+import PageHeader from "./PageHeader.jsx";
 
 // ============================================
 // MATCHMAKING VIEW
@@ -98,13 +99,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   if (elegibles.length < 2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Necesitas al menos 2 peleadores fuera del Super 4</p></div>;
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-3 text-boxing-cream" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "26px", letterSpacing: "0.05em" }}>
-          <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
-          Emparejamientos
-        </h2>
-        <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>
-      </div>
+      <PageHeader kicker="Armado de peleas" title="Emparejamientos" right={<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>} />
 
       {/* Peleas IMPOSIBLES (rival eliminado / atleta en el Super 4): sin criterio humano posible, se quitan de un toque */}
       {conflicts.huerfanas.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">

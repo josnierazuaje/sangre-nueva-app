@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { getWeightCategory, getCategoryInfo, getExperienceLevel, getExperienceInfo, getAgeCategory, weightRangeLabel, guessGenderFromName, genId } from "../constants.js";
 import { normName } from "../lib/dedup.js";
 import Badge from "./Badge.jsx";
+import PageHeader from "./PageHeader.jsx";
 
 // Pone en mayúscula la primera letra de cada palabra al escribir (juan perez
 // → Juan Perez), sin tocar el resto de las letras ni forzar minúsculas.
@@ -114,10 +115,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
     // En escritorio el formulario se centra con un ancho cómodo (los campos
     // no se estiran a todo el ancho de la pantalla) y gana algo de respiro.
     <form ref={formRef} onSubmit={submit} className="space-y-4 bg-boxing-panel border border-boxing-line p-5 lg:max-w-2xl lg:mx-auto lg:p-8">
-      <h2 className="flex items-center gap-3 text-boxing-cream" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "26px", letterSpacing: "0.05em" }}>
-        <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
-        {editingFighter ? "Editar" : "Agregar"} Peleador
-      </h2>
+      <PageHeader kicker={editingFighter ? "Editar registro" : "Nuevo registro"} title={editingFighter ? "Editar Peleador" : "Agregar Peleador"} />
       {addedName && <div className="bg-green-900/20 border border-green-500/40 px-3 py-2.5 fade-in flex items-center gap-2">
         <span className="text-green-400 text-lg">✓</span>
         <span className="text-green-400 text-sm font-semibold">{addedName} fue agregado correctamente a la cartelera</span>

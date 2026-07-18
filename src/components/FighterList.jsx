@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, FECHIBOX_LABEL, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
 import Badge from "./Badge.jsx";
+import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
 import { normName } from "../lib/dedup.js";
 
@@ -110,10 +111,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   if (!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
   return (
     <div className="space-y-3">
-      <h2 className="flex items-center gap-3 text-boxing-cream" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "26px", letterSpacing: "0.05em" }}>
-        <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
-        Peleadores <span className="text-boxing-goldFight">({fighters.length})</span>
-      </h2>
+      <PageHeader kicker="Base de datos de atletas" title="Peleadores" count={fighters.length} />
       <div className="flex flex-wrap gap-2">
         <button onClick={verTodos} className="flex-shrink-0 flex flex-col items-center px-3 py-1.5 border bg-black transition-colors min-w-[64px]" style={{ borderColor: sinFiltros ? "#E5C76B" : "#E5C76B40" }}>
           <span className="text-sm font-bold leading-none" style={{ color: "#E5C76B" }}>{fighters.length}</span>

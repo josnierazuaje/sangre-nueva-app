@@ -4,6 +4,7 @@ import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode } from "
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
+import PageHeader from "./PageHeader.jsx";
 
 export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken }) {
   const [subView, setSubView] = useState(initialTicketCode ? "checkin" : "sell");
@@ -48,7 +49,7 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     // En escritorio se centra con un ancho controlado: los KPIs y las
     // sub-vistas (vender/historial/check-in) no se estiran de más.
     <div className="space-y-4 lg:max-w-4xl lg:mx-auto">
-      <h2 className="text-xl font-black text-white" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>🎫 ENTRADAS</h2>
+      <PageHeader kicker="Boletería" title="Entradas" />
       <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <div className="flex justify-between items-center">
           <span className="text-[11px] text-gray-400 uppercase tracking-wider">Capacidad</span>

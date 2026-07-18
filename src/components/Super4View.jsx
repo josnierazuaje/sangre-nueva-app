@@ -4,6 +4,7 @@ import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weight
 import { dupKey, normName } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
+import PageHeader from "./PageHeader.jsx";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
@@ -287,13 +288,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-3 text-boxing-cream" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "26px", letterSpacing: "0.05em" }}>
-          <span style={{ width: "4px", height: "26px", background: "#c42438", display: "block", flexShrink: 0 }} />
-          Super 4 {"🏆"}
-        </h2>
-        <span className="text-[10px] text-boxing-muted tracking-widest uppercase">{super4.length} llave{super4.length !== 1 ? "s" : ""}</span>
-      </div>
+      <PageHeader kicker="Torneo por cinturón" title="Super 4" right={<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{super4.length} llave{super4.length !== 1 ? "s" : ""}</span>} />
 
       {/* Móvil y lg (1024–1279px): una sola columna a todo el ancho, como
           siempre. El split en dos columnas (controles + llaves) se activa solo

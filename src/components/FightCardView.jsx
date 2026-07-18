@@ -2,6 +2,7 @@ import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
 import { buildCarteleraHtml } from "../lib/printCartelera.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
+import PageHeader from "./PageHeader.jsx";
 
 // ============================================
 // FIGHT CARD VIEW
@@ -44,7 +45,7 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
     // En escritorio la cartelera es un "póster" secuencial: se centra con un
     // ancho cómodo de lectura en vez de estirarse a todo el ancho.
     <div className="space-y-4 lg:max-w-3xl lg:mx-auto">
-      <h2 className="text-xl font-bold text-white">Cartelera</h2>
+      <PageHeader kicker="Planilla oficial del evento" title="Cartelera" count={matchups.length} />
       <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-xl border border-gray-700 overflow-hidden">
         <div className="bg-gradient-to-r from-red-800 via-yellow-700 to-red-800 p-4 text-center"><h3 className="text-2xl font-black text-white uppercase tracking-wider">{"\u{1F94A}"} Sangre Nueva — La Velada</h3><p className="text-yellow-200 text-sm mt-1 capitalize">{eventDate}</p><p className="text-white/60 text-xs">{matchups.length} Peleas</p></div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
