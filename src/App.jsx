@@ -50,6 +50,12 @@ export default function App() {
   // pasar desapercibida).
   const [addedToast, setAddedToast] = useState(null);
   const addedToastTimerRef = useRef(null);
+  // Dueño actual del toast de alta (id del último peleador agregado). El slot
+  // y su timer son únicos: sin este guard, la confirmación de un alta ANTERIOR
+  // pisaría el "Guardando…" del alta más reciente y le robaría el timer de 12s
+  // que vigila el aviso de "quedó pendiente" (registrando de corrido con
+  // conexión intermitente, el último registro jamás mostraría su estado real).
+  const addedToastOwnerRef = useRef(null);
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -223,6 +229,9 @@ export default function App() {
     localStorage.setItem("bm_fighters_v4", JSON.stringify(u));
     pending.forEach(p => {
       const { _queuedAt, ...f } = p;
+      // El último pendiente queda como dueño del toast: al confirmarse se ve
+      // el "✓ guardado" de la recuperación (los demás confirman en silencio).
+      addedToastOwnerRef.current = f.id;
       upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
     });
   }, [cloudMode, hydrated.fighters]);
@@ -245,6 +254,9 @@ export default function App() {
   // (antes salía verde de inmediato y, si la escritura moría —p.ej. recargando
   // la app justo después—, confirmaba un guardado que nunca ocurrió).
   function confirmSaved(f) {
+    // Solo el DUEÑO del toast lo actualiza: las confirmaciones de altas
+    // anteriores son silenciosas (su salida del outbox ya ocurrió en storage).
+    if (addedToastOwnerRef.current !== f.id) return;
     clearTimeout(addedToastTimerRef.current);
     setAddedToast({ name: f.fullName, phase: "saved" });
     addedToastTimerRef.current = setTimeout(() => setAddedToast(null), 6000);
@@ -254,6 +266,7 @@ export default function App() {
     if (editF) { u = fighters.map(x => x.id === f.id ? f : x); setEditF(null); setView("list"); }
     else {
       u = [...fighters, f];
+      addedToastOwnerRef.current = f.id;
       clearTimeout(addedToastTimerRef.current);
       if (cloudMode === true) {
         // "Guardando…" hasta la confirmación real (confirmSaved). Si en 12s no
@@ -283,6 +296,8 @@ export default function App() {
   function undoLastDelete() {
     const f = undoDelete; if (!f) return;
     clearTimeout(undoTimerRef.current); setUndoDelete(null);
+    // El restaurado pasa a ser el dueño del toast: su confirmación se muestra.
+    addedToastOwnerRef.current = f.id;
     const u = [...fighters, f]; setFighters(u); upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved);
   }
   function cancel() { setEditF(null); setView("list"); }

@@ -427,6 +427,13 @@ export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); 
 export function clearLocalEventData() {
   Object.keys(SYNC_KEYS).forEach(k => localStorage.removeItem(k));
   localStorage.removeItem("bm_tickets_v4");
+  // También los PENDIENTES del outbox: traen datos de peleadores (incluye
+  // menores) y no deben quedar legibles sin login. Además, "Recargar desde la
+  // nube" usa esta misma limpieza como reparación de un clic: si el outbox
+  // sobreviviera, el replay re-fusionaría justo el registro que se intentaba
+  // purgar, y un pendiente encolado por una cuenta podría terminar re-subido
+  // por la cuenta que inicie sesión después.
+  localStorage.removeItem(OUTBOX_KEY);
 }
 
 // ============================================
