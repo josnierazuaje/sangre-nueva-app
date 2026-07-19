@@ -402,9 +402,12 @@ export default function App() {
     { label: "Reiniciar evento", danger: true, run: resetEvent },
   ];
   const menuItemCls = (danger) => "block w-full text-left text-[11px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");
-  // Botón de sincronización (☁): mismas clases y texto en móvil y escritorio.
-  const syncBtnCls = "text-[10px] px-2 py-0.5 border font-semibold tracking-widest uppercase transition-colors " + (sync === "on" ? "text-green-400 border-green-500/40" : sync === "connecting" ? "text-yellow-400 border-yellow-500/40" : sync === "error" ? "text-red-400 border-red-500/40" : "text-gray-500 border-gray-600 hover:text-boxing-goldFight hover:border-boxing-goldDim");
-  const syncLabel = sync === "on" ? "☁ Sincronizado" : sync === "connecting" ? "☁ Conectando…" : sync === "error" ? "☁ Error" : "☁ Nube";
+  // Botón de sincronización: píldora con punto de estado vivo (verde pulsa
+  // lento = sincronizado; naranja pulsa rápido = conectando; la urgencia se
+  // comunica con ritmo, no con más resplandor). Mismo look en móvil y escritorio.
+  const syncBtnCls = "flex items-center justify-center gap-1.5 text-[10px] px-3 py-1 rounded-full border font-semibold tracking-[0.18em] uppercase transition-colors " + (sync === "on" ? "text-green-400/80 border-green-500/25" : sync === "connecting" ? "text-yellow-400/90 border-yellow-500/30" : sync === "error" ? "text-red-400 border-red-500/40" : "text-gray-500 border-gray-600/60 hover:text-boxing-goldFight hover:border-boxing-goldDim");
+  const syncDot = <span aria-hidden="true" className={"punto-vivo" + (sync === "connecting" ? " alerta" : sync === "on" ? "" : " apagado")} style={sync === "error" ? { background: "#DC2626", animation: "none" } : undefined} />;
+  const syncLabel = <>{syncDot}{sync === "on" ? "Sincronizado" : sync === "connecting" ? "Conectando…" : sync === "error" ? "Error" : "Nube"}</>;
 
   if (authUser === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em" }}>Cargando…</div>;
   if (authUser === null) return <LoginScreen />;
@@ -414,34 +417,35 @@ export default function App() {
     // siempre. Escritorio (lg, ≥1024px): la app ocupa todo el ancho y se
     // reparte en fila — sidebar fijo a la izquierda + contenido fluido.
     <div className="app-root max-w-[512px] mx-auto flex flex-col overflow-hidden lg:max-w-none lg:flex-row">
-      {/* ===== Sidebar de escritorio (≥1024px) — no existe en móvil ===== */}
-      <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 border-r border-boxing-line relative overflow-hidden" style={{ background: "rgba(16,13,16,0.55)" }}>
-        <div style={{ position: "absolute", top: "-60px", left: "50%", transform: "translateX(-50%)", width: "300px", height: "180px", background: "radial-gradient(ellipse, rgba(155,26,42,0.22) 0%, transparent 70%)", pointerEvents: "none" }} />
-        <div className="flex flex-col items-center pt-7 pb-5 gap-1 border-b border-boxing-line" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "10px", fontWeight: 600, letterSpacing: "0.35em", color: "#c8a04a", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
-          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "72px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200,160,74,0.35))", marginTop: "4px" }} />
+      {/* ===== Sidebar de escritorio (≥1024px) — no existe en móvil =====
+          Rediseño: cristal ahumado (.side-frost, con filo de oro en el borde
+          derecho) y el ítem activo como ÚNICO glow del chrome (.nav-lado.on). */}
+      <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 relative side-frost">
+        <div className="flex flex-col items-center pt-7 pb-5 gap-1" style={{ position: "relative" }}>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "10px", fontWeight: 600, letterSpacing: "0.35em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "72px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))", marginTop: "4px" }} />
           <div className="text-center leading-none" style={{ marginTop: "2px" }}>
-            <div style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "26px", letterSpacing: "0.04em", color: "#e8ddd0", lineHeight: 1 }}>SANGRE NUEVA</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "14px", color: "#c8a04a", letterSpacing: "0.15em", marginTop: "3px" }}>La Velada</div>
+            <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "26px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "14px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "3px" }}>La Velada</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
-            <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg,transparent,#8a6d2f)" }} />
-            <div style={{ width: "4px", height: "4px", background: "#c8a04a", transform: "rotate(45deg)" }} />
-            <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg,#8a6d2f,transparent)" }} />
+            <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg,transparent,rgba(200,160,74,0.4))" }} />
+            <div style={{ width: "5px", height: "5px", background: "#c8a04a", transform: "rotate(45deg)", borderRadius: "1px", boxShadow: "0 0 8px rgba(229,199,107,0.6)" }} />
+            <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg,rgba(200,160,74,0.4),transparent)" }} />
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {NAV_ITEMS.map(it => (
-            <button key={it.key} onClick={() => go(it.key)} className={"w-full flex items-center gap-3 px-3.5 py-2.5 text-left border-l-2 transition-colors " + (view === it.key ? "border-boxing-crimsonLight bg-white/5 text-boxing-goldFight" : "border-transparent text-boxing-muted hover:text-gray-300 hover:bg-white/5")}>
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={it.d} /></svg>
-              <span className="text-[13px] font-semibold tracking-[0.15em] uppercase">{it.label}</span>
+            <button key={it.key} onClick={() => go(it.key)} className={"nav-lado" + (view === it.key ? " on" : "")}>
+              <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={it.d} /></svg>
+              <span>{it.label}</span>
             </button>
           ))}
         </nav>
-        <div className="flex-shrink-0 border-t border-boxing-line p-3 space-y-2" style={{ position: "relative" }}>
-          <button onClick={editEventLabel} title="Tocar para editar" className="w-full flex items-center justify-center gap-2 py-1.5 px-2 border border-boxing-line bg-black/30 hover:border-boxing-goldDim transition-colors">
-            <svg className="w-3 h-3 text-boxing-goldFight flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            <span className="text-[10px] text-boxing-goldFight font-bold tracking-wide truncate">{eventLabel}</span>
+        <div className="flex-shrink-0 p-3 space-y-2" style={{ position: "relative" }}>
+          <button onClick={editEventLabel} title="Tocar para editar" className="chip-fantasma w-full">
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <span className="truncate">{eventLabel}</span>
           </button>
           <div className="flex items-center gap-1.5">
             <button onClick={toggleSync} className={"flex-1 text-center " + syncBtnCls}>{syncLabel}</button>
@@ -449,7 +453,7 @@ export default function App() {
               <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-boxing-goldFight hover:bg-white/5 w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
               {menuOpen && <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 bottom-8 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[130px] shadow-lg">
+                <div className="absolute right-0 bottom-8 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[130px] shadow-lg rounded-xl overflow-hidden">
                   {menuActions.map(a => <button key={a.label} onClick={() => { setMenuOpen(false); a.run(); }} className={menuItemCls(a.danger)}>{a.label}</button>)}
                   <div className="border-t border-boxing-line my-1" />
                   <button onClick={() => { setMenuOpen(false); logout(); }} className={menuItemCls(true)}>Cerrar sesión</button>
@@ -473,7 +477,7 @@ export default function App() {
               <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-500 hover:text-boxing-goldFight hover:bg-white/5 w-6 h-6 flex items-center justify-center transition-colors">⋮</button>
               {menuOpen && <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-7 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[110px] shadow-lg">
+                <div className="absolute right-0 top-7 z-20 bg-boxing-panel border border-boxing-line py-1 min-w-[110px] shadow-lg rounded-xl overflow-hidden">
                   {menuActions.map(a => <button key={a.label} onClick={() => { setMenuOpen(false); a.run(); }} className={menuItemCls(a.danger)}>{a.label}</button>)}
                   <div className="border-t border-boxing-line my-1" />
                   <button onClick={() => { setMenuOpen(false); logout(); }} className={menuItemCls(true)}>Cerrar sesión</button>
@@ -484,16 +488,16 @@ export default function App() {
           </div>
         </div>
         <div className="flex flex-col items-center pb-4 pt-2 gap-1" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "11px", fontWeight: 600, letterSpacing: "0.4em", color: "#c8a04a", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
-          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "88px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200,160,74,0.35))", marginTop: "4px" }} />
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "11px", fontWeight: 600, letterSpacing: "0.4em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "88px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))", marginTop: "4px" }} />
           <div className="text-center leading-none" style={{ marginTop: "2px" }}>
-            <div style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "32px", letterSpacing: "0.04em", color: "#e8ddd0", lineHeight: 1 }}>SANGRE NUEVA</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "16px", color: "#c8a04a", letterSpacing: "0.15em", marginTop: "4px" }}>La Velada</div>
+            <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "32px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "16px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "4px" }}>La Velada</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "10px" }}>
-            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,transparent,#8a6d2f)" }} />
-            <div style={{ width: "5px", height: "5px", background: "#c8a04a", transform: "rotate(45deg)" }} />
-            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,#8a6d2f,transparent)" }} />
+            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,transparent,rgba(200,160,74,0.4))" }} />
+            <div style={{ width: "5px", height: "5px", background: "#c8a04a", transform: "rotate(45deg)", borderRadius: "1px", boxShadow: "0 0 8px rgba(229,199,107,0.6)" }} />
+            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,rgba(200,160,74,0.4),transparent)" }} />
           </div>
         </div>
       </header>
@@ -543,7 +547,7 @@ export default function App() {
           — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
-        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border " + (addedToast.phase === "error" ? "border-red-500/60" : "border-green-500/60")}>
+        {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border rounded-2xl " + (addedToast.phase === "error" ? "border-red-500/60" : "border-green-500/60")} style={{ boxShadow: addedToast.phase === "error" ? "0 0 24px rgba(220,38,38,0.25)" : "0 0 24px rgba(34,197,94,0.2)" }}>
           <span className={"text-lg leading-none " + (addedToast.phase === "error" ? "text-red-400" : "text-green-400")}>{addedToast.phase === "error" ? "⚠️" : "✓"}</span>
           <span className={"text-sm font-semibold flex-1 min-w-0 " + (addedToast.phase === "error" ? "text-red-300" : "text-green-400")}>
             {addedToast.phase === "error"
@@ -552,10 +556,10 @@ export default function App() {
           </span>
           <button onClick={() => { clearTimeout(addedToastTimerRef.current); setAddedToast(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
-        {undoDelete && <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3 fade-in">
+        {undoDelete && <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3 fade-in rounded-2xl" style={{ boxShadow: "0 0 24px rgba(220,38,38,0.25)" }}>
           <span className="text-red-400 text-lg leading-none">🗑️</span>
           <span className="text-boxing-cream text-sm flex-1 min-w-0 truncate">Eliminaste a <b className="text-boxing-cream">{undoDelete.fullName}</b></span>
-          <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-xs font-bold tracking-widest uppercase transition-colors">Deshacer</button>
+          <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 rounded-full bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-xs font-bold tracking-widest uppercase transition-colors">Deshacer</button>
           <button onClick={() => { clearTimeout(undoTimerRef.current); setUndoDelete(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
       </div>}
