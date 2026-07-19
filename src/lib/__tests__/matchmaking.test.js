@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, experienceOk } from "../matchmaking.js";
-import { getWeightCategory, getCategoryInfo } from "../../constants.js";
+import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, bestMatchAll, experienceOk } from "../matchmaking.js";
+import { getWeightCategory, getCategoryInfo, getAgeCategory } from "../../constants.js";
 
 function makeFighter(overrides) {
   const weightKg = overrides.weightKg ?? 60;
@@ -343,5 +343,97 @@ describe("regla dura: diferencia de experiencia (máx 3 peleas, salvo ambos pro 
       makeFighter({ id: "pro", age: 18, weightKg: 60, gym: "Carlos Molina", fightCount: 15, experienceLevel: "profesional" }),
     ];
     for (let i = 0; i < 30; i++) expect(sorteoMatch(fighters).length).toBe(0);
+  });
+});
+
+describe("bestMatchAll — el único botón (fusión justa de Auto VS + sorteo)", () => {
+  // Verificador de que un reparto NUNCA rompe una regla dura. Vale para
+  // cualquier salida, sea del pase determinista o de una corrida aleatoria.
+  const noHardRuleViolations = (fighters, matchups) => {
+    allMatchedPairs(fighters, matchups).forEach(([a, b]) => {
+      expect(a && b).toBeTruthy();
+      expect(getAgeCategory(a.age).key).toBe(getAgeCategory(b.age).key); // edad World Boxing
+      expect(a.sexo || "M").toBe(b.sexo || "M"); // sexo
+      expect((a.gym || "").trim().toLowerCase()).not.toBe((b.gym || "").trim().toLowerCase()); // escuela
+      expect(experienceOk(a, b)).toBe(true); // máx 3 peleas (salvo ambos pro 15+)
+    });
+  };
+
+  it("nunca rompe una regla dura, sobre un universo variado y en muchas corridas", () => {
+    const fighters = [
+      makeFighter({ id: "a", age: 15, weightKg: 50, gym: "Escuela A", fightCount: 2, experienceLevel: "principiante" }),
+      makeFighter({ id: "b", age: 16, weightKg: 51, gym: "Escuela B", fightCount: 3, experienceLevel: "principiante" }),
+      makeFighter({ id: "c", age: 16, weightKg: 52, gym: "Escuela A", fightCount: 4, experienceLevel: "amateur" }),
+      makeFighter({ id: "d", age: 15, weightKg: 53, gym: "Escuela C", fightCount: 2, experienceLevel: "principiante" }),
+      makeFighter({ id: "e", age: 30, weightKg: 70, gym: "Escuela A", fightCount: 10, experienceLevel: "amateur" }),
+      makeFighter({ id: "f", age: 31, weightKg: 71, gym: "Escuela B", fightCount: 12, experienceLevel: "amateur" }),
+      makeFighter({ id: "g", age: 30, weightKg: 72, gym: "Escuela D", fightCount: 20, experienceLevel: "profesional" }),
+      makeFighter({ id: "h", age: 32, weightKg: 90, gym: "Escuela E", fightCount: 25, experienceLevel: "profesional", weightCategory: "pesado" }),
+      makeFighter({ id: "i", age: 25, weightKg: 60, gym: "Escuela F", sexo: "F", fightCount: 1, experienceLevel: "debutante" }),
+      makeFighter({ id: "j", age: 26, weightKg: 61, gym: "Escuela G", sexo: "F", fightCount: 2, experienceLevel: "principiante" }),
+    ];
+    for (let i = 0; i < 25; i++) noHardRuleViolations(fighters, bestMatchAll(fighters, 20));
+  });
+
+  it("empareja al menos a tantos atletas como Auto VS (nunca menos cobertura)", () => {
+    const fighters = [
+      makeFighter({ id: "a", weightKg: 61, gym: "Escuela A" }),
+      makeFighter({ id: "b", weightKg: 62, gym: "Escuela B" }),
+      makeFighter({ id: "c", weightKg: 63, gym: "Escuela C" }),
+      makeFighter({ id: "d", weightKg: 64, gym: "Escuela D" }),
+    ];
+    for (let i = 0; i < 15; i++) {
+      expect(bestMatchAll(fighters, 30).length).toBeGreaterThanOrEqual(autoMatchAll(fighters).length);
+    }
+  });
+
+  it("empareja a los 4 (2+2 escuelas) siempre cruzado", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela A", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela A", weightKg: 62 }),
+      makeFighter({ id: "b1", gym: "Escuela B", weightKg: 63 }),
+      makeFighter({ id: "b2", gym: "Escuela B", weightKg: 64 }),
+    ];
+    for (let i = 0; i < 15; i++) {
+      const m = bestMatchAll(fighters, 30);
+      expect(m.length).toBe(2);
+      noHardRuleViolations(fighters, m);
+    }
+  });
+
+  it("dos de la misma escuela sin otro rival → no se emparejan (0 peleas)", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela X", weightKg: 61 }),
+      makeFighter({ id: "a2", gym: "Escuela X", weightKg: 62 }),
+    ];
+    for (let i = 0; i < 15; i++) expect(bestMatchAll(fighters, 20).length).toBe(0);
+  });
+
+  it("numera las peleas de forma correlativa desde 1", () => {
+    const fighters = [
+      makeFighter({ id: "a1", gym: "Escuela A", weightKg: 61 }),
+      makeFighter({ id: "b1", gym: "Escuela B", weightKg: 62 }),
+      makeFighter({ id: "c1", gym: "Escuela C", weightKg: 63 }),
+      makeFighter({ id: "d1", gym: "Escuela D", weightKg: 64 }),
+    ];
+    const m = bestMatchAll(fighters, 20);
+    m.forEach((x, i) => expect(x.roundNumber).toBe(i + 1));
+  });
+
+  it("no empareja a nadie cuando hay menos de dos elegibles válidos", () => {
+    expect(bestMatchAll([], 10)).toEqual([]);
+    expect(bestMatchAll([makeFighter({ id: "solo" })], 10)).toEqual([]);
+  });
+
+  it("no revienta si un peleador llega SIN escuela (dato viejo/importado)", () => {
+    // getScore/analyzeMatch antes hacían f.gym.toLowerCase() sin guardia y
+    // lanzaban TypeError con gym undefined, colgando el botón en 'EMPAREJANDO…'.
+    const a = makeFighter({ id: "a", weightKg: 61, fightCount: 2 }); delete a.gym;
+    const b = makeFighter({ id: "b", weightKg: 62, gym: "Escuela B", fightCount: 3 });
+    expect(() => bestMatchAll([a, b], 20)).not.toThrow();
+    expect(() => autoMatchAll([a, b])).not.toThrow();
+    // Sin escuela declarada, cumple las 4 reglas duras vs otro de escuela conocida → se empareja.
+    const m = bestMatchAll([a, b], 20);
+    expect(m.length).toBe(1);
   });
 });
