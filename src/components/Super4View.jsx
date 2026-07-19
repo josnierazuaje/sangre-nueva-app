@@ -4,6 +4,7 @@ import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weight
 import { dupKey, normName } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
+import { printHtml } from "../lib/printHtml.js";
 import PageHeader from "./PageHeader.jsx";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
@@ -205,13 +206,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // ---------- Impresión de las llaves ----------
   function printSuper4() {
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
-    const html = buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL"));
-    const win = window.open("", "_blank");
-    if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes e intenta de nuevo."); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 350);
+    printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL")));
   }
 
   // ---------- Presentación en formato bracket ----------

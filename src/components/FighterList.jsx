@@ -3,6 +3,7 @@ import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGO
 import Badge from "./Badge.jsx";
 import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
+import { printHtml } from "../lib/printHtml.js";
 import { normName } from "../lib/dedup.js";
 
 // Chip de filtro: número (en el color de la categoría) + etiqueta, con estado
@@ -90,9 +91,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         <td class="rival"></td>
       </tr>`;
     }).join("");
-    const win = window.open("", "_blank");
-    if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Peleadores — Sangre Nueva</title>
+    printHtml(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Peleadores — Sangre Nueva</title>
 <style>
   /* Forzar impresión de los colores de fondo (sin esto el PDF sale sin color). */
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
@@ -116,9 +115,6 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
 <tbody>${rows}</tbody>
 </table>
 </body></html>`);
-    win.document.close();
-    win.focus();
-    win.print();
   }
 
   if (!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;

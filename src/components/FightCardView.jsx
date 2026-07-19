@@ -1,5 +1,6 @@
 import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
 import { buildCarteleraHtml } from "../lib/printCartelera.js";
+import { printHtml } from "../lib/printHtml.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
 import PageHeader from "./PageHeader.jsx";
@@ -33,13 +34,7 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
   // a más pesado. La numeración se reinicia por bloque, como en la planilla
   // de Excel que usan los jueces.
   function printSheet() {
-    const html = buildCarteleraHtml(matchups, fighters);
-    const win = window.open("", "_blank");
-    if (!win) { alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes e intenta de nuevo."); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
+    printHtml(buildCarteleraHtml(matchups, fighters));
   }
   return (
     // En escritorio la cartelera es un "póster" secuencial: se centra con un
