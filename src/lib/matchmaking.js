@@ -42,7 +42,7 @@ export function analyzeMatch(f1, f2) {
   const ac1 = getAgeCategory(f1.age), ac2 = getAgeCategory(f2.age);
   if (ac1.key !== ac2.key) w.push({ type: "age", severity: "high", message: `${ac1.label} (${f1.age}a) vs ${ac2.label} (${f2.age}a) — NO SE PUEDEN MEZCLAR (World Boxing)` });
   else if (Math.abs(f1.age - f2.age) > 10) w.push({ type: "age", severity: "medium", message: `Δ${Math.abs(f1.age - f2.age)} años de edad` });
-  if (f1.gym.toLowerCase() === f2.gym.toLowerCase()) w.push({ type: "same_gym", severity: "low", message: `Misma escuela: ${f1.gym}` });
+  if ((f1.gym || "").toLowerCase() === (f2.gym || "").toLowerCase()) w.push({ type: "same_gym", severity: "low", message: `Misma escuela: ${f1.gym || ""}` });
   return w;
 }
 
@@ -52,7 +52,7 @@ export function getScore(f1, f2) {
   s -= Math.abs(f1.weightKg - f2.weightKg) * 3;
   const lvls = ["debutante", "principiante", "amateur", "profesional"];
   s -= Math.abs(lvls.indexOf(f1.experienceLevel) - lvls.indexOf(f2.experienceLevel)) * 25;
-  if (f1.gym.toLowerCase() === f2.gym.toLowerCase()) s -= 15;
+  if ((f1.gym || "").toLowerCase() === (f2.gym || "").toLowerCase()) s -= 15;
   if ((f1.sexo || "M") !== (f2.sexo || "M")) s -= 100;
   if (getAgeCategory(f1.age).key !== getAgeCategory(f2.age).key) s -= 100;
   else s -= Math.max(0, Math.abs(f1.age - f2.age) - 6) * 2;
@@ -145,4 +145,90 @@ export function sorteoMatch(fighters) {
     }
   }
   return matchups;
+}
+
+// ============================================
+// EMPAREJAMIENTO ÓPTIMO — el "un solo botón"
+// ============================================
+// Fusiona lo mejor de Auto VS (emparejamiento JUSTO por peso/nivel/escuela) y
+// del sorteo (probar MUCHOS ordenamientos). Genera varios repartos válidos —el
+// determinista de Auto VS más N corridas aleatorias— y se queda con el MEJOR:
+// primero el que empareja a MÁS atletas y, a igualdad, el más parejo (mayor
+// puntaje total). Nunca relaja una regla dura ni el umbral de calidad de Auto
+// VS, así que el resultado SIEMPRE empareja a tantos atletas como Auto VS (o
+// más) y cada pelea es al menos igual de segura y pareja.
+//
+// Umbral de calidad de la fase "resto" (cruces entre grupos): idéntico al de
+// autoMatchAll (Auto VS). No se baja al 20 del sorteo para no colar peleas de
+// peor calidad de peso que las que Auto VS aceptaría.
+const REST_MIN_SCORE = 30;
+
+// Puntaje de un reparto completo: nº de peleas (cobertura) y suma de calidad.
+function matchQuality(matchups, byId) {
+  let score = 0;
+  for (const m of matchups) score += getScore(byId[m.fighterRedId], byId[m.fighterBlueId]);
+  return { pairs: matchups.length, score };
+}
+
+function pushPair(matchups, f1, f2) {
+  matchups.push({ id: genId(), fighterRedId: f1.id, fighterBlueId: f2.id, roundNumber: matchups.length + 1, warnings: analyzeMatch(f1, f2), createdAt: new Date().toISOString() });
+}
+
+// Una corrida ALEATORIA con EXACTAMENTE las mismas reglas duras y el mismo
+// umbral (30) que Auto VS, pero recorriendo a los atletas en orden aleatorio
+// para explorar repartos distintos. Igual que autoMatchAll salvo que baraja los
+// grupos en vez de ordenarlos por peso.
+function randomMatchAll(fighters) {
+  const used = new Set(); const matchups = [];
+  const groups = {};
+  fighters.forEach(f => { const k = (f.sexo || "M") + "_" + f.weightCategory + "_" + f.experienceLevel + "_" + getAgeCategory(f.age).key; if (!groups[k]) groups[k] = []; groups[k].push(f); });
+  Object.values(groups).forEach(g => {
+    const sh = shuffle(g);
+    for (let i = 0; i < sh.length; i++) {
+      if (used.has(sh[i].id)) continue;
+      const f1 = sh[i];
+      // Primer rival del grupo (mismo sexo/división/nivel/edad) que cumpla las
+      // reglas duras restantes: otra escuela y diferencia de peleas válida.
+      let f2 = null;
+      for (let j = i + 1; j < sh.length; j++) {
+        if (used.has(sh[j].id)) continue;
+        if (!sameGym(f1, sh[j]) && experienceOk(f1, sh[j])) { f2 = sh[j]; break; }
+      }
+      if (!f2) continue;
+      used.add(f1.id); used.add(f2.id);
+      pushPair(matchups, f1, f2);
+    }
+  });
+  const rem = shuffle(fighters.filter(f => !used.has(f.id)));
+  for (let i = 0; i < rem.length; i++) {
+    if (used.has(rem[i].id)) continue; let best = null, bs = -1;
+    for (let j = i + 1; j < rem.length; j++) {
+      if (used.has(rem[j].id)) continue;
+      if (getAgeCategory(rem[i].age).key !== getAgeCategory(rem[j].age).key) continue; // regla dura: edad World Boxing
+      if ((rem[i].sexo || "M") !== (rem[j].sexo || "M")) continue; // regla dura: sexo
+      if (sameGym(rem[i], rem[j])) continue; // regla dura: nunca misma escuela
+      if (!experienceOk(rem[i], rem[j])) continue; // regla dura: máx 3 peleas (salvo ambos pro 15+)
+      const sc = getScore(rem[i], rem[j]); if (sc > bs) { bs = sc; best = rem[j]; }
+    }
+    if (best && bs >= REST_MIN_SCORE) { used.add(rem[i].id); used.add(best.id); pushPair(matchups, rem[i], best); }
+  }
+  return matchups;
+}
+
+// El "un solo botón": el reparto más justo posible. Toma como base el de Auto VS
+// (determinista) y prueba `attempts` corridas aleatorias; se queda con el que
+// empareja a más atletas y, a igualdad, con el más parejo. Como Auto VS entra
+// como candidato, el resultado nunca empareja a menos atletas ni es menos justo
+// que Auto VS.
+export function bestMatchAll(fighters, attempts = 250) {
+  const byId = {}; fighters.forEach(f => { byId[f.id] = f; });
+  let best = autoMatchAll(fighters);
+  let bestQ = matchQuality(best, byId);
+  for (let i = 0; i < attempts; i++) {
+    const cand = randomMatchAll(fighters);
+    const q = matchQuality(cand, byId);
+    if (q.pairs > bestQ.pairs || (q.pairs === bestQ.pairs && q.score > bestQ.score)) { best = cand; bestQ = q; }
+  }
+  // Renumerar por prolijidad (el ganador puede venir de una corrida aleatoria).
+  return best.map((m, i) => ({ ...m, roundNumber: i + 1 }));
 }

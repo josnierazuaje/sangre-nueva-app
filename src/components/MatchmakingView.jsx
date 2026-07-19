@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { getCategoryInfo, getExperienceInfo, getAgeCategory, genId } from "../constants.js";
 import { save } from "../lib/storage.js";
-import { autoMatchAll, sorteoMatch, experienceOk, analyzeMatch } from "../lib/matchmaking.js";
+import { bestMatchAll, experienceOk, analyzeMatch } from "../lib/matchmaking.js";
 import { super4FighterIds } from "../lib/super4.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import Badge from "./Badge.jsx";
@@ -34,7 +34,6 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     alert("Sincronizando la cartelera con la nube… intenta de nuevo en unos segundos.");
     return false;
   }
-  function autoM() { if (!checkReady()) return; const m = autoMatchAll(elegibles); setMatchups(m); save("bm_matchups_v3", m); }
   // Quita de un toque SOLO las peleas imposibles (rival eliminado o atleta ya
   // en el Super 4) y renumera; las demás alertas (escuela/experiencia/edad)
   // se resuelven a criterio del organizador pelea por pelea. Exige que el
@@ -66,6 +65,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   }
   function pickForPair(id) {
     if (!checkReady()) return;
+    if (sorting) return;   // durante la animación se está rearmando todo: no aceptar cruces manuales que se perderían
     if (pairPick === id) { setPairPick(null); return; }   // tocar de nuevo = deseleccionar
     if (!pairPick) { setPairPick(id); return; }             // primer atleta elegido
     const a = byId[pairPick], b = byId[id];
@@ -78,7 +78,9 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     setMatchups(u); save("bm_matchups_v3", u);
   }
   // La planilla imprimible vive ahora en la pestaña Cartelera (FightCardView).
-  function runSorteo() {
+  // Único botón de armado: busca el reparto MÁS JUSTO posible (fusión de Auto VS
+  // + sorteo). La animación corre mientras se prueban muchos repartos.
+  function armarPeleas() {
     if (!checkReady()) return;
     setSorting(true);
     setMatchups([]);
@@ -88,7 +90,7 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
       setSortCount(count);
       if (count >= 12) {
         clearInterval(interval);
-        const m = sorteoMatch(elegibles);
+        const m = bestMatchAll(elegibles);
         setMatchups(m);
         save("bm_matchups_v3", m);
         setSorting(false);
@@ -125,48 +127,45 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
       {conflicts.edadMixta.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
         <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {conflicts.edadMixta.length} pelea{conflicts.edadMixta.length !== 1 ? "s" : ""} mezcla{conflicts.edadMixta.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
         <div className="space-y-1">{conflicts.edadMixta.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
-        <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Sorteo / Auto VS.</p>
+        <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Emparejar.</p>
       </div>}
 
       {/* Peleas entre atletas de la misma escuela (entrenan juntos) */}
       {conflicts.mismaEscuela.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 space-y-1 fade-in">
         <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {conflicts.mismaEscuela.length} pelea{conflicts.mismaEscuela.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
         <div className="space-y-0.5">{conflicts.mismaEscuela.map(v => <p key={v.id} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
-        <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
+        <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Emparejar) o elimina esas peleas.</p>
       </div>}
 
       {/* Peleas con demasiada diferencia de experiencia (regla dura: máx 3 peleas, salvo ambos pro 15+) */}
       {conflicts.experiencia.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
         <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.experiencia.length} pelea{conflicts.experiencia.length !== 1 ? "s" : ""} con demasiada diferencia de experiencia</p>
         <div className="space-y-0.5">{conflicts.experiencia.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
-        <p className="text-boxing-muted text-xs">Máximo 3 peleas de diferencia (salvo que ambos tengan 15+). Vuelve a generar (Sorteo / Auto VS) o elimina esas peleas.</p>
+        <p className="text-boxing-muted text-xs">Máximo 3 peleas de diferencia (salvo que ambos tengan 15+). Vuelve a generar (Emparejar) o elimina esas peleas.</p>
       </div>}
 
-      {/* Botón Sorteo destacado */}
-      <button onClick={runSorteo} disabled={sorting} className={"btn-primary w-full lg:max-w-xl lg:mx-auto py-4 font-black text-lg tracking-widest flex items-center justify-center gap-3" + (sorting ? " cursor-not-allowed" : "")} style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
-        {sorting
-          ? <>EMPAREJANDO...</>
-          : <>EMPAREJAMIENTO</>
-        }
+      {/* ÚNICO botón de armado. Fusiona la presentación destacada del antiguo
+          "EMPAREJAMIENTO" con la inteligencia del antiguo "Auto VS": un toque
+          arma toda la cartelera buscando el reparto más justo posible. */}
+      <button onClick={armarPeleas} disabled={sorting} className={"btn-primary w-full lg:max-w-xl lg:mx-auto py-4 flex flex-col items-center justify-center gap-1" + (sorting ? " cursor-not-allowed" : "")}>
+        <span className="flex items-center gap-3 font-black tracking-widest" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "22px", letterSpacing: "4px" }}>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          {sorting ? "EMPAREJANDO..." : "EMPAREJAR"}
+        </span>
+        {!sorting && <span className="text-[10px] tracking-[0.2em] uppercase opacity-80">Automático · el reparto más justo</span>}
       </button>
 
-      {/* Overlay animado durante sorteo */}
+      {/* Overlay animado mientras se prueban muchos repartos */}
       {sorting && <div className="bg-black/60 border border-red-500/30 p-6 text-center scale-in lg:max-w-xl lg:mx-auto">
         <div className="text-4xl mb-3" style={{ animation: "vsFlash 0.3s ease-in-out infinite" }}>🥊</div>
-        <p className="text-red-400 font-bold text-lg" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>MEZCLANDO PELEADORES...</p>
+        <p className="text-red-400 font-bold text-lg" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>BUSCANDO LAS PELEAS MÁS JUSTAS...</p>
         <div className="flex justify-center gap-1 mt-3">{[...Array(5)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-red-500" style={{ animation: `vsFlash 0.6s ease-in-out ${i * 0.1}s infinite` }}></div>)}</div>
       </div>}
 
-      {/* Botón Auto VS (secundario) */}
-      <div className="flex gap-2 lg:max-w-xl lg:mx-auto">
-        <button onClick={autoM} disabled={sorting} className="btn-gold flex-1 font-semibold py-2.5 flex items-center justify-center gap-2 tracking-widest uppercase" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "16px" }}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          Auto VS
-        </button>
-        {matchups.length > 0 && <button onClick={clearAll} disabled={sorting} className="px-4 py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar</button>}
-      </div>
+      {/* Limpiar (solo si ya hay peleas armadas) */}
+      {matchups.length > 0 && !sorting && <button onClick={clearAll} className="w-full lg:max-w-xl lg:mx-auto px-4 py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase hover:border-boxing-goldDim transition-colors">Limpiar y empezar de nuevo</button>}
 
-      {!matchups.length && !sorting && <div className="border border-dashed border-boxing-lineBright p-4 text-center lg:max-w-xl lg:mx-auto"><p className="text-boxing-muted text-sm">Usa <span className="text-red-400 font-bold">EMPAREJAMIENTO</span> para emparejamientos aleatorios<br />o <span className="text-boxing-cream font-semibold">Auto VS</span> para emparejamiento inteligente</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría · nivel · escuela</p></div>}
+      {!matchups.length && !sorting && <div className="border border-dashed border-boxing-lineBright p-4 text-center lg:max-w-xl lg:mx-auto"><p className="text-boxing-muted text-sm">Un toque arma <span className="text-boxing-cream font-semibold">toda la cartelera</span> automáticamente,<br />buscando las peleas <span className="text-red-400 font-bold">más parejas posibles</span>.</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría de edad · nivel · peso · escuela</p></div>}
       {/* Móvil: lista vertical. Escritorio: cuadrícula de 2 columnas. */}
       <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">{matchups.map((m, i) => <VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM} onNotaChange={notaChange} />)}</div>
       {unmatched.length > 0 && <div><button onClick={() => setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform " + (showUn ? "rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>Sin pelea ({unmatched.length})</button>
