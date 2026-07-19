@@ -487,17 +487,21 @@ export default function App() {
               <button onClick={logout} className="text-[10px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
           </div>
         </div>
-        <div className="flex flex-col items-center pb-4 pt-2 gap-1" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "11px", fontWeight: 600, letterSpacing: "0.4em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
-          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "88px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))", marginTop: "4px" }} />
-          <div className="text-center leading-none" style={{ marginTop: "2px" }}>
-            <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "32px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "16px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "4px" }}>La Velada</div>
+        {/* Bloque de marca compacto: en un teléfono la cabecera es chrome FIJO
+            (nunca hace scroll), así que cada píxel se lo quita a la lista. Se
+            conserva la jerarquía completa —sello, escudo, oro, itálica y orla—
+            en escala de teléfono. El sidebar de escritorio no se toca. */}
+        <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "9.5px", fontWeight: 600, letterSpacing: "0.36em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "58px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 8px 20px rgba(155,26,42,0.4))", marginTop: "2px" }} />
+          <div className="text-center leading-none" style={{ marginTop: "1px" }}>
+            <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "24px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "13px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "2px" }}>La Velada</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "10px" }}>
-            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,transparent,rgba(200,160,74,0.4))" }} />
-            <div style={{ width: "5px", height: "5px", background: "#c8a04a", transform: "rotate(45deg)", borderRadius: "1px", boxShadow: "0 0 8px rgba(229,199,107,0.6)" }} />
-            <div style={{ width: "50px", height: "1px", background: "linear-gradient(90deg,rgba(200,160,74,0.4),transparent)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "9px", marginTop: "5px" }}>
+            <div style={{ width: "38px", height: "1px", background: "linear-gradient(90deg,transparent,rgba(200,160,74,0.4))" }} />
+            <div style={{ width: "4px", height: "4px", background: "#c8a04a", transform: "rotate(45deg)", borderRadius: "1px", boxShadow: "0 0 8px rgba(229,199,107,0.6)" }} />
+            <div style={{ width: "38px", height: "1px", background: "linear-gradient(90deg,rgba(200,160,74,0.4),transparent)" }} />
           </div>
         </div>
       </header>

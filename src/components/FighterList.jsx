@@ -123,11 +123,17 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
       <PageHeader kicker="Base de datos de atletas" title="Peleadores" count={fighters.length} />
       <div className="flex flex-wrap gap-2">
         <FilterChip n={fighters.length} label="Todos" color="#E5C76B" active={sinFiltros} onClick={verTodos} />
-        {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; return <FilterChip key={e.key} n={c} label={e.label} color={e.color} active={experienceFilter === e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} />; })}
+        {/* "Amateur Avanzado" es la etiqueta más larga de la fila: en móvil se
+            corta a "Amateur" para que quepan más chips por fila. */}
+        {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; const label = e.key === "amateur" ? <>Amateur<span className="hidden lg:inline"> Avanzado</span></> : e.label; return <FilterChip key={e.key} n={c} label={label} color={e.color} active={experienceFilter === e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} />; })}
         {faltantesCount > 0 && <FilterChip n={faltantesCount} label="Faltante" color="#F97316" active={showFaltantes} onClick={() => setShowFaltantes(!showFaltantes)} />}
         <FilterChip n={sexCounts.M} label="Masculino" color="#3B82F6" active={sexFilter === "M"} onClick={() => setSexFilter(sexFilter === "M" ? "all" : "M")} />
         <FilterChip n={sexCounts.F} label="Femenino" color="#EC4899" active={sexFilter === "F"} onClick={() => setSexFilter(sexFilter === "F" ? "all" : "F")} />
-        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <FilterChip key={a.key} n={c} label={`${a.label} · ${FECHIBOX_LABEL[a.key] || a.label}`} color={a.color} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
+        {/* En móvil solo el nombre World Boxing (U15, U17, U19, Elite); la
+            equivalencia FECHIBOX —útil pero larga— aparece en escritorio, que
+            es donde hay ancho de sobra. Las planillas impresas la siguen
+            llevando siempre. */}
+        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <FilterChip key={a.key} n={c} label={<>{a.label}<span className="hidden lg:inline"> · {FECHIBOX_LABEL[a.key] || a.label}</span></>} color={a.color} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
         {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2 fade-in">
