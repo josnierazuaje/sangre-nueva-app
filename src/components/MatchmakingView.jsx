@@ -14,7 +14,6 @@ import PageHeader from "./PageHeader.jsx";
 export default function MatchmakingView({ fighters, matchups, setMatchups, super4, ready, super4Ready }) {
   const [showUn, setShowUn] = useState(false);
   const [sorting, setSorting] = useState(false);
-  const [sortCount, setSortCount] = useState(0);
   const [pairPick, setPairPick] = useState(null); // 1er atleta elegido para emparejar a mano
   // Los atletas que ya están en una llave del Super 4 no pueden estar también
   // en la cartelera VS: se excluyen del universo de emparejamiento.
@@ -87,14 +86,12 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     let count = 0;
     const interval = setInterval(() => {
       count++;
-      setSortCount(count);
       if (count >= 12) {
         clearInterval(interval);
         const m = bestMatchAll(elegibles);
         setMatchups(m);
         save("bm_matchups_v3", m);
         setSorting(false);
-        setSortCount(0);
       }
     }, 120);
   }
