@@ -75,7 +75,7 @@ export default function App() {
     // de que se pierdan en silencio. Sin este guard, el "✓ guardado" inmediato
     // podría mentir: se dio por guardado algo que este borrado destruiría.
     const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que AÚN NO se guardaron en la nube (parece que estás sin conexión).\n\nSi cierras sesión ahora, se PERDERÁN.\n\nPara no perderlos: revisa tu internet, espera a que arriba diga "Sincronizado" y recién cierra sesión.\n\n¿Cerrar sesión de todos modos?`)) return;
+    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\nSi cierras sesión ahora, se PERDERÁN.\n\nEspera a que el chip de arriba diga "Sincronizado" antes de cerrar sesión. Si dice "Conectando…", revisa tu internet; si dice "Error", revisa tus permisos.\n\n¿Cerrar sesión de todos modos?`)) return;
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
     location.reload();
@@ -91,7 +91,7 @@ export default function App() {
     // Igual que en logout: recargar desde la nube BORRA lo local (incluido el
     // outbox), así que unas altas sin subir se perderían. Avisamos primero.
     const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que AÚN NO se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que esos ${pend} registro(s) se PERDERÍAN.\n\nMejor espera a que arriba diga "Sincronizado" y luego recarga. ¿Recargar de todos modos?`)) return;
+    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que esos ${pend} registro(s) se PERDERÍAN.\n\nEspera a que el chip de arriba diga "Sincronizado" (si dice "Error", revisa tus permisos) y luego recarga.\n\n¿Recargar de todos modos?`)) return;
     if (!confirm("¿Recargar los datos desde la nube?\n\nSe reemplazan los datos de ESTE dispositivo con la copia compartida en la nube. Útil si ves algo que no cuadra (por ejemplo, un peleador que aparece al registrar pero no en la lista).\n\nNo afecta la nube ni a otros dispositivos.")) return;
     clearLocalEventData();
     location.reload();

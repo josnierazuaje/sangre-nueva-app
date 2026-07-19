@@ -21,7 +21,7 @@ describe("outbox de peleadores (escrituras que sobreviven a la recarga)", () => 
     const l = applyOutboxPut(applyOutboxPut([], A, now), B, now);
     expect(applyOutboxRemove(l, A.id).map(x => x.id)).toEqual([B.id]);
   });
-  it("pruneOutbox descarta pendientes más viejos que el TTL (48h) y sin marca", () => {
+  it("pruneOutbox descarta pendientes más viejos que el TTL y sin marca", () => {
     const fresh = { ...A, _queuedAt: now };
     const stale = { ...B, _queuedAt: now - OUTBOX_TTL_MS - 1 };
     const sinMarca = { ...C };

@@ -167,9 +167,17 @@ export async function fetchCloudArray(key) {
 // commit; al arrancar la app, los pendientes se re-suben solos (replay).
 // Como el upsert fusiona por id contra el servidor, el replay es idempotente.
 const OUTBOX_KEY = "bm_fighters_outbox";
-// Vida útil de un pendiente: tras 48h sin poder confirmarse se descarta (evita
-// resucitar registros muy viejos, p.ej. eliminados desde otro dispositivo).
-export const OUTBOX_TTL_MS = 48 * 60 * 60 * 1000;
+// Vida útil de un pendiente: tras 14 días sin poder confirmarse se descarta.
+// Antes eran 48h, pero era MUY corto y causaba pérdida silenciosa: un
+// dispositivo que registra SIN conexión y no reconecta en 2 días (p.ej. pesaje
+// el viernes, evento el domingo → >48h) perdía el registro — al podarse el
+// pendiente, el auto-reparo lo tomaba por "fantasma" y lo borraba sin aviso, y
+// los guards de logout/recargar quedaban ciegos (outboxList() ya daba 0). 14
+// días cubren con holgura cualquier ventana del evento. El costo (una edición
+// pendiente muy vieja podría resucitar un peleador borrado en otro dispositivo)
+// es raro y RECUPERABLE (reaparece visible, se vuelve a borrar), mucho mejor
+// que perder una inscripción en silencio (posible menor).
+export const OUTBOX_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 // Puras y testeables (la lista viaja como argumento):
 export function applyOutboxPut(list, fighter, now) {
