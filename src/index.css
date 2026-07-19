@@ -180,10 +180,13 @@ input[type="number"] { -moz-appearance:textfield; }
 .filter-chip.on .l { color:color-mix(in srgb, var(--c) 75%, #e8ddd0); }
 /* MÓVIL: la misma píldora, en una sola línea (número · etiqueta). Apiladas
    ocupaban 4 filas y empujaban la lista fuera de la pantalla; en línea caben
-   en 2-3 filas y el primer peleador se ve sin hacer scroll. En escritorio se
-   conserva la versión apilada, que respira mejor con el ancho disponible. */
+   en menos alto y el primer peleador se ve sin hacer scroll. En escritorio se
+   conserva la versión apilada, que respira mejor con el ancho disponible.
+   El alto NO baja de 33px: es un filtro que el staff toca a dedo y con prisa
+   durante la velada, así que la comodidad de toque manda sobre ahorrar dos
+   píxeles más (33px es el tamaño estándar de chip táctil). */
 @media (max-width: 63.98rem) {
-  .filter-chip { flex-direction:row; align-items:baseline; gap:6px; min-width:0; padding:5px 11px; }
+  .filter-chip { flex-direction:row; align-items:baseline; gap:6px; min-width:0; padding:8px 12px; min-height:33px; }
   .filter-chip .n { font-size:13px; }
   .filter-chip .l { font-size:9px; margin-top:0; letter-spacing:0.1em; }
 }
