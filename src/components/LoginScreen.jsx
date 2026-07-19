@@ -27,16 +27,20 @@ export default function LoginScreen() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-      <form onSubmit={submit} className="w-full max-w-sm bg-boxing-panel border border-boxing-line p-6 space-y-4">
+      {/* Panel de tinta: mismo degradado y borde tenue que los paneles del
+          rediseño — la marca preside como en el sidebar de escritorio. */}
+      <form onSubmit={submit} className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ background: "linear-gradient(170deg,#131016,#0c0a0e)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <div className="text-center mb-2">
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "30px", letterSpacing: "0.05em", color: "#e8ddd0" }}>SANGRE NUEVA</div>
-          <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "14px", color: "#c8a04a", letterSpacing: "0.1em" }}>La Velada</div>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600, fontSize: "9.5px", letterSpacing: "0.35em", textTransform: "uppercase", color: "rgba(138,132,148,0.85)", marginBottom: "12px" }}>Azuaje Team &amp; HH Arias</div>
+          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ width: "86px", height: "auto", display: "block", margin: "0 auto 10px", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))" }} />
+          <div className="marca-oro" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "28px", letterSpacing: "0.14em", lineHeight: 1 }}>SANGRE NUEVA</div>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "14.5px", color: "rgba(200,160,74,0.9)", marginTop: "3px" }}>La Velada</div>
           <div className="mt-3 text-[10px] font-semibold text-boxing-muted tracking-[0.3em] uppercase">Acceso privado</div>
         </div>
         <div><label className="block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Correo</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-base" /></div>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" className="input-ink w-full px-3 py-2.5 text-base" /></div>
         <div><label className="block text-[10px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Contraseña</label>
-          <input type="password" value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password" className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-base" /></div>
+          <input type="password" value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password" className="input-ink w-full px-3 py-2.5 text-base" /></div>
         {err && <p className="text-red-400 text-xs">{err}</p>}
         {resetSent && <p className="text-green-400 text-xs">Te enviamos un correo para restablecer tu contraseña.</p>}
         <button type="submit" disabled={loading} className="btn-primary w-full py-3.5" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "20px", letterSpacing: "0.1em" }}>

@@ -9,7 +9,7 @@ import PageHeader from "./PageHeader.jsx";
 // FIGHT CARD VIEW
 // ============================================
 export default function FightCardView({ matchups, fighters, super4 = [] }) {
-  if (!matchups.length) return <div className="text-center py-16"><div className="text-5xl mb-4">{"\u{1F4CB}"}</div><p className="text-gray-400">Primero crea los VS</p></div>;
+  if (!matchups.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-3xl"><div className="text-5xl mb-4 opacity-40">{"\u{1F4CB}"}</div><p className="text-boxing-muted">Primero crea los VS</p></div>;
   // Fecha REAL del evento (dos días), no la de hoy. Fuente única: EVENT_DATES.
   const eventDate = EVENT_LABELS.rango;
   // Misma revisión en vivo que la pestaña VS: avisa AQUÍ (donde se imprime)
@@ -41,21 +41,27 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
     // ancho cómodo de lectura en vez de estirarse a todo el ancho.
     <div className="space-y-4 lg:max-w-3xl lg:mx-auto">
       <PageHeader kicker="Planilla oficial del evento" title="Cartelera" count={matchups.length} />
-      <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-xl border border-gray-700 overflow-hidden">
-        <div className="bg-gradient-to-r from-red-800 via-yellow-700 to-red-800 p-4 text-center"><h3 className="text-2xl font-black text-white uppercase tracking-wider">{"\u{1F94A}"} Sangre Nueva — La Velada</h3><p className="text-yellow-200 text-sm mt-1 capitalize">{eventDate}</p><p className="text-white/60 text-xs">{matchups.length} Peleas</p></div>
+      <div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: "linear-gradient(180deg, #120e14, #0b090c)" }}>
+        {/* Cabecera de cartel: la marca en serif sobre tinta, con los humos de
+            las dos esquinas — el póster del evento, no una franja de color. */}
+        <div className="p-5 text-center relative" style={{ background: "radial-gradient(300px 130px at 12% 0%, rgba(155,26,42,0.28), transparent 65%), radial-gradient(300px 130px at 88% 0%, rgba(37,99,235,0.18), transparent 65%), rgba(0,0,0,0.35)" }}>
+          <h3 className="titulo-cartel" style={{ fontSize: "26px", letterSpacing: "0.04em" }}>SANGRE NUEVA</h3>
+          <p className="titulo-oro" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontStyle: "italic", fontSize: "17px", marginTop: "2px" }}>La Velada</p>
+          <p className="text-boxing-muted text-xs mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
+        </div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
-        <div className="flex gap-2 p-3 border-b border-gray-800"><button onClick={printSheet} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2">{"🖨️"} Imprimir</button><button onClick={shareWA} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2">{"\u{1F4E4}"} WhatsApp</button></div>
+        <div className="flex gap-2 p-3 border-b border-white/5"><button onClick={printSheet} className="btn-gold flex-1 font-bold py-3 text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button><button onClick={shareWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors">{"\u{1F4E4}"} WhatsApp</button></div>
         {/* Aviso de peleas con problemas, visible donde se imprime la planilla */}
         {conflictLines.length > 0 && <div className="bg-red-900/30 border-b border-red-500/40 p-3 space-y-1">
           <p className="text-red-300 text-xs font-bold">{"⚠️"} {conflictLines.length} problema{conflictLines.length !== 1 ? "s" : ""} en la cartelera — corrígelo{conflictLines.length !== 1 ? "s" : ""} en la pestaña VS</p>
           {conflictLines.map((v, i) => <p key={v.id + "-" + i} className="text-[11px] text-red-200/80">{v.texto}</p>)}
           {conflicts.huerfanas.length > 0 && <p className="text-[10px] text-red-200/60">Las peleas con rival eliminado no salen en la planilla impresa.</p>}
         </div>}
-        <div className="divide-y divide-gray-800">{matchups.map((m, i) => { const r = fighters.find(f => f.id === m.fighterRedId); const b = fighters.find(f => f.id === m.fighterBlueId); if (!r || !b) return null; const c = getCategoryInfo(r.weightCategory); const main = i === matchups.length - 1;
-          return <div key={m.id} className={"px-4 py-3 " + (main ? "bg-yellow-900/20" : "")}>
-            {main ? <div className="text-center mb-1"><span className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest bg-yellow-500/10 px-2 py-0.5 rounded">{"⭐"} Estelar</span></div> : <div className="text-center mb-1"><span className="text-[10px] text-gray-500">Pelea {m.roundNumber}</span></div>}
-            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-white" : "text-sm text-gray-200")}>{r.fullName}</p><p className="text-[11px] text-gray-500">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="text-yellow-500 font-black text-sm">VS</span><span className="text-[10px] text-gray-500">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-white" : "text-sm text-gray-200")}>{b.fullName}</p><p className="text-[11px] text-gray-500">{b.weightKg}kg · {b.gym}</p></div></div></div>; })}</div>
-        <div className="bg-gray-800/50 px-4 py-2 text-center"><p className="text-gray-500 text-[10px]">Sangre Nueva · La Velada</p></div>
+        <div className="divide-y divide-white/5">{matchups.map((m, i) => { const r = fighters.find(f => f.id === m.fighterRedId); const b = fighters.find(f => f.id === m.fighterBlueId); if (!r || !b) return null; const c = getCategoryInfo(r.weightCategory); const main = i === matchups.length - 1;
+          return <div key={m.id} className={"px-4 py-3 " + (main ? "bg-[rgba(200,160,74,0.08)]" : "")}>
+            {main ? <div className="text-center mb-1"><span className="text-[10px] text-boxing-goldBright font-bold uppercase tracking-widest bg-[rgba(200,160,74,0.12)] border border-[rgba(200,160,74,0.4)] px-2.5 py-0.5 rounded-full">{"⭐"} Estelar</span></div> : <div className="text-center mb-1"><span className="text-[10px] text-boxing-muted tracking-[0.18em] uppercase">Pelea {m.roundNumber}</span></div>}
+            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{r.fullName}</p><p className="text-[11px] text-boxing-muted">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="vsx-vs" style={{ fontSize: "16px" }}>VS</span><span className="text-[10px] text-boxing-muted">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{b.fullName}</p><p className="text-[11px] text-boxing-muted">{b.weightKg}kg · {b.gym}</p></div></div></div>; })}</div>
+        <div className="bg-black/30 px-4 py-2 text-center"><p className="text-boxing-muted text-[10px] tracking-[0.22em] uppercase">Sangre Nueva · La Velada</p></div>
       </div>
     </div>
   );

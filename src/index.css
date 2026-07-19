@@ -402,22 +402,26 @@ input[type="number"] { -moz-appearance:textfield; }
 .s4-final { grid-area:final; align-self:center; min-width:0; }
 .s4-line { display:none; }
 .s4-curvas { display:none; }
+.s4-c1, .s4-c2 { display:none; }
 @media (min-width:80rem) {
   .s4-bracket {
-    position:relative;
-    grid-template-columns:minmax(0,1fr) 60px minmax(300px,380px) 60px minmax(0,1fr);
-    grid-template-areas:"s1 gap1 vacio gap2 s2" "abajo abajo final abajo2 abajo3";
+    grid-template-columns:minmax(0,1fr) 64px minmax(300px,380px) 64px minmax(0,1fr);
+    grid-template-areas:"s1 c1 final c2 s2";
     align-items:start;
     row-gap:0;
   }
   .s4-conn { display:none; }
   .s4-s1 { grid-area:s1; }
   .s4-s2 { grid-area:s2; }
-  .s4-final { grid-area:final; align-self:start; margin-top:44px; }
+  /* La FINAL más abajo que las semis: el punto de gravedad visual del altar */
+  .s4-final { grid-area:final; align-self:stretch; padding-top:44px; }
   .s4-line { display:none; }
-  /* Venas de luz: el SVG absoluto que dibuja el componente sobre la llave */
-  .s4-curvas { display:block; position:absolute; inset:0; pointer-events:none; z-index:0; }
-  .s4-s1, .s4-s2, .s4-final { position:relative; z-index:1; }
+  /* Columnas conectoras: cada una aloja el SVG de su vena de luz, estirado a
+     la altura real de la fila (las curvas siempre nacen en la semi y mueren
+     en el flanco de la final, mida lo que mida la llave). */
+  .s4-c1 { display:block; grid-area:c1; align-self:stretch; pointer-events:none; }
+  .s4-c2 { display:block; grid-area:c2; align-self:stretch; pointer-events:none; }
+  .s4-c1 svg, .s4-c2 svg { width:100%; height:100%; overflow:visible; }
 }
 /* Destello que recorre la vena hacia el oro (trazo crema por encima) */
 .s4-vena { stroke-dasharray:8 240; animation:venaPulse 2.8s cubic-bezier(.45,0,.25,1) infinite; }

@@ -28,6 +28,46 @@ const LEGACY_TIER_TO_FIGHTS = { debutante: "0", principiante: "3", amateur: "10"
 const CANTIDAD_OPTIONS = ["all", "1", "2", "3", "4", "5"];
 function cantidadLabel(v) { return v === "all" ? "Todas las posibles" : `${v} llave${v === "1" ? "" : "s"}`; }
 
+// ---------- Piezas visuales del rediseño "Foso de Luz" ----------
+// Título de cinturón en serif dorada con el separador "·" en carmesí (el
+// degradado de oro se aplica POR TRAMO para que el punto carmesí no quede
+// atrapado por el background-clip del texto en Firefox).
+function TituloLlave({ label }) {
+  const partes = String(label).split(" · ");
+  return (
+    <span className="min-w-0" style={{ fontFamily: "'Playfair Display','Didot','Bodoni 72',Georgia,serif", fontSize: "24px", lineHeight: 1.15, letterSpacing: "0.01em" }}>
+      {partes.map((p, i) => (
+        <span key={i}>
+          {i > 0 && <span style={{ color: "#c42438" }}> · </span>}
+          <span className="titulo-oro">{p}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Píldora de condición (edad / kg / sexo) de la cabecera de cada llave: tinte
+// y borde de SU color con luz interior — jamás glow externo en reposo (el
+// resplandor de la llave es privilegio del altar de la final).
+function Pildora({ c, children }) {
+  return (
+    <span className="rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.14em] uppercase whitespace-nowrap flex-shrink-0" style={{ color: c, borderColor: c + "66", boxShadow: `inset 0 0 10px ${c}1f` }}>
+      {children}
+    </span>
+  );
+}
+
+// Edad y división de una llave, para pintar sus píldoras de condición.
+// Cinturones legacy (catKey sin "__" ni ageKey/divKey) devuelven null y la
+// cabecera cae al texto de la regla guardada, como siempre.
+function condicionesLlave(b) {
+  let ageKey = b.ageKey, divKey = b.divKey;
+  if ((!ageKey || !divKey) && b.catKey && b.catKey.includes("__")) [ageKey, divKey] = b.catKey.split("__");
+  const ageInfo = AGE_CATEGORIES.find(a => a.key === ageKey);
+  const div = WEIGHT_CATEGORIES.find(d => d.key === divKey);
+  return ageInfo && div ? { ageInfo, div } : null;
+}
+
 // ============================================
 // SUPER 4 — llaves de campeonato por cinturón
 // Formato bracket de eliminación directa: las dos semifinales del sábado a
@@ -223,10 +263,13 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   }
 
   function Tarjeta({ dia, decidido, destacada, children }) {
+    // Rediseño: superficie de tinta redondeada; la FINAL (destacada) es el
+    // altar de la llave — borde de oro y aura contenida (.s4-altar), el único
+    // resplandor en reposo de toda la llave.
     return (
-      <div className={"rounded-xl border overflow-hidden bg-black/40 " + (destacada ? "border-boxing-goldDim/60" : "border-boxing-lineBright")}>
-        <div className="flex items-center justify-between px-2.5 pt-1.5 pb-1">
-          <span className="text-[9px] text-boxing-muted font-semibold tracking-wide">{dia}</span>
+      <div className={"rounded-2xl border overflow-hidden " + (destacada ? "s4-altar" : "border-white/10")} style={destacada ? undefined : { background: "linear-gradient(168deg,#171219,#0c0a0e)" }}>
+        <div className="flex items-center justify-between px-3 pt-2 pb-1">
+          <span className={"text-[9px] font-semibold tracking-[0.18em] uppercase " + (destacada ? "text-boxing-goldFight" : "text-boxing-muted")}>{dia}</span>
           {decidido && <span className="text-[8px] rounded-full bg-white/10 text-boxing-cream px-2 py-0.5">Fin</span>}
         </div>
         <div>{children}</div>
@@ -240,7 +283,11 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // La final no lleva ✕ (sus atletas salen de las semifinales, no se
   // reemplazan a mano), así que onRemove llega sólo en las semifinales.
   function Fila({ fid, winner, onWin, onRemove, lado, placeholder, bloqueada }) {
-    const cuadro = <span className="rounded-sm flex-shrink-0" style={{ width: 11, height: 11, background: lado === "rojo" ? "#c0392b" : "#2980b9" }} />;
+    // Venda de esquina: barra vertical del color del rincón (roja arriba, azul
+    // abajo) que se apaga hacia el centro; al ganar, funde a dorado.
+    const esGanadorVenda = winner && winner === fid;
+    const vendaColor = esGanadorVenda ? "#e5c76b" : lado === "rojo" ? "#c42438" : "#2563EB";
+    const cuadro = <span aria-hidden="true" className="flex-shrink-0 self-stretch" style={{ width: 3, minHeight: 26, borderRadius: "0 3px 3px 0", background: `linear-gradient(180deg, ${vendaColor}, transparent 130%)` }} />;
     const f = fid ? byId[fid] : null;
     const inexistente = !!fid && !f; // el id apunta a un peleador borrado / no sincronizado
     // Cupo LIBRE (vacío o con peleador eliminado) de una SEMIFINAL: se puede
@@ -249,20 +296,21 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     // solo llega en las semifinales; la final toma a sus atletas de las semis,
     // así que ahí este botón no aparece (se conserva el placeholder).
     if ((!fid || inexistente) && onRemove) return (
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
+      <div className="flex items-center gap-2 pr-2.5 py-1.5">
         {cuadro}
         <span className="flex flex-col min-w-0 flex-1">
           <span className="text-[11.5px] text-boxing-muted italic truncate">Cupo libre</span>
           {inexistente && <span className="text-[8.5px] text-boxing-muted/70 truncate">peleador eliminado</span>}
         </span>
-        <button type="button" onClick={onRemove} title="Elegir un peleador para este cupo" className="px-2.5 h-7 flex items-center justify-center gap-1 rounded border border-green-500/60 text-green-300 hover:bg-green-600/25 text-[11px] font-bold tracking-wide flex-shrink-0 transition-colors">{"＋"} Elegir</button>
+        <button type="button" onClick={onRemove} title="Elegir un peleador para este cupo" className="px-3 h-7 flex items-center justify-center gap-1 rounded-full border border-green-500/60 text-green-300 hover:bg-green-600/25 text-[11px] font-bold tracking-wide flex-shrink-0 transition-colors">{"＋"} Elegir</button>
       </div>
     );
-    // Cupo vacío que NO se rellena aquí (placeholder de la final): solo texto.
+    // Cupo vacío que NO se rellena aquí (placeholder de la final): en itálica
+    // serif apagada, como promesa del ganador que vendrá.
     if (!fid) return (
-      <div className="flex items-center gap-2 px-2.5 py-2 opacity-50">
+      <div className="flex items-center gap-2 pr-2.5 py-2 opacity-60">
         {cuadro}
-        <span className="text-[11px] text-boxing-muted italic truncate">{placeholder}</span>
+        <span className="text-[12px] text-boxing-muted italic truncate" style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>{placeholder}</span>
       </div>
     );
     const esGanador = winner === fid;
@@ -271,14 +319,16 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     // sus dos finalistas (no se puede coronar con una sola semi decidida).
     const winBloqueado = inexistente || bloqueada;
     return (
-      <div className={"flex items-center gap-2 px-2.5 py-1.5 " + (esGanador ? "bg-boxing-goldDim/15" : "")}>
+      <div className={"flex items-center gap-2 pr-2.5 py-1.5 " + (esGanador ? "bg-boxing-goldDim/15" : "")}>
         {cuadro}
         <span className="flex flex-col min-w-0 flex-1">
-          <span className={"text-[12.5px] leading-tight truncate " + (perdio ? "text-boxing-muted line-through" : "text-boxing-cream font-bold")}>{f ? f.fullName : "—"}</span>
+          <span className={"text-[12.5px] leading-tight truncate " + (perdio ? "text-boxing-muted line-through" : esGanador ? "font-bold text-boxing-goldBright" : "text-boxing-cream font-bold")}>{f ? f.fullName : "—"}</span>
           <span className="text-[8.5px] text-boxing-muted truncate">{f ? `${f.gym} · ${f.weightKg}kg · ${f.age}a` : "peleador eliminado"}</span>
         </span>
-        {onWin && <button type="button" disabled={winBloqueado} onClick={onWin} title={esGanador ? "Quitar como ganador" : "Marcó ganador — avanza"} className={"w-7 h-7 flex items-center justify-center rounded border text-sm flex-shrink-0 transition-colors " + (esGanador ? "bg-green-600 border-green-500 text-white" : "border-boxing-lineBright text-green-400 hover:bg-green-600/20") + (winBloqueado ? " opacity-30 cursor-not-allowed" : "")}>✓</button>}
-        {onRemove && <button type="button" onClick={onRemove} title="Eliminar y elegir otro" className="w-7 h-7 flex items-center justify-center rounded border border-boxing-lineBright text-red-400 hover:bg-red-600/20 text-sm flex-shrink-0 transition-colors">✕</button>}
+        {/* Sellos de juez: círculos monocromos que solo se encienden (verde el
+            ✓, rosa-carmesí el ✕) al tocarlos; el ✓ del ganador queda sólido. */}
+        {onWin && <button type="button" disabled={winBloqueado} onClick={onWin} title={esGanador ? "Quitar como ganador" : "Marcó ganador — avanza"} className={"seal seal-win text-sm" + (winBloqueado ? " opacity-30 cursor-not-allowed" : "")} style={esGanador ? { background: "#16a34a", borderColor: "#22C55E", color: "#fff", boxShadow: "0 0 12px rgba(34,197,94,0.5)" } : undefined}>✓</button>}
+        {onRemove && <button type="button" onClick={onRemove} title="Eliminar y elegir otro" className="seal seal-chg text-sm">✕</button>}
       </div>
     );
   }
@@ -297,18 +347,18 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
       </div>
 
-      <button onClick={() => setShowPosibles(o => !o)} className="w-full lg:max-w-xl lg:mx-auto py-2.5 bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
+      <button onClick={() => setShowPosibles(o => !o)} className="w-full lg:max-w-xl lg:mx-auto py-2.5 rounded-2xl bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
         Posibles llaves{posibles.length ? ` (${posibles.length})` : ""} <span className={"text-base leading-none transition-transform " + (showPosibles ? "rotate-180" : "")}>▾</span>
       </button>
-      {showPosibles && <div className="lg:max-w-3xl lg:mx-auto border border-blue-500/30 bg-blue-950/10 p-3 space-y-2 fade-in">
+      {showPosibles && <div className="lg:max-w-3xl lg:mx-auto rounded-2xl border border-blue-500/30 bg-blue-950/10 p-3 space-y-2 fade-in">
         <p className="text-[10px] text-boxing-muted">Combinaciones que se pueden armar con los peleadores que aún NO están en una llave{fightsCeil != null ? ` (hasta ${fightsCeil} pelea${fightsCeil === 1 ? "" : "s"})` : ""}. Toca "Agregar" en la que quieras.</p>
         {posibles.length === 0
           ? <p className="text-boxing-muted text-sm text-center py-2">No hay más llaves posibles con los peleadores libres.</p>
           : posibles.map(b => (
-            <div key={b.catKey} className="border border-boxing-line bg-black/40 p-2.5">
+            <div key={b.catKey} className="rounded-xl border border-boxing-line bg-black/40 p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-boxing-goldFight font-bold text-sm min-w-0 truncate" style={{ fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.05em" }}>{"🏆"} {b.catLabel}</p>
-                <button onClick={() => agregarPosible(b)} className="flex-shrink-0 px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold tracking-widest uppercase transition-colors">Agregar</button>
+                <button onClick={() => agregarPosible(b)} className="flex-shrink-0 px-3 py-1 rounded-full bg-green-600 hover:bg-green-500 text-white text-xs font-bold tracking-widest uppercase transition-colors">Agregar</button>
               </div>
               <p className="text-[9px] text-boxing-muted mb-1">{b.regla}</p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
@@ -330,29 +380,29 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </button>
 
       {configOpen && <div className="space-y-4 lg:max-w-3xl lg:mx-auto fade-in">
-      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+      <div className="bg-black/40 border border-boxing-lineBright rounded-xl px-3 py-2.5 space-y-1.5">
         <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Experiencia de peleadores en el Super 4</p>
         <label className="flex items-center gap-2">
           <span className="text-[12px] text-boxing-cream whitespace-nowrap">Peleadores hasta con:</span>
-          <select value={maxFightsSel} onChange={e => cambiarMaxFights(e.target.value)} className="flex-1 bg-black border border-boxing-lineBright text-boxing-cream text-sm px-2 py-1.5 focus:border-boxing-goldDim outline-none">
+          <select value={maxFightsSel} onChange={e => cambiarMaxFights(e.target.value)} className="input-ink flex-1 text-sm px-2.5 py-1.5">
             {MAX_FIGHTS_OPTIONS.map(v => <option key={v} value={v}>{fightsOptionLabel(v)}</option>)}
           </select>
         </label>
       </div>
       {fightsCeil != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Solo entran a la llave los peleadores con {fightsCeil} pelea{fightsCeil === 1 ? "" : "s"} como máximo. Toca GENERAR LLAVES para aplicarlo.</p>}
 
-      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+      <div className="bg-black/40 border border-boxing-lineBright rounded-xl px-3 py-2.5 space-y-1.5">
         <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Cantidad de llaves del Super 4</p>
         <label className="flex items-center gap-2">
           <span className="text-[12px] text-boxing-cream whitespace-nowrap">Cantidad de llaves:</span>
-          <select value={cantidadLlaves} onChange={e => cambiarCantidad(e.target.value)} className="flex-1 bg-black border border-boxing-lineBright text-boxing-cream text-sm px-2 py-1.5 focus:border-boxing-goldDim outline-none">
+          <select value={cantidadLlaves} onChange={e => cambiarCantidad(e.target.value)} className="input-ink flex-1 text-sm px-2.5 py-1.5">
             {CANTIDAD_OPTIONS.map(v => <option key={v} value={v}>{cantidadLabel(v)}</option>)}
           </select>
         </label>
       </div>
       {llavesCap != null && <p className="text-[10px] text-boxing-goldFight -mt-2">Se arman como máximo {llavesCap} llave{llavesCap === 1 ? "" : "s"} de las categorías elegidas (menor edad y peso primero). Toca GENERAR LLAVES para aplicarlo.</p>}
 
-      <button type="button" onClick={() => cambiarIncompletas(!incompletas)} className="w-full bg-black/40 border border-boxing-lineBright px-3 py-2.5 flex items-center justify-between gap-3 transition-colors hover:bg-white/5">
+      <button type="button" onClick={() => cambiarIncompletas(!incompletas)} className="w-full bg-black/40 border border-boxing-lineBright rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 transition-colors hover:bg-white/5">
         <span className="text-left min-w-0">
           <span className="text-[12px] text-boxing-cream block">Armar aunque falten peleadores</span>
           <span className="text-[10px] text-boxing-muted block">Crea llaves incompletas (cupos "＋ Elegir") para ver todas las categorías e irlas completando.</span>
@@ -363,13 +413,13 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </button>
       {incompletas && <p className="text-[10px] text-boxing-goldFight -mt-2">Se armarán las categorías elegidas con al menos 1 atleta, aunque no lleguen a 4. Los cupos vacíos se llenan con "＋ Elegir".</p>}
 
-      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+      <div className="bg-black/40 border border-boxing-lineBright rounded-xl px-3 py-2.5 space-y-1.5">
         <p className="text-[11px] text-boxing-muted tracking-wide uppercase">Categoría de peleadores en el Super 4</p>
         <div className="flex flex-wrap gap-1.5">
           {AGE_OPTIONS.map(a => {
             const on = selectedAges.includes(a.key);
             return (
-              <button key={a.key} type="button" onClick={() => toggleAge(a.key)} className={"flex items-center gap-1.5 px-2.5 py-1.5 border text-sm transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15 text-boxing-cream" : "border-boxing-lineBright text-boxing-muted hover:border-boxing-lineBright/80")}>
+              <button key={a.key} type="button" onClick={() => toggleAge(a.key)} className={"flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15 text-boxing-cream" : "border-boxing-lineBright text-boxing-muted hover:border-boxing-lineBright/80")}>
                 <span className={"w-3.5 h-3.5 flex items-center justify-center text-[10px] border rounded-sm flex-shrink-0 " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
                 <span className="flex flex-col leading-tight text-left">
                   <span>{a.label} <span className="text-[9px] text-boxing-muted">({a.minAge}-{a.maxAge})</span></span>
@@ -382,7 +432,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </div>
       {!selectedAges.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos una categoría de edad.</p>}
 
-      <div className="bg-black/40 border border-boxing-lineBright px-3 py-2 space-y-1.5">
+      <div className="bg-black/40 border border-boxing-lineBright rounded-xl px-3 py-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-boxing-muted tracking-wide uppercase truncate">Peso oficial de peleadores en el Super 4</p>
           <span className="text-[11px] flex-shrink-0">
@@ -395,7 +445,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           {DIVISION_OPTIONS.map(d => {
             const on = selectedDivs.includes(d.key);
             return (
-              <button key={d.key} type="button" onClick={() => toggleDiv(d.key)} className={"flex items-center gap-1.5 px-2 py-1.5 border text-left transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15" : "border-boxing-lineBright hover:border-boxing-lineBright/80")}>
+              <button key={d.key} type="button" onClick={() => toggleDiv(d.key)} className={"flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-left transition-colors " + (on ? "border-boxing-goldDim bg-boxing-goldDim/15" : "border-boxing-lineBright hover:border-boxing-lineBright/80")}>
                 <span className={"w-3.5 h-3.5 flex items-center justify-center text-[9px] border rounded-sm flex-shrink-0 " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
                 <span className="flex flex-col min-w-0 leading-tight">
                   <span className={"font-bold text-[13px] whitespace-nowrap " + (on ? "text-boxing-cream" : "text-boxing-muted")}>{weightRangeLabel(d)}</span>
@@ -408,12 +458,12 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       </div>
       {!selectedDivs.length && <p className="text-[10px] text-boxing-crimsonLight -mt-2">Elige al menos un peso.</p>}
 
-      {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase">Limpiar llaves</button>}
+      {super4.length > 0 && <button onClick={limpiar} className="w-full py-2.5 rounded-2xl bg-black/40 border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase hover:border-boxing-goldDim hover:text-boxing-goldFight transition-colors">Limpiar llaves</button>}
       </div>}
 
       {/* ===== Las llaves, a todo el ancho: el protagonista de la pestaña ===== */}
       <div className="space-y-4 lg:space-y-6">
-      {!super4.length && <div className="lg:max-w-2xl lg:mx-auto border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
+      {!super4.length && <div className="lg:max-w-2xl lg:mx-auto rounded-3xl border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
         <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
         <div className="text-left text-xs text-boxing-muted space-y-1 pt-2">
           {resultado.brackets.length === 0 && resultado.faltantes.length === 0 && <p>Con los filtros actuales no hay atletas para armar llaves. Ajusta la experiencia, la edad o los pesos.</p>}
@@ -427,13 +477,21 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {super4.map(b => {
         const finalistas = [b.semis[0].winner, b.semis[1].winner];
         const campeon = b.finalWinner;
+        // Cabecera de cinturón: título en serif dorada por tramos y píldoras
+        // de condición (edad · kg · sexo) cuando la llave trae sus claves;
+        // los cinturones legacy caen al texto de la regla, como siempre.
+        const cond = condicionesLlave(b);
         return (
-          <div key={b.id} className="bg-boxing-panel border border-boxing-goldDim/40 overflow-hidden scale-in relative">
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,transparent,#c8a04a,transparent)" }} />
-            <div className="px-4 py-2.5 bg-black/40 border-b border-boxing-line flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-boxing-goldFight font-bold truncate" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.08em" }}>{"🏆"} {b.catLabel}</p>
-                <p className="text-[10px] text-boxing-muted truncate">{b.regla}</p>
+          <div key={b.id} className="rounded-3xl border border-white/5 overflow-hidden scale-in relative" style={{ background: "linear-gradient(170deg, rgba(22,17,26,0.75), rgba(11,9,12,0.85))" }}>
+            <div className="px-4 py-3 bg-black/30 border-b border-white/5 flex items-center justify-between gap-2 flex-wrap">
+              <div className="min-w-0 flex items-baseline gap-2.5 flex-wrap">
+                <TituloLlave label={b.catLabel} />
+                {cond && <span className="flex items-center gap-1.5 flex-wrap">
+                  <Pildora c={cond.ageInfo.color}>{cond.ageInfo.label} · {cond.ageInfo.minAge}-{cond.ageInfo.maxAge}a</Pildora>
+                  <Pildora c="#6366F1">{weightRangeLabel(cond.div)}</Pildora>
+                  <Pildora c={cond.div.genero === "F" ? "#EC4899" : "#3B82F6"}>{cond.div.genero === "F" ? "Femenino" : "Masculino"}</Pildora>
+                </span>}
+                {!cond && <p className="text-[10px] text-boxing-muted truncate w-full">{b.regla}</p>}
               </div>
               <span className="text-[8.5px] text-boxing-muted flex-shrink-0 text-right leading-tight"><span className="text-green-400">✓</span> gana · <span className="text-red-400">✕</span> cambia</span>
             </div>
@@ -459,8 +517,37 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                   );
                 })}
                 <div className="s4-conn"><Conector /></div>
-                <div className="s4-line s4-line1" />
-                <div className="s4-line s4-line2" />
+                {/* Venas de luz (solo XL): curvas de doble trazo — neón difuso
+                    debajo, línea nítida encima y un destello que las recorre —
+                    que nacen rojas/azules en su semi y funden a DORADO al
+                    tocar la final. Los ids de gradiente llevan el id de la
+                    llave: con varias llaves en pantalla no pueden repetirse. */}
+                <div className="s4-c1" aria-hidden="true">
+                  <svg viewBox="0 0 64 190" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id={"s4gr-" + b.id} x1="2" y1="60" x2="62" y2="130" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#c42438" /><stop offset="1" stopColor="#e5c76b" />
+                      </linearGradient>
+                      <filter id={"s4fr-" + b.id} x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5" /></filter>
+                    </defs>
+                    <path d="M 2 60 C 42 60, 22 130, 62 130" stroke={"url(#s4gr-" + b.id + ")"} strokeWidth="8" fill="none" strokeLinecap="round" opacity=".35" filter={"url(#s4fr-" + b.id + ")"} />
+                    <path d="M 2 60 C 42 60, 22 130, 62 130" stroke={"url(#s4gr-" + b.id + ")"} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                    <path d="M 2 60 C 42 60, 22 130, 62 130" stroke="#f4ead0" strokeWidth="2.5" fill="none" strokeLinecap="round" className="s4-vena" opacity=".85" />
+                  </svg>
+                </div>
+                <div className="s4-c2" aria-hidden="true">
+                  <svg viewBox="0 0 64 190" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id={"s4gb-" + b.id} x1="62" y1="60" x2="2" y2="130" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#2563EB" /><stop offset="1" stopColor="#e5c76b" />
+                      </linearGradient>
+                      <filter id={"s4fb-" + b.id} x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5" /></filter>
+                    </defs>
+                    <path d="M 62 60 C 22 60, 42 130, 2 130" stroke={"url(#s4gb-" + b.id + ")"} strokeWidth="8" fill="none" strokeLinecap="round" opacity=".35" filter={"url(#s4fb-" + b.id + ")"} />
+                    <path d="M 62 60 C 22 60, 42 130, 2 130" stroke={"url(#s4gb-" + b.id + ")"} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                    <path d="M 62 60 C 22 60, 42 130, 2 130" stroke="#f4ead0" strokeWidth="2.5" fill="none" strokeLinecap="round" className="s4-vena tarde" opacity=".85" />
+                  </svg>
+                </div>
                 <div className="s4-final">
                   <Tarjeta dia={`${EVENT_LABELS.finalAbbr} · Final`} decidido={!!campeon} destacada>
                     <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onWin={() => marcarFinal(b.id, finalistas[0])} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
@@ -468,9 +555,9 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                   </Tarjeta>
                 </div>
               </div>
-              {campeon && <div className="mt-3 xl:mt-5 xl:max-w-md xl:mx-auto border border-boxing-goldFight/50 bg-boxing-goldDim/10 px-3 py-2.5 text-center fade-in">
+              {campeon && <div className="mt-3 xl:mt-5 xl:max-w-md xl:mx-auto rounded-2xl border border-boxing-goldFight/50 px-3 py-2.5 text-center fade-in" style={{ background: "radial-gradient(220px 90px at 50% 0%, rgba(200,160,74,0.14), transparent 70%), rgba(138,109,47,0.08)", boxShadow: "0 0 24px rgba(200,160,74,0.18)" }}>
                 <p className="text-[10px] tracking-widest uppercase text-boxing-goldFight">Campeón {b.catLabel}</p>
-                <p className="text-boxing-cream font-black" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.05em" }}>{"🏆"} {nombre(campeon)}</p>
+                <p className="font-black titulo-oro" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: "23px", letterSpacing: "0.02em" }}>{"🏆"} {nombre(campeon)}</p>
               </div>}
             </div>
           </div>
@@ -495,7 +582,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         const saleF = byId[reemplazo.saliente]; // el que sale, o undefined si el cupo ya estaba libre
         return (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4" onClick={() => setReemplazo(null)}>
-            <div className="w-full max-w-md bg-boxing-panel border border-boxing-goldDim/50 rounded-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-md bg-boxing-panel border border-boxing-goldDim/50 rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-boxing-line">
                 <p className="text-boxing-cream font-bold" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.05em" }}>{saleF ? "Reemplazar peleador" : "Elegir peleador"}</p>
                 <p className="text-[11px] text-boxing-muted">{b.catLabel}{saleF ? <> · sale <span className="text-boxing-cream font-semibold">{saleF.fullName}</span></> : " · cupo libre"}</p>

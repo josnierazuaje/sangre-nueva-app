@@ -117,7 +117,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
 </body></html>`);
   }
 
-  if (!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
+  if (!fighters.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-[22px]"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Sin peleadores</p><p className="text-boxing-muted text-sm opacity-60 mt-1">Registra al primer peleador para el cartel.</p></div>;
   return (
     <div className="space-y-3">
       <PageHeader kicker="Base de datos de atletas" title="Peleadores" count={fighters.length} />
@@ -130,20 +130,22 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <FilterChip key={a.key} n={c} label={`${a.label} · ${FECHIBOX_LABEL[a.key] || a.label}`} color={a.color} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
         {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
       </div>
-      {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 px-3 py-2 fade-in">
+      {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2 fade-in">
         <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
       </div>}
       {/* Móvil: búsqueda arriba y filtros abajo, como siempre. Escritorio
           (lg): todo en una sola fila-herramienta para liberar alto visual. */}
       <div className="space-y-3 lg:space-y-0 lg:flex lg:gap-2 lg:items-stretch">
-      <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="w-full px-3 py-2.5 bg-black border border-boxing-lineBright rounded-none text-boxing-cream placeholder-boxing-muted focus:outline-none focus:border-boxing-goldDim text-sm transition-colors lg:flex-1" />
+      {/* Pozos de tinta: .input-ink trae fondo hundido, radio 14px, placeholder
+          apagado y el halo cobalto de foco — aquí solo queda el tamaño. */}
+      <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="input-ink w-full px-3 py-2.5 text-sm lg:flex-1" />
       <div className="flex gap-2 lg:flex-shrink-0">
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="flex-1 px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors">
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input-ink flex-1 px-2 py-2 text-sm">
           <option value="all">Todas categorías</option>
           <optgroup label="Hombres">{WEIGHT_CATEGORIES_M.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
           <optgroup label="Mujeres">{WEIGHT_CATEGORIES_F.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
         </select>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-2 py-2 bg-black border border-boxing-lineBright rounded-none text-boxing-cream text-sm transition-colors"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-ink px-2 py-2 text-sm"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
         <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="btn-gold px-3 py-2 text-sm">🖨️</button>
       </div>
       </div>
@@ -152,21 +154,34 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
       <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3">
         {!filtered.length ? <p className="text-boxing-muted text-center py-8 text-sm lg:col-span-full">Sin resultados</p> : filtered.map(f => {
           const cat = getCategoryInfo(f.weightCategory); const exp = getExperienceInfo(f.experienceLevel);
-          return (<div key={f.id} className="fighter-card p-3.5 space-y-2.5 fade-in" style={{ "--edge": exp?.color || "#4B5563" }}>
+          // Rediseño: la tarjeta lleva --cat (color de la DIVISIÓN) — pinta el
+          // aro del avatar; el filo de oro y el hover los da .fighter-card.
+          return (<div key={f.id} className="fighter-card group p-3.5 space-y-2.5 fade-in" style={{ "--cat": cat?.color || "#9CA3AF" }}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-[13px] font-bold rounded" style={{ background: "linear-gradient(150deg," + (cat?.color || "#9CA3AF") + "30," + (cat?.color || "#9CA3AF") + "08)", border: "1px solid " + (cat?.color || "#9CA3AF") + "59", color: cat?.color || "#9CA3AF" }}>{getInitials(f.fullName)}</div>
-                <div className="min-w-0 flex-1"><h3 className="text-boxing-cream font-semibold text-base leading-tight truncate">{f.fullName}</h3><p className="text-boxing-muted text-[11px] mt-0.5 truncate tracking-[0.12em] uppercase">{f.gym}</p></div>
+                <div className="avatar-ring"><span>{getInitials(f.fullName)}</span></div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="leading-tight truncate text-[17px]" style={{ fontFamily: "'Playfair Display',Georgia,serif", color: "#f2edf4" }}>{f.fullName}</h3>
+                  <p className="text-boxing-muted text-[11px] mt-0.5 truncate tracking-[0.14em] uppercase"><span style={{ color: "rgba(200,160,74,0.6)" }}>· </span>{f.gym}</p>
+                </div>
               </div>
-              <div className="flex gap-1 ml-2 flex-shrink-0"><button onClick={() => onEdit(f)} className="p-2 text-boxing-muted hover:text-boxing-goldFight hover:bg-white/5 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button><button onClick={() => del(f.id)} className={"p-2 transition-colors hover:bg-white/5 " + (confirmDeleteId === f.id ? "text-red-400" : "text-boxing-muted hover:text-red-400")}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div></div>
-            <div className="flex flex-wrap gap-1.5 pl-[52px]">
+              {/* Acciones que no estorban: en escritorio aparecen al pasar el
+                  cursor (group-hover); en móvil siempre visibles (no hay hover).
+                  Editar vira a dorado, eliminar a carmesí — el peligro se
+                  anuncia con color. */}
+              <div className="flex gap-1.5 ml-2 flex-shrink-0 lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 lg:focus-within:opacity-100 lg:focus-within:translate-y-0 transition-all duration-150">
+                <button onClick={() => onEdit(f)} aria-label="Editar" className="w-[30px] h-[30px] rounded-[10px] border border-white/10 bg-black/60 flex items-center justify-center text-boxing-muted hover:text-boxing-goldBright hover:bg-boxing-goldFight/10 hover:border-boxing-goldFight/40 transition-colors"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                <button onClick={() => del(f.id)} aria-label="Eliminar" className={"w-[30px] h-[30px] rounded-[10px] border flex items-center justify-center transition-colors " + (confirmDeleteId === f.id ? "text-red-400 border-red-500/50 bg-red-900/20" : "border-white/10 bg-black/60 text-boxing-muted hover:text-red-400 hover:bg-red-900/20 hover:border-red-500/40")}><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pl-[56px]">
               <Badge color={cat?.color || "#F59E0B"}>{f.weightKg}kg · {cat?.label}</Badge>
               <Badge color={exp?.color}>{f.fightCount}p · {exp?.label}</Badge>
               <Badge color={getAgeCategory(f.age).color}>{f.age}a · {getAgeCategory(f.age).label.split(" ")[0]}</Badge>
               <Badge color={(f.sexo || "M") === "F" ? "#EC4899" : "#3B82F6"}>{(f.sexo || "M") === "F" ? "F" : "M"}</Badge>
             </div>
-            {f.phone && <div className="text-xs text-boxing-muted pl-[52px]"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
-            {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-[52px]">{"⚠️"} Toca de nuevo para eliminar</p>}
+            {f.phone && <div className="text-xs text-boxing-muted pl-[56px]"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
+            {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-[56px]">{"⚠️"} Toca de nuevo para eliminar</p>}
           </div>);
         })}
       </div>

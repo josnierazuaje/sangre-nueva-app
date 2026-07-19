@@ -113,7 +113,6 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   const checked = tickets.filter(t => t.status === "ingresado");
   const pending = tickets.filter(t => t.status === "activo");
   const checkedInLog = useMemo(() => [...checked].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)), [checked]);
-  const iS = { background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px" };
   if (justCheckedIn) {
     const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === justCheckedIn.ticketType) || TICKET_TYPES_V2[0];
     return <CheckInWelcome ticket={justCheckedIn} ticketTypeInfo={ticketTypeInfo} onClose={closeWelcome} />;
@@ -121,29 +120,29 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+        <div className="rounded-2xl p-3 text-center border" style={{ background: "linear-gradient(158deg, rgba(34,197,94,0.08), transparent 48%), linear-gradient(168deg, #14101a, #0b090c)", borderColor: "rgba(34,197,94,0.25)" }}>
           <p className="text-2xl font-black text-green-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{checked.length}</p>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Ingresados</p>
+          <p className="text-[10px] text-boxing-muted uppercase tracking-[0.18em]">Ingresados</p>
         </div>
-        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+        <div className="rounded-2xl p-3 text-center border" style={{ background: "linear-gradient(158deg, rgba(245,158,11,0.08), transparent 48%), linear-gradient(168deg, #14101a, #0b090c)", borderColor: "rgba(245,158,11,0.25)" }}>
           <p className="text-2xl font-black text-yellow-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{pending.length}</p>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pendientes</p>
+          <p className="text-[10px] text-boxing-muted uppercase tracking-[0.18em]">Pendientes</p>
         </div>
       </div>
-      {scanning && <div className="rounded-xl overflow-hidden relative scale-in" style={{ border: "1px solid rgba(220,38,38,0.4)" }}>
+      {scanning && <div className="rounded-2xl overflow-hidden relative scale-in" style={{ border: "1px solid rgba(220,38,38,0.4)" }}>
         <video ref={videoRef} playsInline muted className="w-full" style={{ maxHeight: "260px", objectFit: "cover", background: "#000" }} />
         <canvas ref={canvasRef} style={{ display: "none" }} />
         <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(220,38,38,0.6)", pointerEvents: "none", margin: "14%" }} />
-        <button onClick={stopScan} type="button" className="absolute top-2 right-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: "rgba(0,0,0,0.6)" }}>Cancelar</button>
+        <button onClick={stopScan} type="button" className="absolute top-2 right-2 px-3 py-1.5 rounded-full text-xs font-bold text-white" style={{ background: "rgba(0,0,0,0.6)" }}>Cancelar</button>
         <p className="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/80">Apunta al código QR de la entrada</p>
       </div>}
-      {!scanning && <button onClick={startScan} type="button" className="btn-primary w-full py-3.5 rounded-xl font-black flex items-center justify-center gap-2" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
+      {!scanning && <button onClick={startScan} type="button" className="btn-primary w-full py-3.5 font-black flex items-center justify-center gap-2" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
       {scanErr && <p className="text-red-400 text-xs text-center">{scanErr}</p>}
-      <form onSubmit={search} className="rounded-xl p-4 space-y-3" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <h3 className="text-xs font-bold text-white uppercase tracking-widest">Validar manualmente</h3>
+      <form onSubmit={search} className="rounded-3xl p-4 space-y-3 border border-white/5" style={{ background: "linear-gradient(170deg, #131016, #0c0a0e)" }}>
+        <h3 className="text-boxing-cream" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: "17px" }}>Validar manualmente</h3>
         <div className="flex gap-2">
-          <input value={input} onChange={e => setInput(e.target.value.toUpperCase())} placeholder="PRE-0001 / PUE-0003..." className="flex-1 px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none" style={iS} />
-          <button type="submit" className="px-4 py-2.5 rounded-xl text-white text-sm font-bold" style={{ background: "rgba(220,38,38,0.35)", border: "1px solid rgba(220,38,38,0.45)" }}>Buscar</button>
+          <input value={input} onChange={e => setInput(e.target.value.toUpperCase())} placeholder="PRE-0001 / PUE-0003..." className="input-ink flex-1 px-3 py-2.5 text-sm" />
+          <button type="submit" className="btn-gold px-4 py-2.5 text-sm font-bold tracking-[0.14em] uppercase">Buscar</button>
         </div>
       </form>
       {result && result !== "notfound" && (() => {
@@ -153,7 +152,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         // ingreso; si de verdad es el dueño, el staff puede validar a mano.
         if (verify === "bad") {
           return (
-            <div className="rounded-xl p-4 space-y-2 scale-in text-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.45)" }}>
+            <div className="rounded-2xl p-4 space-y-2 scale-in text-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.45)" }}>
               <p className="text-red-400 font-black text-lg">⚠️ Código QR inválido</p>
               <p className="text-gray-300 text-sm">El QR no coincide con la boleta <span className="font-bold text-white">#{result.id}</span>. Puede ser una entrada falsificada o duplicada.</p>
               <p className="text-gray-500 text-xs">Si la persona insiste, pide su boleta original y valida el número a mano.</p>
@@ -161,7 +160,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
           );
         }
         return (
-          <div className="rounded-xl p-4 space-y-3 scale-in" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid " + (result.status === "ingresado" ? "rgba(34,197,94,0.4)" : "rgba(245,158,11,0.35)") }}>
+          <div className="rounded-2xl p-4 space-y-3 scale-in" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid " + (result.status === "ingresado" ? "rgba(34,197,94,0.4)" : "rgba(245,158,11,0.35)") }}>
             <div className="flex items-center gap-3">
               <span className="text-3xl">{result.status === "ingresado" ? "✅" : "🎫"}</span>
               <div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-xs text-gray-400">#{result.id} · <span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</span></p></div>
@@ -172,18 +171,18 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
               ? (already
                   ? <p className="text-yellow-300 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.12)" }}>⚠️ Otra puerta ya marcó este ingreso{inAt ? " (" + inAt + ")" : ""}</p>
                   : <p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.1)" }}>✓ Ya registrado como ingresado{inAt ? " (" + inAt + ")" : ""}</p>)
-              : <button onClick={doIn} disabled={checking} className="w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>{checking ? "MARCANDO..." : "✅ MARCAR INGRESO"}</button>
+              : <button onClick={doIn} disabled={checking} className="w-full py-3 rounded-2xl font-black text-white transition-all active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>{checking ? "MARCANDO..." : "✅ MARCAR INGRESO"}</button>
             }
             {actionErr && <p className="text-red-400 text-xs text-center">{actionErr}</p>}
           </div>
         );
       })()}
-      {result === "notfound" && <div className="text-center py-4 rounded-xl scale-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-xs mt-1">Verifica el número ingresado</p></div>}
-      {checkedInLog.length > 0 && <div><p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Registro de ingresos ({checkedInLog.length})</p>
+      {result === "notfound" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-xs mt-1">Verifica el número ingresado</p></div>}
+      {checkedInLog.length > 0 && <div><p className="text-[10px] text-boxing-muted uppercase tracking-[0.22em] mb-2">Registro de ingresos ({checkedInLog.length})</p>
         <div className="space-y-1.5">{checkedInLog.map(t => {
           const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
           const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "--:--";
-          return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span></div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[10px] text-gray-500">{time}</span><span className="text-[10px] text-green-400">#{t.id}</span></div></div>;
+          return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span></div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[10px] text-gray-500">{time}</span><span className="text-[10px] text-green-400">#{t.id}</span></div></div>;
         })}</div>
       </div>}
     </div>

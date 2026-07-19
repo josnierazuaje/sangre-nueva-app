@@ -44,51 +44,65 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     setTickets(tickets.filter(t => t.id !== id));
     removeTicketNode(id);
   }
-  const tabs = [{ k: "sell", label: "Vender", e: "🎫" }, { k: "history", label: "Historial", e: "📋" }, { k: "checkin", label: "Check-in", e: "✅" }];
+  const tabs = [{ k: "sell", label: "Vender" }, { k: "history", label: "Historial" }, { k: "checkin", label: "Check-in" }];
   return (
     // En escritorio se centra con un ancho controlado: los KPIs y las
     // sub-vistas (vender/historial/check-in) no se estiran de más.
     <div className="space-y-4 lg:max-w-4xl lg:mx-auto">
       <PageHeader kicker="Boletería" title="Entradas" />
-      <div className="kpi-tile p-4 space-y-2.5" style={{ "--c": "#c42438" }}>
-        <div className="flex justify-between items-baseline">
-          <span className="text-[10px] text-boxing-muted uppercase tracking-[0.22em]">Capacidad</span>
-          <span className="text-boxing-cream"><span style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "20px", letterSpacing: "0.03em" }}>{kpis.total}</span> <span className="text-boxing-muted text-xs">/ {MAX_CAP}</span></span>
-        </div>
-        {/* Medidor segmentado por tipo de entrada (ocupación vs. aforo). La pista
-            clara es el aforo restante; cada tramo, un tipo. Bordes redondeados y
-            separación de 2px entre tramos. */}
-        <div className="w-full h-2.5 rounded-full overflow-hidden flex gap-[2px]" style={{ background: "rgba(255,255,255,0.06)" }}>
-          {TICKET_TYPES_V2.map(tt => { const w = (kpis.byType[tt.key] || 0) / MAX_CAP * 100; return w > 0 ? <div key={tt.key} className="transition-all duration-700" style={{ width: w + "%", background: tt.color }} /> : null; })}
-        </div>
-        {/* Leyenda etiquetada: da la identidad del color (necesaria porque los
-            colores de tipo no se distinguen bien bajo daltonismo). */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {TICKET_TYPES_V2.map(tt => <span key={tt.key} className="inline-flex items-center gap-1.5 text-[10px]">
-            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: tt.color }} />
-            <span className="text-boxing-muted uppercase tracking-wide">{tt.label}</span>
-            <span className="font-bold" style={{ color: tt.color }}>{kpis.byType[tt.key] || 0}</span>
-          </span>)}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="kpi-tile p-4" style={{ "--c": "#c8a04a" }}>
-          <p className="text-[10px] text-boxing-muted uppercase tracking-[0.22em] mb-1.5">Ingresos</p>
-          <p className="leading-none truncate" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "27px", letterSpacing: "0.02em", color: "#e5c76b" }}>{fmt$(kpis.revenue)}</p>
-          <div className="mt-2 space-y-0.5">{Object.entries(kpis.byPayment).filter(([, v]) => v > 0).map(([m, v]) => <p key={m} className="text-[10px] text-boxing-muted">{m}: <span className="text-boxing-cream/80 font-semibold">{fmt$(v)}</span></p>)}</div>
-        </div>
-        <div className="kpi-tile p-4" style={{ "--c": "#22c55e" }}>
-          <p className="text-[10px] text-boxing-muted uppercase tracking-[0.22em] mb-1.5">Check-in</p>
-          <p className="leading-none" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "27px", letterSpacing: "0.02em", color: "#4ade80" }}>{kpis.checkedIn}<span className="text-boxing-muted" style={{ fontSize: "16px" }}> / {kpis.total}</span></p>
-          <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: (kpis.total ? kpis.checkedIn / kpis.total * 100 : 0) + "%", background: "linear-gradient(90deg,#16a34a,#4ade80)" }} />
+      {/* KPIs con jerarquía asimétrica: la recaudación es LA cifra de la
+          pantalla (héroe dorado); Capacidad y Check-in susurran al lado.
+          En móvil se conserva el orden de siempre (Capacidad arriba a lo
+          ancho, luego Ingresos y Check-in en dos columnas); en escritorio
+          el héroe ocupa la columna izquierda completa vía order + row-span. */}
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-[1.55fr_1fr] lg:gap-3.5">
+        <div className="kpi-tile col-span-2 order-1 p-4 lg:col-span-1 lg:order-2" style={{ "--c": "#6b5f6e" }}>
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-semibold text-boxing-muted uppercase tracking-[0.26em]">Capacidad</span>
+            <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.total}<span className="font-normal" style={{ opacity: 0.35 }}> / {MAX_CAP}</span></span>
           </div>
-          <p className="text-[10px] text-boxing-muted mt-1.5">Pendientes: {kpis.total - kpis.checkedIn}</p>
+          {/* Cinturón de capacidad: carril hundido con un tramo redondeado por
+              tipo de entrada vendido (ocupación real vs. aforo). */}
+          <div className="belt-bar mt-2.5">
+            {TICKET_TYPES_V2.map(tt => { const n = kpis.byType[tt.key] || 0; return n > 0 ? <span key={tt.key} className="belt-seg transition-all duration-700" style={{ width: (n / MAX_CAP * 100) + "%", background: tt.color }} /> : null; })}
+          </div>
+          {/* Leyenda etiquetada: da la identidad del color (necesaria porque los
+              colores de tipo no se distinguen bien bajo daltonismo). */}
+          <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2.5">
+            {TICKET_TYPES_V2.map(tt => <span key={tt.key} className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: tt.color }} />{tt.label} <b className="text-boxing-cream font-semibold">{kpis.byType[tt.key] || 0}</b>
+            </span>)}
+          </div>
+        </div>
+        <div className="kpi-oro order-2 p-4 lg:order-1 lg:row-span-2 lg:p-7 flex flex-col justify-center min-w-0">
+          <p className="text-[10px] lg:text-xs font-semibold uppercase tracking-[0.32em]" style={{ color: "rgba(200,160,74,0.85)" }}>Ingresos</p>
+          <p className="titulo-oro italic leading-[1.06] mt-1 truncate" style={{ fontSize: "clamp(30px,7vw,64px)", fontVariantNumeric: "tabular-nums", filter: "drop-shadow(0 0 18px rgba(200,160,74,0.35))" }}>{fmt$(kpis.revenue)}</p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tracking-[0.08em] text-boxing-muted">
+            {Object.entries(kpis.byPayment).filter(([, v]) => v > 0).map(([m, v]) => <span key={m}>{m}: <b className="text-boxing-cream font-semibold">{fmt$(v)}</b></span>)}
+            <span>{kpis.total} entrada{kpis.total !== 1 ? "s" : ""} emitida{kpis.total !== 1 ? "s" : ""}</span>
+          </div>
+        </div>
+        <div className="kpi-tile order-3 p-4" style={{ "--c": "#22C55E" }}>
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "rgba(34,197,94,0.8)" }}>Check-in</span>
+            <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.checkedIn}<span className="font-normal" style={{ opacity: 0.35 }}> / {kpis.total}</span></span>
+          </div>
+          <div className="belt-bar mt-2.5">
+            {kpis.checkedIn > 0 && <span className="belt-seg transition-all duration-700" style={{ width: (kpis.total ? kpis.checkedIn / kpis.total * 100 : 0) + "%", background: "linear-gradient(90deg,#16a34a,#4ade80)" }} />}
+          </div>
+          <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2.5">
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#22C55E" }} />Ingresados <b className="text-boxing-cream font-semibold">{kpis.checkedIn}</b>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#6b5f6e" }} />Pendientes <b className="text-boxing-cream font-semibold">{kpis.total - kpis.checkedIn}</b>
+            </span>
+          </div>
         </div>
       </div>
-      <div className="flex rounded-xl overflow-hidden" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        {tabs.map(s => <button key={s.k} onClick={() => setSubView(s.k)} className="flex-1 py-2.5 text-xs font-bold transition-all"
-          style={subView === s.k ? { background: "rgba(220,38,38,0.25)", color: "white", borderBottom: "2px solid #DC2626" } : { color: "#4B5563" }}>{s.e} {s.label}</button>)}
+      {/* Pestañas segmentadas: píldora con frost, la activa con filo dorado. */}
+      <div className="tab-pill">
+        {tabs.map(s => <button key={s.k} type="button" onClick={() => setSubView(s.k)} className={subView === s.k ? "on" : ""}>{s.label}</button>)}
       </div>
       {subView === "sell" && <SellView onAdd={addTicket} />}
       {subView === "history" && <HistoryView tickets={tickets} onDelete={deleteTicket} />}

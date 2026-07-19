@@ -95,20 +95,20 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
       }
     }, 120);
   }
-  if (elegibles.length < 2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Necesitas al menos 2 peleadores fuera del Super 4</p></div>;
+  if (elegibles.length < 2) return <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-3xl"><div className="text-5xl mb-4 opacity-30">{"\u{1F94A}"}</div><p className="text-boxing-muted" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "22px", letterSpacing: "0.08em" }}>Necesitas al menos 2 peleadores fuera del Super 4</p></div>;
   return (
     <div className="space-y-4">
       <PageHeader kicker="Armado de peleas" title="Emparejamientos" right={<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{matchups.length} peleas</span>} />
 
       {/* Peleas IMPOSIBLES (rival eliminado / atleta en el Super 4): sin criterio humano posible, se quitan de un toque */}
-      {conflicts.huerfanas.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+      {conflicts.huerfanas.length > 0 && <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-4 space-y-1 fade-in">
         <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.huerfanas.length} pelea{conflicts.huerfanas.length !== 1 ? "s" : ""} con un rival que ya no existe</p>
         <div className="space-y-0.5">{conflicts.huerfanas.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Su rival fue eliminado de la lista de peleadores; estas peleas no salen en la planilla impresa.</p>
       </div>}
 
       {/* Peleas con atletas que ya están en el Super 4 (no pueden estar en ambas planillas) */}
-      {conflicts.super4.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+      {conflicts.super4.length > 0 && <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-4 space-y-1 fade-in">
         <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.super4.length} pelea{conflicts.super4.length !== 1 ? "s" : ""} incluye{conflicts.super4.length !== 1 ? "n" : ""} atletas que ya están en el Super 4</p>
         <div className="space-y-0.5">{conflicts.super4.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Un atleta no puede estar en la cartelera y en el Super 4 a la vez.</p>
@@ -116,26 +116,26 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
 
       {/* Botón de limpieza de las peleas imposibles (huérfanas + Super 4). Solo
           aparece con el Super 4 ya hidratado desde la nube (ver quitarImposibles). */}
-      {conflicts.removibles.length > 0 && super4Ready && <button onClick={quitarImposibles} disabled={sorting} className="w-full py-3 bg-red-900/40 hover:bg-red-900/60 border border-red-500/60 text-red-200 font-bold text-sm tracking-widest uppercase transition-colors">
+      {conflicts.removibles.length > 0 && super4Ready && <button onClick={quitarImposibles} disabled={sorting} className="w-full py-3 rounded-2xl bg-red-900/40 hover:bg-red-900/60 border border-red-500/60 text-red-200 font-bold text-sm tracking-widest uppercase transition-colors">
         {"🧹"} Quitar {conflicts.removibles.length === 1 ? "la pelea imposible" : `las ${conflicts.removibles.length} peleas imposibles`} (Super 4 / rival eliminado)
       </button>}
 
       {/* Aviso de cruces de categoría de edad World Boxing en VS ya guardados */}
-      {conflicts.edadMixta.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-2 fade-in">
+      {conflicts.edadMixta.length > 0 && <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-4 space-y-2 fade-in">
         <p className="text-red-400 font-bold text-sm flex items-center gap-2">{"⚠️"} {conflicts.edadMixta.length} pelea{conflicts.edadMixta.length !== 1 ? "s" : ""} mezcla{conflicts.edadMixta.length !== 1 ? "n" : ""} categorías de edad — World Boxing no lo permite</p>
         <div className="space-y-1">{conflicts.edadMixta.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Elimina esas peleas (✕) y empareja de nuevo, o vuelve a generar todo con Emparejar.</p>
       </div>}
 
       {/* Peleas entre atletas de la misma escuela (entrenan juntos) */}
-      {conflicts.mismaEscuela.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 p-4 space-y-1 fade-in">
+      {conflicts.mismaEscuela.length > 0 && <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-2xl p-4 space-y-1 fade-in">
         <p className="text-yellow-400 font-bold text-sm">{"⚠️"} {conflicts.mismaEscuela.length} pelea{conflicts.mismaEscuela.length !== 1 ? "s" : ""} entre atletas de la misma escuela</p>
         <div className="space-y-0.5">{conflicts.mismaEscuela.map(v => <p key={v.id} className="text-yellow-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Dos que entrenan juntos no deberían pelear — vuelve a generar (Emparejar) o elimina esas peleas.</p>
       </div>}
 
       {/* Peleas con demasiada diferencia de experiencia (regla dura: máx 3 peleas, salvo ambos pro 15+) */}
-      {conflicts.experiencia.length > 0 && <div className="bg-red-900/20 border border-red-500/50 p-4 space-y-1 fade-in">
+      {conflicts.experiencia.length > 0 && <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-4 space-y-1 fade-in">
         <p className="text-red-400 font-bold text-sm">{"⚠️"} {conflicts.experiencia.length} pelea{conflicts.experiencia.length !== 1 ? "s" : ""} con demasiada diferencia de experiencia</p>
         <div className="space-y-0.5">{conflicts.experiencia.map(v => <p key={v.id} className="text-red-300/90 text-xs">{v.texto}</p>)}</div>
         <p className="text-boxing-muted text-xs">Máximo 3 peleas de diferencia (salvo que ambos tengan 15+). Vuelve a generar (Emparejar) o elimina esas peleas.</p>
@@ -153,23 +153,23 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
       </button>
 
       {/* Overlay animado mientras se prueban muchos repartos */}
-      {sorting && <div className="bg-black/60 border border-red-500/30 p-6 text-center scale-in lg:max-w-xl lg:mx-auto">
+      {sorting && <div className="bg-black/60 border border-red-500/30 rounded-3xl p-6 text-center scale-in lg:max-w-xl lg:mx-auto">
         <div className="text-4xl mb-3" style={{ animation: "vsFlash 0.3s ease-in-out infinite" }}>🥊</div>
         <p className="text-red-400 font-bold text-lg" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>BUSCANDO LAS PELEAS MÁS JUSTAS...</p>
         <div className="flex justify-center gap-1 mt-3">{[...Array(5)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-red-500" style={{ animation: `vsFlash 0.6s ease-in-out ${i * 0.1}s infinite` }}></div>)}</div>
       </div>}
 
       {/* Limpiar (solo si ya hay peleas armadas) */}
-      {matchups.length > 0 && !sorting && <button onClick={clearAll} className="w-full lg:max-w-xl lg:mx-auto px-4 py-2.5 bg-black border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase hover:border-boxing-goldDim transition-colors">Limpiar y empezar de nuevo</button>}
+      {matchups.length > 0 && !sorting && <button onClick={clearAll} className="block w-full lg:max-w-xl lg:mx-auto px-4 py-2.5 rounded-2xl bg-black/40 border border-boxing-lineBright text-boxing-muted text-sm tracking-widest uppercase hover:border-boxing-goldDim hover:text-boxing-goldFight transition-colors">Limpiar y empezar de nuevo</button>}
 
-      {!matchups.length && !sorting && <div className="border border-dashed border-boxing-lineBright p-4 text-center lg:max-w-xl lg:mx-auto"><p className="text-boxing-muted text-sm">Un toque arma <span className="text-boxing-cream font-semibold">toda la cartelera</span> automáticamente,<br />buscando las peleas <span className="text-red-400 font-bold">más parejas posibles</span>.</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría de edad · nivel · peso · escuela</p></div>}
+      {!matchups.length && !sorting && <div className="border border-dashed border-boxing-lineBright rounded-3xl p-4 text-center lg:max-w-xl lg:mx-auto"><p className="text-boxing-muted text-sm">Un toque arma <span className="text-boxing-cream font-semibold">toda la cartelera</span> automáticamente,<br />buscando las peleas <span className="text-red-400 font-bold">más parejas posibles</span>.</p><p className="text-boxing-muted text-xs mt-1 opacity-60">Respeta categoría de edad · nivel · peso · escuela</p></div>}
       {/* Móvil: lista vertical. Escritorio: cuadrícula de 2 columnas. */}
       <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">{matchups.map((m, i) => <VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM} onNotaChange={notaChange} />)}</div>
       {unmatched.length > 0 && <div><button onClick={() => setShowUn(!showUn)} className="text-sm text-boxing-muted hover:text-boxing-goldFight flex items-center gap-1 tracking-wide"><svg className={"w-4 h-4 transition-transform " + (showUn ? "rotate-90" : "")} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>Sin pelea ({unmatched.length})</button>
         {showUn && <div className="mt-2 space-y-1.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-1.5">
           <p className="text-[11px] text-boxing-muted leading-snug lg:col-span-full">Toca dos atletas para emparejarlos a mano.{pairPick && byId[pairPick] ? <> Elegido: <b className="text-boxing-cream">{byId[pairPick].fullName}</b> — toca su rival o <button type="button" onClick={() => setPairPick(null)} className="text-red-400 underline">cancela</button>.</> : ""}</p>
           {unmatched.map(f => { const c = getCategoryInfo(f.weightCategory); const e = getExperienceInfo(f.experienceLevel); const sel = pairPick === f.id;
-            return <button key={f.id} type="button" onClick={() => pickForPair(f.id)} className={"w-full text-left px-3 py-2 flex items-center justify-between fade-in border transition-colors " + (sel ? "bg-boxing-crimson/25 border-red-500/60" : "bg-boxing-panel border-boxing-line hover:border-boxing-goldDim")}>
+            return <button key={f.id} type="button" onClick={() => pickForPair(f.id)} className={"w-full text-left px-3 py-2 rounded-xl flex items-center justify-between fade-in border transition-colors " + (sel ? "bg-boxing-crimson/25 border-red-500/60" : "bg-boxing-panel border-boxing-line hover:border-boxing-goldDim")}>
               <div className="flex items-center gap-2 min-w-0"><span className={"text-[9px] w-4 h-4 flex items-center justify-center rounded-sm flex-shrink-0 " + (sel ? "bg-boxing-crimson text-white" : "border border-boxing-lineBright text-boxing-muted")}>{sel ? "1" : "+"}</span><span className="text-boxing-cream text-sm truncate">{f.fullName}</span><span className="text-boxing-muted text-xs whitespace-nowrap">{c?.label} · {f.weightKg}kg · {f.fightCount || 0}p</span></div>
               <Badge color={e?.color}>{e?.label}</Badge>
             </button>; })}

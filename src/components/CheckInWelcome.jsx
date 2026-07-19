@@ -16,7 +16,8 @@ export default function CheckInWelcome({ ticket, ticketTypeInfo, onClose }) {
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(28px,7vw,40px)", letterSpacing: "0.04em", color: "#e8ddd0", lineHeight: 1.1, marginTop: "6px" }}>¡BIENVENIDO A<br />LA VELADA!</div>
       <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "22px", color: "#e8ddd0", marginTop: "16px" }}>{ticket.attendeeName}</div>
       <div style={{ marginTop: "12px" }}><Badge color={ticketTypeInfo.color}>{ticketTypeInfo.icon} {ticketTypeInfo.label} · #{ticket.id}</Badge></div>
-      <button onClick={onClose} type="button" className="active:scale-95 transition-transform" style={{ marginTop: "36px", background: "#9b1a2a", color: "#e8ddd0", padding: "14px 40px", border: "none", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em", cursor: "pointer" }}>Escanear siguiente</button>
+      {/* Único protagonista de la pantalla: el CTA carmesí del sistema */}
+      <button onClick={onClose} type="button" className="btn-primary active:scale-95 transition-transform" style={{ marginTop: "36px", padding: "14px 40px", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em", cursor: "pointer" }}>Escanear siguiente</button>
     </div>
   );
 }

@@ -2,6 +2,10 @@ import { useState } from "react";
 import { TICKET_TYPES_V2, PAYMENT_METHODS_V2, fmt$ } from "../constants.js";
 import TicketPreview from "./TicketPreview.jsx";
 
+// Terna RGB del color de cada tipo de entrada, para graduar alphas en la
+// tarjeta-radio (.type-card usa rgba(var(--c), …)).
+const TYPE_RGB = { inscripcion: "59,130,246", preventa: "168,85,247", puerta: "249,115,22" };
+
 export default function SellView({ onAdd }) {
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
@@ -27,38 +31,44 @@ export default function SellView({ onAdd }) {
       setSubmitting(false);
     }
   }
-  const iS = { background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px" };
+  // Kicker de campo del rediseño: condensada pequeña en oro apagado.
+  const lbl = "text-[11px] font-semibold mb-1.5 block tracking-[0.22em] uppercase text-[rgba(200,160,74,0.55)]";
   return (
     <div className="space-y-4">
-      <form onSubmit={submit} className="rounded-xl p-4 space-y-3" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <h3 className="text-xs font-bold text-white uppercase tracking-widest">Nueva Entrada</h3>
-        <div><label className="text-[11px] text-gray-400 mb-1 block">Nombre del asistente</label>
-          <input value={name} onChange={e => { setName(e.target.value); if (nameError) setNameError(""); }} placeholder="Nombre completo" required maxLength={60} className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none" style={iS} />
+      <form onSubmit={submit} className="rounded-3xl p-4 lg:p-5 space-y-3.5 border border-white/5" style={{ background: "linear-gradient(170deg, #131016, #0c0a0e)" }}>
+        <h3 className="text-boxing-cream" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: "20px" }}>Nueva entrada</h3>
+        <div><label className={lbl}>Nombre del asistente</label>
+          <input value={name} onChange={e => { setName(e.target.value); if (nameError) setNameError(""); }} placeholder="Nombre completo" required maxLength={60} className="input-ink w-full px-3 py-2.5 text-sm" />
           {nameError && <p className="text-red-400 text-xs mt-1">{nameError}</p>}</div>
-        <div><label className="text-[11px] text-gray-400 mb-1 block">Teléfono (opcional)</label>
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+56 9..." className="w-full px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none" style={iS} /></div>
-        <div><label className="text-[11px] text-gray-400 mb-2 block">Tipo de Entrada</label>
-          <div className="grid grid-cols-3 gap-2">
+        <div><label className={lbl}>Teléfono (opcional)</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+56 9..." className="input-ink w-full px-3 py-2.5 text-sm" /></div>
+        <div><label className={lbl}>Tipo de entrada</label>
+          {/* Tarjetas-radio: cada tipo se enciende con el neón de SU color al
+              elegirlo (azul inscripción, púrpura preventa, naranja puerta) y
+              solo una brilla a la vez. */}
+          <div className="grid grid-cols-3 gap-2.5">
             {TICKET_TYPES_V2.map(t => (
-              <button key={t.key} type="button" onClick={() => setType(t.key)} className="py-3 rounded-xl text-xs font-bold transition-all active:scale-95"
-                style={type === t.key ? { background: t.color + "22", border: "1px solid " + t.color, color: t.color } : { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.07)", color: "#6B7280" }}>
+              <button key={t.key} type="button" onClick={() => setType(t.key)}
+                className={"type-card py-3 px-1 text-xs font-bold active:scale-95" + (type === t.key ? " sel" : "")}
+                style={{ "--c": TYPE_RGB[t.key] || "168,85,247", color: type === t.key ? t.color : "#6B7280" }}>
                 <div className="text-lg">{t.icon}</div>
-                <div>{t.label}</div>
-                <div className="text-[10px] opacity-75">{fmt$(t.price)}</div>
+                <div className="tracking-[0.12em] uppercase mt-0.5 text-boxing-cream">{t.label}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: type === t.key ? t.color : "#6b5f6e", fontVariantNumeric: "tabular-nums" }}>{fmt$(t.price)}</div>
               </button>
             ))}
           </div>
         </div>
-        <div><label className="text-[11px] text-gray-400 mb-2 block">Método de Pago</label>
+        <div><label className={lbl}>Método de pago</label>
           <div className="flex gap-2">
             {PAYMENT_METHODS_V2.map(m => (
-              <button key={m} type="button" onClick={() => setMethod(m)} className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
-                style={method === m ? { background: "rgba(220,38,38,0.2)", border: "1px solid rgba(220,38,38,0.5)", color: "#FCA5A5" } : { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.07)", color: "#6B7280" }}>{m}</button>
+              <button key={m} type="button" onClick={() => setMethod(m)} className="flex-1 py-2 rounded-full text-xs font-bold tracking-[0.14em] uppercase transition-all border"
+                style={method === m ? { background: "#1c1620", borderColor: "rgba(255,255,255,0.2)", color: "#e8ddd0" } : { background: "transparent", borderColor: "rgba(255,255,255,0.08)", color: "#6b5f6e" }}>{m}</button>
             ))}
           </div>
         </div>
-        <button type="submit" disabled={submitting} className="btn-primary w-full py-3.5 rounded-xl font-black"
-          style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px" }}>
+        {/* La campana de la venta: único glow permanente del panel. */}
+        <button type="submit" disabled={submitting} className="btn-primary w-full py-3.5 font-black"
+          style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px", fontVariantNumeric: "tabular-nums" }}>
           {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
         </button>
       </form>
