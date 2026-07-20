@@ -19,15 +19,10 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
   // eliminado, misma escuela, experiencia o edad).
   const conflicts = matchupConflicts(matchups, fighters, super4FighterIds(super4));
   const conflictLines = [...conflicts.huerfanas, ...conflicts.super4, ...conflicts.edadMixta, ...conflicts.mismaEscuela, ...conflicts.experiencia];
-  function shareWA() {
-    // Mismo filtro que la planilla impresa: las peleas con rival eliminado no
-    // se comparten (saldrían como "undefined" en el mensaje).
-    const text = "*CARTELERA DE BOXEO*\n" + eventDate + "\n\n" + matchups
-      .map(m => ({ m, r: fighters.find(f => f.id === m.fighterRedId), b: fighters.find(f => f.id === m.fighterBlueId) }))
-      .filter(x => x.r && x.b)
-      .map(({ m, r, b }) => { const c = getCategoryInfo(r.weightCategory); return `*Pelea ${m.roundNumber}* (${c?.label})\n${r.fullName} _(${r.weightKg}kg, ${r.gym})_\nVS\n${b.fullName} _(${b.weightKg}kg, ${b.gym})_`; }).join("\n\n");
-    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
-  }
+  // (Se quitó el botón de WhatsApp: mandaba la cartelera como texto plano, que
+  // se desarma en el chat y no se puede corregir. La descarga en Excel cumple
+  // mejor esa función —se adjunta al chat, se ve como planilla y el que la
+  // recibe puede editarla— así que la cabecera queda con Imprimir y Excel.)
   // Abre una ventana con una tabla imprimible (N°/Escuela/Atleta/VS/Atleta/
   // Escuela/Peso/Nota) y dispara el diálogo de impresión del navegador —
   // desde ahí se puede imprimir directo o guardar como PDF. Las peleas se
@@ -67,12 +62,11 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
           <p className="text-boxing-muted text-xs mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
         </div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
-        {/* Tres acciones en una fila: en móvil el texto baja a 11px y las
-            letras se juntan para que "WhatsApp" no se corte. */}
+        {/* Dos acciones a mitad y mitad: imprimir (o guardar en PDF) y bajar la
+            planilla editable en Excel, que es la que se comparte por chat. */}
         <div className="flex gap-2 p-3 border-b border-white/5">
-          <button onClick={printSheet} title="Imprimir o guardar como PDF" className="btn-gold flex-1 font-bold py-3 text-[11px] sm:text-sm flex items-center justify-center gap-1.5 tracking-[0.08em] sm:tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button>
-          <button onClick={downloadExcel} title="Descargar la cartelera en Excel para editarla (Numbers, Excel o Google Sheets)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl text-[11px] sm:text-sm flex items-center justify-center gap-1.5 tracking-[0.08em] sm:tracking-[0.14em] uppercase transition-colors">{"📊"} Excel</button>
-          <button onClick={shareWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-2xl text-[11px] sm:text-sm flex items-center justify-center gap-1.5 transition-colors">{"\u{1F4E4}"} WhatsApp</button>
+          <button onClick={printSheet} title="Imprimir o guardar como PDF" className="btn-gold flex-1 font-bold py-3 text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button>
+          <button onClick={downloadExcel} title="Descargar la cartelera en Excel para editarla (Numbers, Excel o Google Sheets)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">{"📊"} Excel</button>
         </div>
         {/* Aviso de peleas con problemas, visible donde se imprime la planilla */}
         {conflictLines.length > 0 && <div className="bg-red-900/30 border-b border-red-500/40 p-3 space-y-1">

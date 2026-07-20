@@ -35,6 +35,8 @@ const S = {
   grupo: { bold: true, size: 12, fill: GRIS_GRUPO, align: "center", border: true },
   grupoAlerta: { bold: true, size: 12, color: ALERTA_TEXTO, fill: ALERTA_FONDO, align: "center", border: true },
   celda: { align: "center", border: true },
+  peso: { bold: true, align: "center", border: true, wrap: true },
+  pesoCruce: { bold: true, color: ALERTA_TEXTO, fill: ALERTA_FONDO, align: "center", border: true, wrap: true },
   celdaIzq: { align: "left", border: true },
   escuela: { bold: true, align: "center", border: true, wrap: true },
   atletaRojo: { bold: true, fill: ROJO_CELDA, align: "center", border: true, wrap: true },
@@ -70,7 +72,10 @@ export function buildCarteleraXlsx(matchups, fighters, subtitulo = EVENT_LABELS.
     merges.push([rows.length, 0, rows.length, NCOL - 1]);
     rows.push([{ v: g.headerText, s: g.mixta ? S.grupoAlerta : S.grupo }]);
     g.list.forEach(({ m, r, b }, i) => {
-      const { rango, detalle } = carteleraPeso(r, b);
+      // Columna Peso: la división oficial World Boxing, no los kilos sueltos.
+      // Si los dos atletas no caen en la misma división, la celda va en rojo y
+      // lleva los kilos entre paréntesis para poder corregirlo.
+      const { division, detalle, cruce, pesos } = carteleraPeso(r, b);
       rows.push([
         { v: i + 1, s: S.celda },
         { v: (r.gym || "").toUpperCase(), s: S.escuela },
@@ -78,7 +83,7 @@ export function buildCarteleraXlsx(matchups, fighters, subtitulo = EVENT_LABELS.
         { v: "-", s: S.celda },
         { v: b.fullName, s: S.atletaAzul },
         { v: (b.gym || "").toUpperCase(), s: S.escuela },
-        { v: rango, s: S.celda },
+        { v: cruce ? `${division} ⚠ ${pesos}` : division, s: cruce ? S.pesoCruce : S.peso },
         { v: detalle, s: S.celda },
         // Vacía pero con borde: es la columna que se rellena a mano.
         { v: m.nota || "", s: S.nota },
@@ -92,7 +97,7 @@ export function buildCarteleraXlsx(matchups, fighters, subtitulo = EVENT_LABELS.
 
   return buildXlsx([{
     name: "Cartelera",
-    cols: [5, 22, 24, 4, 24, 22, 14, 20, 22],
+    cols: [5, 22, 24, 4, 24, 22, 22, 20, 22],
     rows,
     merges,
     freeze: 3,          // el título y los encabezados quedan fijos al bajar
