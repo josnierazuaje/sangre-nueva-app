@@ -46,6 +46,37 @@ export function bracketMaxFights(b) {
   if (b.maxExpKey) return LEGACY_TIER_MAXFIGHTS[b.maxExpKey] ?? null;
   return null;
 }
+// Repara las llaves que vuelven de la nube con semifinales incompletas.
+//
+// POR QUÉ: una llave armada con "Armar aunque falten peleadores" y solo 1 o 2
+// atletas elegibles deja la segunda semifinal con los tres campos en null
+// ({red:null, blue:null, winner:null}). Firebase NO guarda las claves con
+// valor null, y un nodo que se queda sin hijos deja de existir: al recargar,
+// `semis` vuelve con UN solo elemento en vez de dos. Todo lo que lee
+// semis[1] a ciegas (la vista del Super 4, la planilla impresa y la descarga
+// en Excel) reventaba entonces con "Cannot read properties of undefined",
+// dejando la pestaña en blanco para TODOS los dispositivos hasta limpiar las
+// llaves.
+//
+// Se aplica al entrar los datos al estado (nube, disco e importación de JSON),
+// que es el único punto por donde puede llegar el arreglo truncado.
+export function normalizeSuper4(brackets) {
+  if (!Array.isArray(brackets)) return [];
+  return brackets.map(b => {
+    if (!b || typeof b !== "object") return b;
+    const semis = Array.isArray(b.semis) ? b.semis : [];
+    const cupo = i => {
+      const s = semis[i];
+      return {
+        red: s?.red ?? null,
+        blue: s?.blue ?? null,
+        winner: s?.winner ?? null,
+      };
+    };
+    return { ...b, semis: [cupo(0), cupo(1)], finalWinner: b.finalWinner ?? null };
+  });
+}
+
 export const SUPER4_CATEGORIES = [
   { key: "cadete71", label: "Cadetes 71kg", ageKey: "cadete", maxKg: 71, sexo: "M", regla: "Cadete (15-16) · hasta 71kg" },
   { key: "juvenil81", label: "Juvenil 81kg", ageKey: "juvenil", maxKg: 81, sexo: "M", regla: "Juvenil (17-18) · hasta 81kg" },

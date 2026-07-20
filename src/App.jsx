@@ -3,6 +3,8 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
 import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
+import { normalizeSuper4 } from "./lib/super4.js";
+import { downloadBytes } from "./lib/download.js";
 import { reconcileData } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -105,7 +107,7 @@ export default function App() {
   function applyRemote(k, val) {
     if (k === "bm_fighters_v4") setFighters(normalizeFighters(val));
     else if (k === "bm_matchups_v3") setMatchups(val);
-    else if (k === "bm_super4_v1") setSuper4(val);
+    else if (k === "bm_super4_v1") setSuper4(normalizeSuper4(val));
     else if (k === "bm_event_label") setEventLabel(val);
     // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
     // individual, ver migrateTicketsIfNeeded/watchTickets más abajo.
@@ -148,7 +150,7 @@ export default function App() {
   useEffect(() => {
     setFighters(normalizeFighters(loadFighters()));
     setMatchups(load("bm_matchups_v3", []));
-    setSuper4(load("bm_super4_v1", []));
+    setSuper4(normalizeSuper4(load("bm_super4_v1", [])));
     setTicketsNew(loadTicketsV4());
     const raw = localStorage.getItem("bm_fb_config");
     const disabled = localStorage.getItem("bm_fb_disabled");
@@ -335,8 +337,14 @@ export default function App() {
   // Incluye ticketsNew (boletas reales v4) además de fighters/matchups —
   // antes de la Fase 5 el export manual no incluía las boletas reales, con
   // lo cual no servía como respaldo de ellas.
-  function handleExport() { const d = { fighters, matchups, super4, ticketsNew }; const b = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "evento_" + new Date().toISOString().split("T")[0] + ".json"; a.click(); URL.revokeObjectURL(u); }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { setSuper4(d.super4); save("bm_super4_v1", d.super4); } restoreTicketsFromImport(d.ticketsNew); } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  // El respaldo del evento en JSON. Usa downloadBytes (el mismo ayudante que
+  // las planillas de Excel): antes revocaba la URL justo después del click,
+  // que es la causa conocida de que en Safari el archivo se descargue VACÍO.
+  function handleExport() {
+    const d = { fighters, matchups, super4, ticketsNew };
+    downloadBytes(JSON.stringify(d, null, 2), "evento_" + new Date().toISOString().split("T")[0] + ".json", "application/json");
+  }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); } restoreTicketsFromImport(d.ticketsNew); } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
   // Las boletas viven en nodos individuales en la nube (no en el blob), así que
   // se restauran aparte: requieren conexión y se agregan por id a las
   // existentes; watchTickets refresca la UI al confirmarse la escritura.

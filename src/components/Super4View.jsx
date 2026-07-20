@@ -5,6 +5,8 @@ import { dupKey, normName } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
 import { printHtml } from "../lib/printHtml.js";
+import { buildSuper4Xlsx } from "../lib/xlsxPlanillas.js";
+import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import PageHeader from "./PageHeader.jsx";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
@@ -248,6 +250,18 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
     printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL")));
   }
+  // Las mismas llaves como archivo de Excel editable: en la planilla van como
+  // lista (una fila por peleador, agrupada por llave y fase), que es lo que se
+  // puede corregir a mano si cambia un resultado o un participante.
+  function excelSuper4() {
+    if (!super4.length) { alert("No hay llaves para descargar. Toca GENERAR LLAVES primero."); return; }
+    const fecha = new Date().toLocaleDateString("es-CL");
+    downloadBytes(
+      buildSuper4Xlsx(super4, byId, fecha),
+      xlsxFilename("Super 4 Sangre Nueva", fecha.replace(/\//g, "-")),
+      XLSX_MIME,
+    );
+  }
 
   // ---------- Presentación en formato bracket ----------
   const LINEA = "#4a4050";
@@ -345,6 +359,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           GENERAR LLAVES
         </button>
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
+        <button onClick={excelSuper4} title="Descargar las llaves en Excel para editarlas (Numbers, Excel o Google Sheets)" className="px-4 text-xl rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
       </div>
 
       <button onClick={() => setShowPosibles(o => !o)} className="w-full lg:max-w-xl lg:mx-auto py-2.5 rounded-2xl bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">

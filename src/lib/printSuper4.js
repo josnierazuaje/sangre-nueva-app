@@ -25,14 +25,18 @@ export function buildSuper4Html(super4, byId, fecha = "") {
         ${fila(blueFid, "azul", winner, phBlue)}
       </div>`;
   const llaves = super4.map(b => {
-    const finalistas = [b.semis[0].winner, b.semis[1].winner];
+    // Las llaves entran al estado ya reparadas por normalizeSuper4, pero la
+    // planilla tampoco da por hecho que `semis` traiga sus dos elementos: si
+    // viniera truncada, mejor imprimir la llave con cupos vacíos que reventar.
+    const s0 = b.semis?.[0] || {}, s1 = b.semis?.[1] || {};
+    const finalistas = [s0.winner, s1.winner];
     return `
       <div class="llave">
         <div class="cat">🏆 ${escapeHtml(bracketPrintTitle(b))} <span class="regla">${escapeHtml(b.regla)}</span></div>
         <div class="bracket">
           <div class="col semis">
-            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 1`, b.semis[0].red, b.semis[0].blue, b.semis[0].winner)}
-            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 2`, b.semis[1].red, b.semis[1].blue, b.semis[1].winner)}
+            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 1`, s0.red, s0.blue, s0.winner)}
+            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 2`, s1.red, s1.blue, s1.winner)}
           </div>
           <div class="conn"><i class="lt"></i><i class="lb"></i><i class="lv"></i><i class="lm"></i></div>
           <div class="col colfinal">

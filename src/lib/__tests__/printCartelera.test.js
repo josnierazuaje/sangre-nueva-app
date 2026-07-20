@@ -88,3 +88,17 @@ describe("buildCarteleraHtml", () => {
     expect(html).toContain("La grilla está sujeta a modificaciones.");
   });
 });
+
+// Un JSON importado puede traer weightKg como string: "55" + "60" concatena
+// ("5560") en vez de sumar, y el bloque quedaba desordenado.
+describe("orden por peso con weightKg en texto", () => {
+  const f = (id, kg) => ({ id, fullName: "P" + id, gym: "G" + id, weightKg: kg, age: 14, sexo: "M", weightCategory: "m_gallo", fightCount: 1, experienceLevel: "principiante" });
+  it("ordena de más liviano a más pesado aunque los pesos vengan como texto", () => {
+    const fighters = [f("1", "90"), f("2", "92"), f("3", "55"), f("4", "56")];
+    const html = buildCarteleraHtml([
+      { id: "a", roundNumber: 1, fighterRedId: "1", fighterBlueId: "2", nota: "" },
+      { id: "b", roundNumber: 2, fighterRedId: "3", fighterBlueId: "4", nota: "" },
+    ], fighters);
+    expect(html.indexOf("55kg / 56kg")).toBeLessThan(html.indexOf("90kg / 92kg"));
+  });
+});
