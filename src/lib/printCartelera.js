@@ -1,4 +1,4 @@
-import { getAgeCategory, FECHIBOX_LABEL } from "../constants.js";
+import { getAgeCategory, getCategoryInfo, getWeightCategory, weightRangeLabel, FECHIBOX_LABEL } from "../constants.js";
 import { escapeHtml } from "./html.js";
 
 // Orden de bloques en la planilla: categorías World Boxing de menor a mayor
@@ -39,18 +39,38 @@ export function carteleraGroups(matchups, fighters) {
   });
 }
 
-// Las dos etiquetas de la columna "Peso" de una pelea: el rango ("55kg / 60kg")
-// y el detalle de categoría ("U15 · 3R × 1,5min", o "U15 vs U17" si el cruce es
-// de categorías distintas). También compartida con la descarga en Excel.
+// Lo que va en la columna "Peso" de una pelea.
+//
+// Se imprime la DIVISIÓN OFICIAL World Boxing ("Gallo · 50-55kg"), no los kilos
+// de cada atleta: la planilla se comparte con las otras escuelas y los kilos
+// sueltos se prestan a confusión — lo que vale para la federación es la
+// categoría. (Los kilos exactos siguen en la planilla de Peleadores.)
+//
+// La pelea se disputa al límite del MÁS PESADO, así que esa es la división que
+// se imprime. Si los dos atletas no caen en la misma división (ej. 88kg es
+// Pesado y 92kg Superpesado), se devuelve `cruce: true`: la celda se marca en
+// rojo y ahí SÍ se muestran los dos kilos, que es lo que hace falta para
+// corregirlo. Compartida con la descarga en Excel.
 export function carteleraPeso(r, b) {
   const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
   const detalle = c1.key === c2.key ? `${c1.label} · ${c1.formato}` : `${c1.label} vs ${c2.label}`;
-  // El peso se muestra de menor a mayor (es el rango de la pelea, no
-  // "rojo / azul"), pedido del organizador. Number() porque un JSON
-  // importado puede traer weightKg como string (comparación lexicográfica:
-  // "100" <= "60" daría orden descendente).
-  const [wLo, wHi] = Number(r.weightKg) <= Number(b.weightKg) ? [r.weightKg, b.weightKg] : [b.weightKg, r.weightKg];
-  return { rango: `${wLo}kg / ${wHi}kg`, detalle };
+  // Number() porque un JSON importado puede traer weightKg como string
+  // (comparación lexicográfica: "100" <= "60" daría el orden al revés).
+  const kgR = Number(r.weightKg), kgB = Number(b.weightKg);
+  const [wLo, wHi] = kgR <= kgB ? [r.weightKg, b.weightKg] : [b.weightKg, r.weightKg];
+  const pesos = `${wLo}kg / ${wHi}kg`;
+  // La división se recalcula desde el peso y el sexo (no se confía en el campo
+  // guardado, que en registros antiguos puede traer una clave que ya no existe).
+  const div = (kg, sexo) => (Number.isFinite(kg) ? getCategoryInfo(getWeightCategory(kg, sexo)) : null);
+  const dR = div(kgR, r.sexo), dB = div(kgB, b.sexo);
+  const mayor = kgR >= kgB ? dR : dB;
+  const cruce = !!(dR && dB) && dR.key !== dB.key;
+  return {
+    division: mayor ? `${mayor.label} · ${weightRangeLabel(mayor)}` : "",
+    detalle,
+    cruce,
+    pesos,
+  };
 }
 
 // Genera el HTML imprimible de la cartelera (tabla N°/Escuela/Atleta/VS/Atleta/
@@ -64,7 +84,7 @@ export function buildCarteleraHtml(matchups, fighters) {
     const headerRow = `<tr><td colspan="8" class="${mixta ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
     const groupRows = list.map((x, i) => {
       const { m, r, b } = x;
-      const { rango, detalle: pesoDetalle } = carteleraPeso(r, b);
+      const { division, detalle: pesoDetalle, cruce, pesos } = carteleraPeso(r, b);
       return `<tr>
           <td>${i + 1}</td>
           <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
@@ -72,7 +92,7 @@ export function buildCarteleraHtml(matchups, fighters) {
           <td class="vs">-</td>
           <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
           <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
-          <td>${rango}<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
+          <td class="${cruce ? "peso peso-cruce" : "peso"}">${escapeHtml(division)}<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div>${cruce ? `<div class="peso-detalle peso-aviso">⚠ ${pesos}</div>` : ""}</td>
           <td>${escapeHtml(m.nota || "")}</td>
         </tr>`;
     }).join("");
@@ -95,7 +115,12 @@ export function buildCarteleraHtml(matchups, fighters) {
   td.esc{font-weight:bold;text-transform:uppercase;}
   td.grupo{background:#E5E7EB;font-weight:bold;font-size:14px;padding:8px;letter-spacing:1px;}
   td.grupo-alerta{background:#FEE2E2;color:#B91C1C;}
+  td.peso{font-weight:bold;font-size:14px;}
+  /* Cruce de divisiones: la pelea va al límite del más pesado, pero se marca
+     en rojo con los dos kilos para que se revise antes de compartirla. */
+  td.peso-cruce{background:#FEE2E2;color:#B91C1C;}
   .peso-detalle{font-size:10px;color:#374151;font-weight:normal;margin-top:2px;}
+  .peso-aviso{color:#B91C1C;font-weight:bold;}
   .nota-final{margin-top:14px;text-align:center;font-size:13px;font-weight:bold;font-style:italic;color:#B91C1C;}
   @page{size:landscape;margin:12mm;}
 </style></head>

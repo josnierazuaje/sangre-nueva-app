@@ -36,21 +36,57 @@ describe("buildCarteleraHtml", () => {
     expect(html).not.toContain("<b>Niño</b>");
   });
 
-  it("el peso de cada pelea se muestra de menor a mayor, sin importar la esquina", () => {
-    const r = f({ id: "r", age: 14, weightKg: 63 }); // rojo MÁS pesado
-    const b = f({ id: "b", age: 14, weightKg: 60 });
+  // La columna Peso lleva la DIVISIÓN oficial World Boxing, no los kilos: la
+  // planilla se comparte con otras escuelas y los kilos sueltos confunden.
+  it("imprime la división oficial de la pelea, no los kilos de cada atleta", () => {
+    const r = f({ id: "r", age: 14, weightKg: 52 }), b = f({ id: "b", age: 14, weightKg: 55 });
     const html = buildCarteleraHtml([vs(r, b)], [r, b]);
-    expect(html).toContain("60kg / 63kg");
-    expect(html).not.toContain("63kg / 60kg");
+    expect(html).toContain("Gallo · 50-55kg");
+    expect(html).not.toContain("52kg / 55kg");
+    // Sin cruce, la celda va con la clase normal (ojo: "peso-cruce" aparece
+    // igualmente en la hoja de estilos, por eso se mira la celda concreta).
+    expect(html).toContain('<td class="peso">');
+    expect(html).not.toContain('<td class="peso peso-cruce">');
   });
 
-  it("el orden de peso es numérico aunque weightKg venga como string (JSON importado)", () => {
-    // Lexicográficamente "100" <= "60", el orden debe seguir siendo numérico.
+  it("usa la división del MÁS pesado (es el límite al que se disputa)", () => {
+    const r = f({ id: "r", age: 20, weightKg: 63 }); // Wélter 60-65
+    const b = f({ id: "b", age: 20, weightKg: 58 }); // Ligero 55-60
+    expect(buildCarteleraHtml([vs(r, b)], [r, b])).toContain("Wélter · 60-65kg");
+    // Da igual en qué esquina esté el más pesado.
+    expect(buildCarteleraHtml([vs(b, r)], [r, b])).toContain("Wélter · 60-65kg");
+  });
+
+  it("marca en rojo y muestra los kilos cuando los dos caen en divisiones distintas", () => {
+    const r = f({ id: "r", age: 20, weightKg: 92 }); // Superpesado +90
+    const b = f({ id: "b", age: 20, weightKg: 88 }); // Pesado 85-90
+    const html = buildCarteleraHtml([vs(r, b)], [r, b]);
+    expect(html).toContain('<td class="peso peso-cruce">');
+    expect(html).toContain("Superpesado · +90kg");
+    expect(html).toContain("88kg / 92kg"); // de menor a mayor, sin importar la esquina
+    expect(html).not.toContain("92kg / 88kg");
+  });
+
+  it("usa la tabla de mujeres cuando la peleadora es femenina", () => {
+    const r = f({ id: "r", age: 20, weightKg: 53, sexo: "F" });
+    const b = f({ id: "b", age: 20, weightKg: 52, sexo: "F" });
+    // 51-54kg es Gallo en mujeres; en hombres 52-53kg caería en Gallo 50-55.
+    expect(buildCarteleraHtml([vs(r, b)], [r, b])).toContain("Gallo · 51-54kg");
+  });
+
+  it("la división es numérica aunque weightKg venga como string (JSON importado)", () => {
+    // Lexicográficamente "100" <= "60": sin Number() la división saldría mal.
     const r = f({ id: "r", age: 20, weightKg: "100" });
     const b = f({ id: "b", age: 20, weightKg: "60" });
     const html = buildCarteleraHtml([vs(r, b)], [r, b]);
+    expect(html).toContain("Superpesado · +90kg");
     expect(html).toContain("60kg / 100kg");
-    expect(html).not.toContain("100kg / 60kg");
+  });
+
+  it("no revienta ni inventa división si a un atleta le falta el peso", () => {
+    const r = f({ id: "r", age: 20, weightKg: undefined }), b = f({ id: "b", age: 20, weightKg: 60 });
+    expect(() => buildCarteleraHtml([vs(r, b)], [r, b])).not.toThrow();
+    expect(buildCarteleraHtml([vs(r, b)], [r, b])).not.toContain("NaN");
   });
 
   it("dentro de un bloque ordena de más liviano a más pesado (por suma de pesos)", () => {
@@ -99,6 +135,6 @@ describe("orden por peso con weightKg en texto", () => {
       { id: "a", roundNumber: 1, fighterRedId: "1", fighterBlueId: "2", nota: "" },
       { id: "b", roundNumber: 2, fighterRedId: "3", fighterBlueId: "4", nota: "" },
     ], fighters);
-    expect(html.indexOf("55kg / 56kg")).toBeLessThan(html.indexOf("90kg / 92kg"));
+    expect(html.indexOf("Ligero · 55-60kg")).toBeLessThan(html.indexOf("Superpesado · +90kg"));
   });
 });
