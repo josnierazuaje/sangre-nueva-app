@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds, bracketPrintTitle } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds, bracketPrintTitle, normalizeSuper4 } from "../super4.js";
 import { dupKey } from "../dedup.js";
 
 let n = 0;
@@ -532,5 +532,38 @@ describe("bracketPrintTitle (World Boxing + FECHIBOX + división)", () => {
   it("tolera bracket nulo o sin datos", () => {
     expect(bracketPrintTitle(null)).toBe("");
     expect(bracketPrintTitle({})).toBe("");
+  });
+});
+
+// Firebase NO guarda las claves con valor null y un nodo sin hijos deja de
+// existir: una semifinal entera vacía desaparecía y `semis` volvía de la nube
+// con UN solo elemento, reventando la vista, la impresión y la descarga.
+describe("normalizeSuper4 (repara las llaves truncadas por Firebase)", () => {
+  const b = { id: "x", catKey: "cadete__m_ligero", semis: [{ red: "a", blue: "b", winner: "a" }], finalWinner: null };
+  it("rellena la semifinal que falta con cupos libres", () => {
+    const [r] = normalizeSuper4([b]);
+    expect(r.semis).toHaveLength(2);
+    expect(r.semis[1]).toEqual({ red: null, blue: null, winner: null });
+  });
+  it("no toca las llaves que ya vienen completas", () => {
+    const ok = { ...b, semis: [{ red: "a", blue: "b", winner: "a" }, { red: "c", blue: "d", winner: null }] };
+    expect(normalizeSuper4([ok])[0].semis).toEqual(ok.semis);
+  });
+  it("completa las claves que Firebase borró dentro de una semifinal", () => {
+    const [r] = normalizeSuper4([{ ...b, semis: [{ red: "a" }, { blue: "d" }] }]);
+    expect(r.semis[0]).toEqual({ red: "a", blue: null, winner: null });
+    expect(r.semis[1]).toEqual({ red: null, blue: "d", winner: null });
+  });
+  it("conserva el resto de los campos del cinturón", () => {
+    const [r] = normalizeSuper4([{ ...b, catLabel: "Cadetes 71kg", maxFights: 3, finalWinner: "a" }]);
+    expect(r.catLabel).toBe("Cadetes 71kg");
+    expect(r.maxFights).toBe(3);
+    expect(r.finalWinner).toBe("a");
+  });
+  it("tolera entradas raras sin reventar", () => {
+    expect(normalizeSuper4(null)).toEqual([]);
+    expect(normalizeSuper4(undefined)).toEqual([]);
+    expect(normalizeSuper4([])).toEqual([]);
+    expect(normalizeSuper4([{ id: "y" }])[0].semis).toHaveLength(2);
   });
 });

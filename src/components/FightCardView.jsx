@@ -1,6 +1,8 @@
 import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
-import { buildCarteleraHtml } from "../lib/printCartelera.js";
+import { buildCarteleraHtml, carteleraGroups } from "../lib/printCartelera.js";
 import { printHtml } from "../lib/printHtml.js";
+import { buildCarteleraXlsx } from "../lib/xlsxPlanillas.js";
+import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
 import PageHeader from "./PageHeader.jsx";
@@ -36,6 +38,21 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
   function printSheet() {
     printHtml(buildCarteleraHtml(matchups, fighters));
   }
+  // Descarga la MISMA planilla como archivo de Excel editable. En la mesa de
+  // control siempre hay cambios de último minuto (un atleta que no llega, un
+  // peso que cambia en la balanza): así se corrige en Numbers/Excel/Google
+  // Sheets y se imprime desde ahí, sin volver a entrar a la app. El PDF no se
+  // puede editar sin programas de pago.
+  function downloadExcel() {
+    // Cuenta las peleas que REALMENTE salen en la planilla: las que tienen
+    // rival eliminado se filtran, así que matchups.length mentiría.
+    const n = carteleraGroups(matchups, fighters).reduce((s, g) => s + g.list.length, 0);
+    downloadBytes(
+      buildCarteleraXlsx(matchups, fighters, `${eventDate} · ${n} pelea${n === 1 ? "" : "s"}`),
+      xlsxFilename("Cartelera Sangre Nueva", new Date().toLocaleDateString("es-CL").replace(/\//g, "-")),
+      XLSX_MIME,
+    );
+  }
   return (
     // En escritorio la cartelera es un "póster" secuencial: se centra con un
     // ancho cómodo de lectura en vez de estirarse a todo el ancho.
@@ -50,7 +67,13 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
           <p className="text-boxing-muted text-xs mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
         </div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
-        <div className="flex gap-2 p-3 border-b border-white/5"><button onClick={printSheet} className="btn-gold flex-1 font-bold py-3 text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button><button onClick={shareWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors">{"\u{1F4E4}"} WhatsApp</button></div>
+        {/* Tres acciones en una fila: en móvil el texto baja a 11px y las
+            letras se juntan para que "WhatsApp" no se corte. */}
+        <div className="flex gap-2 p-3 border-b border-white/5">
+          <button onClick={printSheet} title="Imprimir o guardar como PDF" className="btn-gold flex-1 font-bold py-3 text-[11px] sm:text-sm flex items-center justify-center gap-1.5 tracking-[0.08em] sm:tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button>
+          <button onClick={downloadExcel} title="Descargar la cartelera en Excel para editarla (Numbers, Excel o Google Sheets)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl text-[11px] sm:text-sm flex items-center justify-center gap-1.5 tracking-[0.08em] sm:tracking-[0.14em] uppercase transition-colors">{"📊"} Excel</button>
+          <button onClick={shareWA} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-2xl text-[11px] sm:text-sm flex items-center justify-center gap-1.5 transition-colors">{"\u{1F4E4}"} WhatsApp</button>
+        </div>
         {/* Aviso de peleas con problemas, visible donde se imprime la planilla */}
         {conflictLines.length > 0 && <div className="bg-red-900/30 border-b border-red-500/40 p-3 space-y-1">
           <p className="text-red-300 text-xs font-bold">{"⚠️"} {conflictLines.length} problema{conflictLines.length !== 1 ? "s" : ""} en la cartelera — corrígelo{conflictLines.length !== 1 ? "s" : ""} en la pestaña VS</p>

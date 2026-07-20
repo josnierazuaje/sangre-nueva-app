@@ -1,7 +1,7 @@
 import { ref, set as dbSet, update as dbUpdate, remove as dbRemove, get, onValue, runTransaction } from "firebase/database";
 import { SYNC_KEYS } from "../constants.js";
 import { FB, fbPath, reportSyncError } from "./firebase.js";
-import { mergeRegenerated } from "./super4.js";
+import { mergeRegenerated, normalizeSuper4 } from "./super4.js";
 
 // Normaliza el valor crudo de un nodo-arreglo (que RTDB puede devolver como
 // arreglo, objeto con claves numéricas, null o el centinela "__EMPTY__") a un
@@ -109,7 +109,11 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged, clearKeys = 
   runTransaction(nodeRef, cur => mergeRegenerated(nodeToArray(cur), clean, clearKeys))
     .then(res => {
       if (!res.committed) return;
-      const list = nodeToArray(res.snapshot.val());
+      // normalizeSuper4: Firebase no guarda las claves con valor null, así que
+      // una semifinal entera en null desaparece y el arreglo `semis` vuelve
+      // con un solo elemento. Se repara AQUÍ, que es la otra puerta de entrada
+      // de datos de la nube al estado (la primera es applyRemote en App.jsx).
+      const list = normalizeSuper4(nodeToArray(res.snapshot.val()));
       localStorage.setItem("bm_super4_v1", JSON.stringify(list));
       onMerged(list);
     })

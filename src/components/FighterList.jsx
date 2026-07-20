@@ -4,6 +4,8 @@ import Badge from "./Badge.jsx";
 import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
 import { printHtml } from "../lib/printHtml.js";
+import { buildFightersXlsx } from "../lib/xlsxPlanillas.js";
+import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
 
 // Chip de filtro: número (en el color de la categoría) + etiqueta, con estado
@@ -66,7 +68,9 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   // los datos útiles para buscarle rival a cada uno: división de peso,
   // categoría de edad World Boxing, nivel de experiencia y escuela. El
   // subtítulo deja claro qué filtro estaba activo al imprimir.
-  function printList() {
+  // Descripción de los filtros activos, para que la planilla (impresa o en
+  // Excel) diga siempre a qué corresponde la lista que trae.
+  function subtituloFiltros() {
     const filtros = [];
     if (showFaltantes) filtros.push("FALTANTES (sin rival asignado en el VS)");
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
@@ -75,7 +79,23 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     if (categoryFilter !== "all") { const c = getCategoryInfo(categoryFilter); if (c) filtros.push(`División: ${c.label} ${weightRangeLabel(c)} (${c.genero === "F" ? "Mujeres" : "Hombres"})`); }
     if (experienceFilter !== "all") { const e = getExperienceInfo(experienceFilter); if (e) filtros.push(`Nivel: ${e.label}`); }
     if (searchQuery.trim()) filtros.push(`Búsqueda: "${searchQuery.trim()}"`);
-    const subtitulo = (filtros.length ? filtros.join(" · ") : "Todos los peleadores") + ` — ${filtered.length} peleador${filtered.length !== 1 ? "es" : ""}`;
+    return (filtros.length ? filtros.join(" · ") : "Todos los peleadores") + ` — ${filtered.length} peleador${filtered.length !== 1 ? "es" : ""}`;
+  }
+
+  // La misma lista en Excel editable, con peso, edad y peleas como números de
+  // verdad (se puede ordenar y filtrar) y la columna "Rival propuesto" en
+  // blanco para anotar a mano.
+  function excelList() {
+    const fecha = new Date().toLocaleDateString("es-CL");
+    downloadBytes(
+      buildFightersXlsx(filtered, subtituloFiltros()),
+      xlsxFilename("Peleadores Sangre Nueva", fecha.replace(/\//g, "-")),
+      XLSX_MIME,
+    );
+  }
+
+  function printList() {
+    const subtitulo = subtituloFiltros();
     const rows = filtered.map((f, i) => {
       const cat = getCategoryInfo(f.weightCategory);
       const ac = getAgeCategory(f.age);
@@ -153,6 +173,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-ink px-2 py-2 text-sm"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
         <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="btn-gold px-3 py-2 text-sm">🖨️</button>
+        <button onClick={excelList} title="Descargar la lista visible en Excel para editarla (Numbers, Excel o Google Sheets)" className="px-3 py-2 text-sm rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
       </div>
       </div>
       {/* Móvil: lista vertical de siempre. Escritorio: cuadrícula de 2

@@ -5,14 +5,14 @@ import { escapeHtml } from "./html.js";
 // edad, y al final "mixta" (cruce prohibido, va resaltado en rojo).
 const AGE_GROUP_ORDER = ["escolar", "cadete", "juvenil", "adulto", "infantil", "veterano", "mixta"];
 
-// Genera el HTML imprimible de la cartelera (tabla N°/Escuela/Atleta/VS/Atleta/
-// Escuela/Peso/Nota). Función pura y testeable: recibe los matchups y el arreglo
-// de peleadores y devuelve el documento HTML completo como string. Las peleas se
-// agrupan por categoría de edad World Boxing (con su formato de rounds en el
-// encabezado de cada bloque) y dentro de cada bloque van de más liviano a más
-// pesado; la numeración se reinicia por bloque, como en la planilla de Excel.
-export function buildCarteleraHtml(matchups, fighters) {
-  const withData = matchups
+// Agrupa las peleas tal como salen en la planilla: por categoría de edad World
+// Boxing (orden de menor a mayor edad, y "mixta" al final), y dentro de cada
+// bloque de más liviano a más pesado. Fuente ÚNICA de la agrupación: la usan
+// tanto la planilla impresa (abajo) como la descarga en Excel
+// (xlsxPlanillas.js), para que las dos salidas nunca se desincronicen.
+// Devuelve [{ key, headerText, mixta, list: [{ m, r, b }] }].
+export function carteleraGroups(matchups, fighters) {
+  const withData = (matchups || [])
     .map(m => ({ m, r: fighters.find(f => f.id === m.fighterRedId), b: fighters.find(f => f.id === m.fighterBlueId) }))
     .filter(x => x.r && x.b);
   const groups = {};
@@ -24,25 +24,47 @@ export function buildCarteleraHtml(matchups, fighters) {
     if (!groups[key]) groups[key] = [];
     groups[key].push(x);
   });
-  const rows = AGE_GROUP_ORDER.filter(k => groups[k]).map(k => {
-    const list = groups[k].sort((x1, x2) => (x1.r.weightKg + x1.b.weightKg) - (x2.r.weightKg + x2.b.weightKg));
+  return AGE_GROUP_ORDER.filter(k => groups[k]).map(k => {
+    // Number() en cada peso: un JSON importado puede traer weightKg como
+    // string y "55" + "60" concatena ("5560") en vez de sumar, dejando el
+    // bloque desordenado (ni en la planilla impresa ni en la de Excel).
+    const peso = x => Number(x.r.weightKg) + Number(x.b.weightKg);
+    const list = groups[k].sort((x1, x2) => peso(x1) - peso(x2));
     const cat = k === "mixta" ? null : getAgeCategory(list[0].r.age);
     const fechibox = cat ? FECHIBOX_LABEL[cat.key] : null;
     const headerText = cat
       ? `${cat.label}${fechibox ? " · " + fechibox : ""} · ${cat.formato}`.toUpperCase()
       : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (WORLD BOXING NO PERMITE ESTE CRUCE)";
-    const headerRow = `<tr><td colspan="8" class="${k === "mixta" ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
+    return { key: k, headerText, mixta: k === "mixta", list };
+  });
+}
+
+// Las dos etiquetas de la columna "Peso" de una pelea: el rango ("55kg / 60kg")
+// y el detalle de categoría ("U15 · 3R × 1,5min", o "U15 vs U17" si el cruce es
+// de categorías distintas). También compartida con la descarga en Excel.
+export function carteleraPeso(r, b) {
+  const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
+  const detalle = c1.key === c2.key ? `${c1.label} · ${c1.formato}` : `${c1.label} vs ${c2.label}`;
+  // El peso se muestra de menor a mayor (es el rango de la pelea, no
+  // "rojo / azul"), pedido del organizador. Number() porque un JSON
+  // importado puede traer weightKg como string (comparación lexicográfica:
+  // "100" <= "60" daría orden descendente).
+  const [wLo, wHi] = Number(r.weightKg) <= Number(b.weightKg) ? [r.weightKg, b.weightKg] : [b.weightKg, r.weightKg];
+  return { rango: `${wLo}kg / ${wHi}kg`, detalle };
+}
+
+// Genera el HTML imprimible de la cartelera (tabla N°/Escuela/Atleta/VS/Atleta/
+// Escuela/Peso/Nota). Función pura y testeable: recibe los matchups y el arreglo
+// de peleadores y devuelve el documento HTML completo como string. Las peleas se
+// agrupan por categoría de edad World Boxing (con su formato de rounds en el
+// encabezado de cada bloque) y dentro de cada bloque van de más liviano a más
+// pesado; la numeración se reinicia por bloque, como en la planilla de Excel.
+export function buildCarteleraHtml(matchups, fighters) {
+  const rows = carteleraGroups(matchups, fighters).map(({ headerText, mixta, list }) => {
+    const headerRow = `<tr><td colspan="8" class="${mixta ? "grupo grupo-alerta" : "grupo"}">${headerText}</td></tr>`;
     const groupRows = list.map((x, i) => {
       const { m, r, b } = x;
-      const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
-      const pesoDetalle = c1.key === c2.key
-        ? `${c1.label} · ${c1.formato}`
-        : `${c1.label} vs ${c2.label}`;
-      // El peso se muestra de menor a mayor (es el rango de la pelea, no
-      // "rojo / azul"), pedido del organizador. Number() porque un JSON
-      // importado puede traer weightKg como string (comparación lexicográfica:
-      // "100" <= "60" daría orden descendente).
-      const [wLo, wHi] = Number(r.weightKg) <= Number(b.weightKg) ? [r.weightKg, b.weightKg] : [b.weightKg, r.weightKg];
+      const { rango, detalle: pesoDetalle } = carteleraPeso(r, b);
       return `<tr>
           <td>${i + 1}</td>
           <td class="esc esc-roja">${escapeHtml(r.gym)}</td>
@@ -50,7 +72,7 @@ export function buildCarteleraHtml(matchups, fighters) {
           <td class="vs">-</td>
           <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
           <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
-          <td>${wLo}kg / ${wHi}kg<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
+          <td>${rango}<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div></td>
           <td>${escapeHtml(m.nota || "")}</td>
         </tr>`;
     }).join("");
