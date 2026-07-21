@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, OUTBOX_TTL_MS } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, OUTBOX_TTL_MS } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -164,5 +164,44 @@ describe("buildTicketRestore", () => {
   it("lista vacía o nula → objetos vacíos", () => {
     expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {} });
     expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {} });
+  });
+});
+
+// Firebase RTDB RECHAZA `undefined` y su validación lanza de forma SÍNCRONA
+// desde runTransaction. Un peleador con el campo Notas vacío llegaba con
+// `notes: undefined` y hacía que la excepción subiera hasta el onSubmit del
+// formulario, saltándose su limpieza: el alta se confirmaba en pantalla pero
+// los campos quedaban llenos.
+describe("stripUndefined (ningún `undefined` puede llegar a la nube)", () => {
+  it("quita la clave cuyo valor es undefined, sin tocar las demás", () => {
+    const out = stripUndefined({ id: "a", fullName: "Ana", notes: undefined });
+    expect(Object.keys(out)).toEqual(["id", "fullName"]);
+    expect("notes" in out).toBe(false);
+  });
+  it("conserva null, 0, cadena vacía y false (valores legítimos en RTDB)", () => {
+    const out = stripUndefined({ weightCategory: null, fightCount: 0, phone: "", pro: false });
+    expect(out).toEqual({ weightCategory: null, fightCount: 0, phone: "", pro: false });
+  });
+  it("limpia dentro de arreglos y en profundidad (la forma real del nodo)", () => {
+    const out = stripUndefined([{ id: "a", notes: undefined }, { id: "b", meta: { x: 1, y: undefined } }]);
+    expect(out).toEqual([{ id: "a" }, { id: "b", meta: { x: 1 } }]);
+  });
+  it("deja intacto un peleador ya válido y no rompe primitivos", () => {
+    const f = { id: "a", fullName: "Ana", notes: "Oficial" };
+    expect(stripUndefined(f)).toEqual(f);
+    expect(stripUndefined("x")).toBe("x");
+    expect(stripUndefined(7)).toBe(7);
+    expect(stripUndefined(null)).toBe(null);
+  });
+  it("una lista upsertada con notes vacío queda apta para RTDB", () => {
+    // Exactamente lo que arma la transacción: applyUpsertFighter + saneado.
+    const nuevo = { id: "c", fullName: "Carlos Aviles", weightKg: 77, notes: undefined };
+    const listo = stripUndefined(applyUpsertFighter([A], nuevo));
+    expect(JSON.stringify(listo)).toBe(JSON.stringify([A, { id: "c", fullName: "Carlos Aviles", weightKg: 77 }]));
+    // Ni una sola clave con valor undefined en toda la estructura:
+    const hayUndefined = o => o !== null && typeof o === "object"
+      ? Object.values(o).some(v => v === undefined || hayUndefined(v))
+      : false;
+    expect(hayUndefined(listo)).toBe(false);
   });
 });
