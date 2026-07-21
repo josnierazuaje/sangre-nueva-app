@@ -13,6 +13,24 @@ export function nodeToArray(v) {
   return [];
 }
 
+// Quita recursivamente las claves cuyo valor es `undefined`. RTDB las RECHAZA
+// (a diferencia de JSON.stringify, que simplemente las omite) y su validación
+// lanza de forma SÍNCRONA desde runTransaction, no como promesa rechazada: un
+// solo campo opcional sin valor —p.ej. `notes` con el campo Notas vacío— hacía
+// que la excepción subiera por upsertFighterTx hasta el onSubmit del
+// formulario, saltándose su limpieza y dejando los campos llenos tras un alta
+// que ya se había confirmado en pantalla. Se sanea aquí, en la frontera con la
+// nube, para que ningún llamador pueda repetir el fallo.
+export function stripUndefined(v) {
+  if (Array.isArray(v)) return v.map(stripUndefined);
+  if (v && typeof v === "object") {
+    const o = {};
+    Object.keys(v).forEach(k => { if (v[k] !== undefined) o[k] = stripUndefined(v[k]); });
+    return o;
+  }
+  return v;
+}
+
 // Fusiones puras (testeables) para las transacciones de peleadores. upsert
 // reemplaza el peleador con el mismo id o lo agrega; remove lo quita. Se
 // aplican SOBRE el estado más fresco del servidor dentro de la transacción,
@@ -225,7 +243,11 @@ function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !lo
 // completará solo". El registro permanece en el outbox (no se saca) para que
 // el replay lo reintente al reconectar o reabrir la app.
 export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted, onError) {
-  if (cloudIntended()) outboxPut(fighter);
+  // Igual que la copia local: anotar el pendiente no debe poder abortar el
+  // guardado real (setItem lanza con la cuota llena).
+  if (cloudIntended()) {
+    try { outboxPut(fighter); } catch (e) { reportSyncError("No se pudo anotar el registro pendiente en este dispositivo:", e); }
+  }
   fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, merged => {
     // Confirmación real: el servidor devolvió la lista fusionada con el id.
     if (merged.some(x => x && x.id === fighter.id)) {
@@ -243,14 +265,32 @@ export function removeFighterTx(id, optimisticList, onMerged) {
 }
 function fighterArrayTx(apply, optimisticList, onMerged, onError) {
   const k = "bm_fighters_v4";
-  localStorage.setItem(k, JSON.stringify(optimisticList));
+  // La copia local no debe poder tumbar el envío a la nube: con la cuota llena
+  // (o el almacenamiento bloqueado por el navegador) setItem LANZA, y esa
+  // excepción salía hasta el formulario. Se avisa y se sigue.
+  try {
+    localStorage.setItem(k, JSON.stringify(optimisticList));
+  } catch (e) {
+    reportSyncError("No se pudo guardar la copia local de los peleadores en este dispositivo:", e);
+  }
   if (!FB.ready) return;
-  runTransaction(ref(FB.db, fbPath(k)), cur => {
-    const next = apply(cur);
-    // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
-    // que un arreglo vacío borre el nodo y resucite datos, ver save()).
-    return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
-  }).then(res => {
+  let tx;
+  try {
+    tx = runTransaction(ref(FB.db, fbPath(k)), cur => {
+      const next = stripUndefined(apply(cur));
+      // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
+      // que un arreglo vacío borre el nodo y resucite datos, ver save()).
+      return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
+    });
+  } catch (e) {
+    // runTransaction VALIDA el dato de forma síncrona y LANZA (no rechaza) si
+    // es inválido, así que el .catch() de abajo no lo vería y la excepción
+    // escaparía al llamador. Se reporta por el mismo camino que un rechazo.
+    reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e);
+    onError?.(e);
+    return;
+  }
+  tx.then(res => {
     if (res.committed) onMerged(nodeToArray(res.snapshot.val()));
   }).catch(e => {
     reportSyncError("No se pudo sincronizar los peleadores con Firebase (el cambio sí quedó guardado localmente):", e);

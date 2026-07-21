@@ -92,21 +92,35 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
     }
     // El campo de teléfono se quitó del formulario; se conserva el valor ya
     // guardado al editar peleadores antiguos que lo tenían.
-    onSubmit({ id: editingFighter?.id || genId(), fullName: name, phone: editingFighter?.phone || "", sexo, gym: gym.trim().replace(/\s+/g, " "), age: parseInt(ageStr), weightKg: parsedWeight, weightCategory, experienceLevel, fightCount: parsedFightCount, createdAt: editingFighter?.createdAt || new Date().toISOString(), notes: notes.trim() || undefined });
-    if (!editingFighter) {
-      setFullName(""); setGym(""); setAgeStr(""); setWeightStr(""); setFightCountStr("0"); setNotes(""); setErrors({});
-      setDupNotice(null);
-      setAddedName(name);
-      clearTimeout(addedTimerRef.current);
-      // 7s (antes 4): registrando de corrido es fácil perderse la confirmación.
-      addedTimerRef.current = setTimeout(() => setAddedName(null), 7000);
-      // El scroll vive en el <main> de la app (no en window), así que se
-      // sube al inicio del formulario para que la confirmación quede visible.
-      formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-      // Deja el cursor listo en "Nombre" para seguir agregando peleadores
-      // sin tener que tocar el campo de nuevo.
-      nameRef.current?.focus();
-    }
+    // `notes` se OMITE cuando está vacío en vez de mandarse como `undefined`:
+    // Firebase RTDB rechaza `undefined` y su validación lanza de forma SÍNCRONA
+    // ("transaction failed: Data returned contains undefined in property
+    // ...notes"), no como promesa rechazada. Con la clave ausente el upsert
+    // reemplaza el registro entero igual, así que borrar las notas al editar
+    // sigue funcionando.
+    const trimmedNotes = notes.trim();
+    const payload = { id: editingFighter?.id || genId(), fullName: name, phone: editingFighter?.phone || "", sexo, gym: gym.trim().replace(/\s+/g, " "), age: parseInt(ageStr), weightKg: parsedWeight, weightCategory, experienceLevel, fightCount: parsedFightCount, createdAt: editingFighter?.createdAt || new Date().toISOString(), ...(trimmedNotes ? { notes: trimmedNotes } : {}) };
+    if (editingFighter) { onSubmit(payload); return; }
+    // ALTA: el formulario se limpia ANTES de guardar. Antes la limpieza vivía
+    // DESPUÉS de onSubmit(...) y CUALQUIER excepción síncrona del guardado se
+    // la saltaba: la confirmación ya se había mostrado (se emite dentro de
+    // addFighter, antes de tocar el almacenamiento), así que el organizador
+    // veía "se agregó" con todos los campos aún llenos y tenía que borrarlos a
+    // mano. Limpiando primero, confirmación y formulario limpio van siempre
+    // juntos, pase lo que pase con el guardado.
+    setFullName(""); setGym(""); setAgeStr(""); setWeightStr(""); setFightCountStr("0"); setNotes(""); setErrors({});
+    setDupNotice(null);
+    setAddedName(name);
+    clearTimeout(addedTimerRef.current);
+    // 7s (antes 4): registrando de corrido es fácil perderse la confirmación.
+    addedTimerRef.current = setTimeout(() => setAddedName(null), 7000);
+    // El scroll vive en el <main> de la app (no en window), así que se
+    // sube al inicio del formulario para que la confirmación quede visible.
+    formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    // Deja el cursor listo en "Nombre" para seguir agregando peleadores
+    // sin tener que tocar el campo de nuevo.
+    nameRef.current?.focus();
+    onSubmit(payload);
   }
 
   // Pozos de tinta: el input-ink trae fondo hundido, radio de 14px y el halo
