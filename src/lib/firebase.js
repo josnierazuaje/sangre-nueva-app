@@ -97,7 +97,13 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
         const remote = (val === null || val === undefined) ? SYNC_KEYS[k] : (val === "__EMPTY__" ? [] : val);
         const remoteRaw = JSON.stringify(remote);
         if (localStorage.getItem(k) !== remoteRaw) { // distinto: aplica el cambio remoto
-          localStorage.setItem(k, remoteRaw);
+          // La caché local es un acelerador, no el dato: si no se puede
+          // escribir (cuota llena) el cambio remoto debe llegar IGUAL a la app.
+          // Sin este guard la excepción sale del callback y ni onRemote ni
+          // onKeyReady se ejecutan, así que esta clave deja de recibir datos de
+          // la nube el resto de la sesión y el replay del outbox —que espera a
+          // que la clave esté lista— no corre nunca.
+          try { localStorage.setItem(k, remoteRaw); } catch (e) { console.error("No se pudo cachear " + k + " en este dispositivo:", e); }
           onRemote(k, remote);
         }
         if (first) { first = false; onKeyReady?.(k); }

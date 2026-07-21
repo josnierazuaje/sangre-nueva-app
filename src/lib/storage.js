@@ -22,7 +22,9 @@ export function nodeToArray(v) {
 // que ya se había confirmado en pantalla. Se sanea aquí, en la frontera con la
 // nube, para que ningún llamador pueda repetir el fallo.
 export function stripUndefined(v) {
-  if (Array.isArray(v)) return v.map(stripUndefined);
+  // En un arreglo, RTDB rechaza igual un ELEMENTO undefined (un hueco de un
+  // arreglo disperso) que una clave: se descartan, no se mapean.
+  if (Array.isArray(v)) return v.filter(x => x !== undefined).map(stripUndefined);
   if (v && typeof v === "object") {
     const o = {};
     Object.keys(v).forEach(k => { if (v[k] !== undefined) o[k] = stripUndefined(v[k]); });
@@ -220,10 +222,28 @@ export function mergePending(fighters, pending) {
   return u;
 }
 
-// Envolturas sobre localStorage:
+// Envolturas sobre localStorage. Escribir puede lanzar (cuota llena), y estas
+// se llaman desde el manejador del formulario y desde DENTRO del .then de la
+// transacción, así que una excepción aquí abortaba el alta a medias.
+// Los dos casos NO son iguales y se avisan distinto:
+//  - outboxPut AGREGA (la cadena crece → puede exceder la cuota) y es lo que
+//    SOSTIENE el "✓ guardado": si no se puede anotar el pendiente, la garantía
+//    de reenvío se perdió, y eso sí merece el chip de sincronización en rojo.
+//  - outboxRemove FILTRA (escribe una cadena más corta sobre la misma clave, o
+//    sea que por cuota no puede fallar) y solo descuenta algo ya confirmado: si
+//    fallara, el pendiente sobrante es inofensivo (el replay es idempotente y
+//    el TTL lo poda). Basta la consola — jamás debe pintar de rojo un guardado
+//    que la nube SÍ confirmó, que es lo que pasaría si la excepción subiera
+//    hasta el .catch de la transacción.
 export function outboxList() { return pruneOutbox(load(OUTBOX_KEY, []), Date.now()); }
-function outboxPut(f) { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(OUTBOX_KEY, []), f, Date.now()))); }
-function outboxRemove(id) { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
+function outboxPut(f) {
+  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(OUTBOX_KEY, []), f, Date.now()))); }
+  catch (e) { reportSyncError("No se pudo anotar el registro pendiente en este dispositivo:", e); }
+}
+function outboxRemove(id) {
+  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
+  catch (e) { console.error("No se pudo descontar el registro pendiente en este dispositivo:", e); }
+}
 // ¿Este dispositivo usa la nube? (misma condición con la que App decide el
 // modo). En modo solo-local el outbox no aplica: no hay nube que confirme.
 function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")); }
@@ -243,11 +263,7 @@ function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !lo
 // completará solo". El registro permanece en el outbox (no se saca) para que
 // el replay lo reintente al reconectar o reabrir la app.
 export function upsertFighterTx(fighter, optimisticList, onMerged, onCommitted, onError) {
-  // Igual que la copia local: anotar el pendiente no debe poder abortar el
-  // guardado real (setItem lanza con la cuota llena).
-  if (cloudIntended()) {
-    try { outboxPut(fighter); } catch (e) { reportSyncError("No se pudo anotar el registro pendiente en este dispositivo:", e); }
-  }
+  if (cloudIntended()) outboxPut(fighter); // outboxPut ya no puede lanzar (ver arriba)
   fighterArrayTx(cur => applyUpsertFighter(cur, fighter), optimisticList, merged => {
     // Confirmación real: el servidor devolvió la lista fusionada con el id.
     if (merged.some(x => x && x.id === fighter.id)) {
@@ -267,7 +283,8 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
   const k = "bm_fighters_v4";
   // La copia local no debe poder tumbar el envío a la nube: con la cuota llena
   // (o el almacenamiento bloqueado por el navegador) setItem LANZA, y esa
-  // excepción salía hasta el formulario. Se avisa y se sigue.
+  // excepción salía hasta el formulario. Se avisa y se sigue — la nube es el
+  // destino que de verdad importa.
   try {
     localStorage.setItem(k, JSON.stringify(optimisticList));
   } catch (e) {

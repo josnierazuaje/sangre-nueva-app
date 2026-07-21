@@ -186,6 +186,12 @@ describe("stripUndefined (ningún `undefined` puede llegar a la nube)", () => {
     const out = stripUndefined([{ id: "a", notes: undefined }, { id: "b", meta: { x: 1, y: undefined } }]);
     expect(out).toEqual([{ id: "a" }, { id: "b", meta: { x: 1 } }]);
   });
+  it("descarta ELEMENTOS undefined de un arreglo (hueco de arreglo disperso)", () => {
+    // RTDB rechaza un elemento undefined igual que una clave undefined.
+    const disperso = [{ id: "a" }, undefined, { id: "b" }];
+    expect(stripUndefined(disperso)).toEqual([{ id: "a" }, { id: "b" }]);
+    expect(stripUndefined(disperso).some(x => x === undefined)).toBe(false);
+  });
   it("deja intacto un peleador ya válido y no rompe primitivos", () => {
     const f = { id: "a", fullName: "Ana", notes: "Oficial" };
     expect(stripUndefined(f)).toEqual(f);
