@@ -33,6 +33,18 @@ export function stripUndefined(v) {
   return v;
 }
 
+// Valor EXACTO que la transacción de peleadores devuelve a RTDB. Vive fuera de
+// fighterArrayTx —en vez de en línea dentro del callback— para que se pueda
+// FIJAR CON PRUEBAS: el saneado es justo lo que rompió el alta con Notas vacío,
+// y en línea era invisible para los tests (se podía borrar sin que fallara
+// nada). El orden importa: primero se sanea y DESPUÉS se mira si quedó vacío.
+export function fighterNodeValue(next) {
+  const clean = stripUndefined(next);
+  // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
+  // que un arreglo vacío borre el nodo y resucite datos, ver save()).
+  return (Array.isArray(clean) && clean.length === 0) ? "__EMPTY__" : clean;
+}
+
 // Fusiones puras (testeables) para las transacciones de peleadores. upsert
 // reemplaza el peleador con el mismo id o lo agrega; remove lo quita. Se
 // aplican SOBRE el estado más fresco del servidor dentro de la transacción,
@@ -293,12 +305,7 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
   if (!FB.ready) return;
   let tx;
   try {
-    tx = runTransaction(ref(FB.db, fbPath(k)), cur => {
-      const next = stripUndefined(apply(cur));
-      // Mantiene vivo el nodo si queda vacío (mismo centinela que save(), evita
-      // que un arreglo vacío borre el nodo y resucite datos, ver save()).
-      return (Array.isArray(next) && next.length === 0) ? "__EMPTY__" : next;
-    });
+    tx = runTransaction(ref(FB.db, fbPath(k)), cur => fighterNodeValue(apply(cur)));
   } catch (e) {
     // runTransaction VALIDA el dato de forma síncrona y LANZA (no rechaza) si
     // es inválido, así que el .catch() de abajo no lo vería y la excepción
