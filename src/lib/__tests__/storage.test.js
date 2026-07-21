@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, OUTBOX_TTL_MS } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -186,6 +186,12 @@ describe("stripUndefined (ningún `undefined` puede llegar a la nube)", () => {
     const out = stripUndefined([{ id: "a", notes: undefined }, { id: "b", meta: { x: 1, y: undefined } }]);
     expect(out).toEqual([{ id: "a" }, { id: "b", meta: { x: 1 } }]);
   });
+  it("descarta ELEMENTOS undefined de un arreglo (hueco de arreglo disperso)", () => {
+    // RTDB rechaza un elemento undefined igual que una clave undefined.
+    const disperso = [{ id: "a" }, undefined, { id: "b" }];
+    expect(stripUndefined(disperso)).toEqual([{ id: "a" }, { id: "b" }]);
+    expect(stripUndefined(disperso).some(x => x === undefined)).toBe(false);
+  });
   it("deja intacto un peleador ya válido y no rompe primitivos", () => {
     const f = { id: "a", fullName: "Ana", notes: "Oficial" };
     expect(stripUndefined(f)).toEqual(f);
@@ -203,5 +209,51 @@ describe("stripUndefined (ningún `undefined` puede llegar a la nube)", () => {
       ? Object.values(o).some(v => v === undefined || hayUndefined(v))
       : false;
     expect(hayUndefined(listo)).toBe(false);
+  });
+});
+
+// Fija el valor que la transacción manda a RTDB. Estos tests son la red que
+// faltaba: antes el saneado vivía en línea dentro del callback de la
+// transacción y se podía borrar sin que fallara ninguna prueba — justo el
+// código cuya ausencia rompió el alta de peleadores con el campo Notas vacío.
+describe("fighterNodeValue (lo que la transacción manda a RTDB)", () => {
+  const sinNotas = { id: "c", fullName: "Carlos Aviles", weightKg: 77, notes: undefined };
+
+  it("REGRESIÓN: sanea el undefined de un alta con Notas vacío", () => {
+    const v = fighterNodeValue(applyUpsertFighter([A], sinNotas));
+    expect("notes" in v[1]).toBe(false);
+    expect(v).toEqual([A, { id: "c", fullName: "Carlos Aviles", weightKg: 77 }]);
+  });
+
+  it("REGRESIÓN: editar BORRANDO las notas deja el registro sin la nota vieja", () => {
+    const conNotas = { id: "c", fullName: "Carlos Aviles", weightKg: 77, notes: "Oficial" };
+    // El formulario omite la clave al guardar con Notas vacío; el upsert
+    // reemplaza el registro entero, así que la nota no puede sobrevivir.
+    const editado = { id: "c", fullName: "Carlos Aviles", weightKg: 77 };
+    const v = fighterNodeValue(applyUpsertFighter([conNotas], editado));
+    expect(v).toHaveLength(1);
+    expect("notes" in v[0]).toBe(false);
+  });
+
+  it("ningún undefined sobrevive en toda la estructura", () => {
+    const hay = o => o !== null && typeof o === "object"
+      ? Object.values(o).some(x => x === undefined || hay(x))
+      : false;
+    expect(hay(fighterNodeValue(applyUpsertFighter([A], sinNotas)))).toBe(false);
+  });
+
+  it("lista vacía → centinela __EMPTY__ (el nodo no se borra)", () => {
+    expect(fighterNodeValue([])).toBe("__EMPTY__");
+    expect(fighterNodeValue(applyRemoveFighter([A], "a"))).toBe("__EMPTY__");
+  });
+
+  it("ORDEN: sanea ANTES de decidir si está vacío (un hueco no cuenta como peleador)", () => {
+    // Si el centinela se evaluara antes del saneado, [undefined] se mandaría
+    // como arreglo "no vacío" y RTDB lo rechazaría lanzando.
+    expect(fighterNodeValue([undefined])).toBe("__EMPTY__");
+  });
+
+  it("una lista normal pasa intacta", () => {
+    expect(fighterNodeValue([A, B])).toEqual([A, B]);
   });
 });
