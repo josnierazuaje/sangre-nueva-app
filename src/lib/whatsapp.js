@@ -9,6 +9,22 @@
 // Todas deben terminar en "56912345678".
 const CHILE = "56";
 
+// Lo que aparece YA ESCRITO en el campo Teléfono de la venta. La velada es en
+// Chile y prácticamente todo comprador tiene móvil chileno, así que el vendedor
+// solo teclea los 8 dígitos que cambian, con la cola esperando.
+export const PREFIJO_CL = "+56 9 ";
+
+// El campo sigue siendo OPCIONAL, pero con el prefijo puesto de antemano queda
+// "lleno" aunque nadie escriba nada. Si detrás del prefijo no hay dígitos, la
+// venta se guarda SIN teléfono: guardar "+56 9" a secas dejaría una boleta con
+// un enlace de WhatsApp roto, que es peor que no tener teléfono.
+export function telefonoIngresado(raw) {
+  const t = String(raw || "").trim();
+  const d = t.replace(/\D/g, "");
+  // "", "5", "56", "569": no hay nada más que el prefijo (o parte de él).
+  return CHILE.startsWith(d) || (CHILE + "9").startsWith(d) ? "" : t;
+}
+
 export function waPhone(raw) {
   let d = String(raw || "").replace(/\D/g, "");
   if (!d) return "";

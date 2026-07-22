@@ -3,6 +3,7 @@ import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGO
 import Badge from "./Badge.jsx";
 import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
+import { waChatUrl } from "../lib/whatsapp.js";
 import { printHtml } from "../lib/printHtml.js";
 import { buildFightersXlsx } from "../lib/xlsxPlanillas.js";
 import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
@@ -212,7 +213,11 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
               <Badge color={getAgeCategory(f.age).color}>{f.age}a · {getAgeCategory(f.age).label.split(" ")[0]}</Badge>
               <Badge color={(f.sexo || "M") === "F" ? "#EC4899" : "#3B82F6"}>{(f.sexo || "M") === "F" ? "F" : "M"}</Badge>
             </div>
-            {f.phone && <div className="text-xs text-boxing-muted pl-[56px]"><a href={"https://wa.me/" + f.phone.replace("+", "")} target="_blank" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
+            {/* El teléfono se escribe a mano y con espacios ("+56 9 6406 1816").
+                Antes el enlace solo quitaba el "+" y los espacios llegaban a la
+                URL, así que WhatsApp abría una pantalla de error en vez del
+                chat. waChatUrl normaliza el número (mismas pruebas que la venta). */}
+            {f.phone && <div className="text-xs text-boxing-muted pl-[56px]"><a href={waChatUrl(f.phone)} target="_blank" rel="noopener noreferrer" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
             {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-[56px]">{"⚠️"} Toca de nuevo para eliminar</p>}
           </div>);
         })}
