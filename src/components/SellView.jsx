@@ -72,7 +72,7 @@ export default function SellView({ onAdd }) {
           {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
         </button>
       </form>
-      {last && <div className="space-y-2 fade-in"><p className="text-[11px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview ticket={last} /></div>}
+      {last && <div className="space-y-2 fade-in"><p className="text-[11px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview key={last.id} ticket={last} /></div>}
     </div>
   );
 }

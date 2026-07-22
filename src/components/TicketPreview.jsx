@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import QRCode from "qrcode";
 import { TICKET_TYPES_V2, fmt$ } from "../constants.js";
+import { waUrl } from "../lib/whatsapp.js";
 import Badge from "./Badge.jsx";
 import QRDisplay from "./QRDisplay.jsx";
 
@@ -8,16 +9,6 @@ import QRDisplay from "./QRDisplay.jsx";
 const WA_VERDE = "#25D366";
 // Glifo de WhatsApp (viewBox 24×24), para que el botón se reconozca de un vistazo.
 const WA_PATH = "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z";
-
-// Número del comprador en el formato que exige wa.me (internacional, solo
-// dígitos). El formulario pide "+56 9…", pero si alguien escribe solo los 9
-// dígitos del móvil chileno se le antepone el 56 para que el enlace funcione.
-function waPhone(raw) {
-  const d = String(raw || "").replace(/\D/g, "");
-  if (!d) return "";
-  if (d.length === 9 && d.startsWith("9")) return "56" + d;
-  return d;
-}
 
 // Dibuja un rectángulo redondeado (roundRect no existe en navegadores viejos).
 function roundRect(ctx, x, y, w, h, r) {
@@ -38,7 +29,8 @@ export default function TicketPreview({ ticket }) {
   const [sharing, setSharing] = useState(false);
   const [aviso, setAviso] = useState(null);
   const shareText = "Sangre Nueva - La Velada\nEntrada: " + ticketTypeInfo.label + "\nBoleta: #" + ticket.id + "\nA nombre de: " + ticket.attendeeName + "\n\nPresenta este codigo QR en la entrada.";
-  const estadoTexto = ticket.status === "ingresado" ? "● INGRESADO" : "● ACTIVO";
+  // Mismo símbolo que la píldora de la tarjeta en pantalla (✓ / ●).
+  const estadoTexto = ticket.status === "ingresado" ? "✓ INGRESADO" : "● ACTIVO";
   const estadoColor = ticket.status === "ingresado" ? "#4ADE80" : "#FCD34D";
 
   // QR NUEVO y grande solo para la imagen que se comparte. Antes se reutilizaba
@@ -71,7 +63,9 @@ export default function TicketPreview({ ticket }) {
         await document.fonts.ready;
       } catch { /* si falla, se dibuja con lo que haya */ }
     }
-    const W = 920, H = 240, ESC = 3;          // 2760×720 px reales: nítido en WhatsApp
+    // Alto suficiente para que la línea del pie NO cruce el QR ni la píldora de
+    // Estado: QR 90→202, píldora 189→210, línea del pie en 222.
+    const W = 920, H = 250, ESC = 3;          // 2760×750 px reales: nítido en WhatsApp
     const PAD = 26;
     const col = ticketTypeInfo.color;
     const canvas = document.createElement("canvas");
@@ -123,7 +117,7 @@ export default function TicketPreview({ ticket }) {
     ctx.beginPath(); ctx.moveTo(PAD, 78); ctx.lineTo(W - PAD, 78); ctx.stroke();
 
     // ---- QR (nítido: se genera grande y se dibuja chico) ----
-    const qrBox = 116, qrX = PAD, qrY = 92, qrPad = 7;
+    const qrBox = 112, qrX = PAD, qrY = 90, qrPad = 7;
     ctx.fillStyle = "#ffffff";
     roundRect(ctx, qrX, qrY, qrBox, qrBox, 10); ctx.fill();
     const qrCanvas = await buildQrCanvas(720);
@@ -137,7 +131,7 @@ export default function TicketPreview({ ticket }) {
     ];
     const labelX = qrX + qrBox + 26;
     const valueX = W - PAD;
-    let y = 116;
+    let y = 114;
     filas.forEach(([label, value, color, font]) => {
       ctx.fillStyle = "#9CA3AF"; ctx.font = "400 14px 'Barlow Condensed', sans-serif";
       ctx.textAlign = "left"; ctx.fillText(label, labelX, y);
@@ -171,62 +165,76 @@ export default function TicketPreview({ ticket }) {
 
   const canvasToBlob = canvas => new Promise(res => canvas.toBlob(res, "image/png"));
 
-  function descargar(canvas) {
+  // Descarga con URL de blob (no toDataURL): un PNG de 2760×750 en base64 son
+  // varios MB metidos en una sola cadena dentro del href.
+  function descargar(blob) {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
+    a.href = url;
     a.download = "entrada-" + ticket.id + ".png";
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   // Un solo botón: mandar el voucher por WhatsApp.
   //
   // WhatsApp NO acepta imágenes por enlace (wa.me solo lleva texto), así que la
   // imagen se entrega por el único camino que cada dispositivo permite:
-  //  · Celular → hoja de compartir del sistema, donde WhatsApp adjunta la imagen
-  //    solo. Es la única vía en iPhone/Android para que llegue como foto.
+  //  · Pantalla táctil (celular/iPad) → hoja del sistema, donde WhatsApp adjunta
+  //    la imagen solo. Es la ÚNICA vía en iPhone/Android para que llegue como
+  //    foto. Se detecta por puntero grueso y no por user-agent, porque el iPad
+  //    se anuncia como Mac desde iPadOS 13.
   //  · Computadora → se COPIA la imagen al portapapeles y se abre el chat: se
   //    pega con ⌘V / Ctrl+V y se envía con la calidad original. (La hoja de
   //    compartir del Mac no ofrece WhatsApp, que era justo el problema.)
-  // Si el portapapeles falla, se descarga la imagen para adjuntarla a mano.
+  // Si algo de eso falla, se descarga el PNG para adjuntarlo a mano. En todos
+  // los casos se termina con el chat abierto y un aviso de qué hacer.
   async function compartirWhatsApp() {
     if (busyRef.current) return;
     busyRef.current = true;
     setSharing(true);
     setAviso(null);
-    const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const tel = waPhone(ticket.phone);
-    const waUrl = "https://wa.me/" + tel + "?text=" + encodeURIComponent(shareText);
+    const url = waUrl(ticket.phone, shareText);
+    const tactil = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
     try {
-      if (esMovil && navigator.canShare && navigator.share) {
-        const blob = await canvasToBlob(await buildTicketCanvas());
+      // El lienzo se construye UNA sola vez y se reutiliza en todos los caminos.
+      const blob = await canvasToBlob(await buildTicketCanvas());
+
+      if (tactil && navigator.canShare && navigator.share) {
         const file = new File([blob], "entrada-" + ticket.id + ".png", { type: "image/png" });
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: shareText });
-          return;
+          try {
+            await navigator.share({ files: [file], text: shareText });
+            return;
+          } catch (e) {
+            if (e && e.name === "AbortError") return;   // el usuario cerró la hoja: no es un error
+            // cualquier otro fallo (iOS puede rechazar por activación perdida)
+            // cae al respaldo de abajo en vez de dejar al vendedor sin salida.
+          }
         }
       }
-      // Escritorio. La ventana se abre PRIMERO, dentro del clic, o el navegador
-      // la bloquearía por abrirse después de un await.
-      const win = window.open(waUrl, "_blank");
+
+      // Copiar SIEMPRE antes de abrir WhatsApp: al abrir la pestaña nueva el
+      // documento pierde el foco y Chrome rechaza la escritura al portapapeles
+      // con NotAllowedError. Este orden es la diferencia entre que funcione o no.
       let copiada = false;
-      try {
-        // ClipboardItem admite una promesa: así el permiso del clic sigue vivo
-        // mientras se dibuja la imagen (si no, Safari lo rechaza).
-        const item = new ClipboardItem({ "image/png": buildTicketCanvas().then(canvasToBlob) });
-        await navigator.clipboard.write([item]);
-        copiada = true;
-      } catch { /* sin portapapeles: se descarga abajo */ }
-      if (copiada) {
-        setAviso({ ok: true, texto: "Imagen copiada. En WhatsApp pégala con ⌘V (Ctrl+V) y envía." });
-      } else {
-        descargar(await buildTicketCanvas());
-        setAviso({ ok: false, texto: "Se descargó la imagen: adjúntala en el chat de WhatsApp." });
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard && navigator.clipboard.write) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          copiada = true;
+        } catch { /* sin permiso de portapapeles: se descarga abajo */ }
       }
-      if (!win) setAviso(a => ({ ...a, texto: (a?.texto || "") + " (El navegador bloqueó la ventana: abre WhatsApp a mano.)" }));
-    } catch (e) {
-      if (!(e && e.name === "AbortError")) {
-        setAviso({ ok: false, texto: "No se pudo preparar la imagen. Intenta de nuevo." });
-      }
+      if (!copiada) descargar(blob);
+      const win = window.open(url, "_blank");
+      setAviso({
+        ok: copiada,
+        texto: copiada
+          ? (tactil ? "Imagen copiada. En el chat mantén pulsado y elige Pegar." : "Imagen copiada. En WhatsApp pégala con ⌘V (Ctrl+V) y envía.")
+          : "Se descargó la imagen: adjúntala en el chat de WhatsApp.",
+        url: win ? null : url,   // si el navegador bloqueó la ventana, se ofrece el enlace
+      });
+    } catch {
+      setAviso({ ok: false, texto: "No se pudo preparar el voucher. Intenta de nuevo.", url });
     } finally {
       setSharing(false);
       busyRef.current = false;
@@ -263,7 +271,10 @@ export default function TicketPreview({ ticket }) {
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true"><path d={WA_PATH} /></svg>
         {sharing ? "Preparando voucher..." : "Compartir al WhatsApp"}
       </button>
-      {aviso && <p className={"text-[11px] text-center leading-snug " + (aviso.ok ? "text-green-400" : "text-yellow-400")}>{aviso.texto}</p>}
+      {aviso && <p className={"text-[11px] text-center leading-snug " + (aviso.ok ? "text-green-400" : "text-yellow-400")}>
+        {aviso.texto}
+        {aviso.url && <> <a href={aviso.url} target="_blank" rel="noopener noreferrer" className="underline text-green-400">Abrir WhatsApp</a>.</>}
+      </p>}
     </div>
   );
 }
