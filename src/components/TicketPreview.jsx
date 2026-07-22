@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import QRCode from "qrcode";
 import { TICKET_TYPES_V2, fmt$ } from "../constants.js";
 import { waUrl } from "../lib/whatsapp.js";
@@ -26,6 +26,7 @@ export default function TicketPreview({ ticket }) {
   const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === ticket.ticketType) || TICKET_TYPES_V2[0];
   const qrData = location.origin + location.pathname + "?ticket=" + encodeURIComponent(ticket.id) + (ticket.token ? "&t=" + encodeURIComponent(ticket.token) : "");
   const busyRef = useRef(false);
+  const listoRef = useRef(null);   // voucher ya dibujado, listo para compartir al instante
   const [sharing, setSharing] = useState(false);
   const [aviso, setAviso] = useState(null);
   const shareText = "Sangre Nueva - La Velada\nEntrada: " + ticketTypeInfo.label + "\nBoleta: #" + ticket.id + "\nA nombre de: " + ticket.attendeeName + "\n\nPresenta este codigo QR en la entrada.";
@@ -165,6 +166,21 @@ export default function TicketPreview({ ticket }) {
 
   const canvasToBlob = canvas => new Promise(res => canvas.toBlob(res, "image/png"));
 
+  // El voucher se prepara EN CUANTO se muestra la boleta, no al pulsar el
+  // botón. En el celular —donde se vende en la puerta— eso es lo que hace que
+  // la hoja de WhatsApp se abra al instante y sin perder el permiso del toque.
+  // Si aún no está listo al pulsar, el botón lo construye igual (camino lento).
+  useEffect(() => {
+    let vivo = true;
+    listoRef.current = null;
+    buildTicketCanvas()
+      .then(canvasToBlob)
+      .then(blob => { if (vivo && blob) listoRef.current = new File([blob], "entrada-" + ticket.id + ".png", { type: "image/png" }); })
+      .catch(() => { /* se construirá al pulsar */ });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket.id, ticket.status]);
+
   // Descarga con URL de blob (no toDataURL): un PNG de 2760×750 en base64 son
   // varios MB metidos en una sola cadena dentro del href.
   function descargar(blob) {
@@ -196,9 +212,26 @@ export default function TicketPreview({ ticket }) {
     setAviso(null);
     const url = waUrl(ticket.phone, shareText);
     const tactil = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+
+    // CAMINO RÁPIDO (celular): la imagen ya está lista desde que se mostró la
+    // boleta, así que se llama a navigator.share SIN NINGUNA espera delante.
+    // Es lo que evita el fallo de iOS: Safari retira el permiso del toque si
+    // entre el dedo y la llamada se cuela un await largo (dibujar el PNG de
+    // 2760×750 tarda lo suficiente como para perderlo).
+    const listo = listoRef.current;
+    if (tactil && listo && navigator.canShare && navigator.share && navigator.canShare({ files: [listo] })) {
+      try {
+        await navigator.share({ files: [listo], text: shareText });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") { setSharing(false); busyRef.current = false; return; }
+        // cualquier otro fallo cae al respaldo de abajo, nunca sin salida
+      }
+    }
+
     try {
       // El lienzo se construye UNA sola vez y se reutiliza en todos los caminos.
-      const blob = await canvasToBlob(await buildTicketCanvas());
+      const blob = listo ? await listo.arrayBuffer().then(b => new Blob([b], { type: "image/png" })) : await canvasToBlob(await buildTicketCanvas());
 
       if (tactil && navigator.canShare && navigator.share) {
         const file = new File([blob], "entrada-" + ticket.id + ".png", { type: "image/png" });
