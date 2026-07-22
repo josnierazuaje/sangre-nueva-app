@@ -349,6 +349,24 @@ export function super4FighterIds(brackets) {
   return ids;
 }
 
+// IDs de peleadores que YA tienen un compromiso en el evento: un cruce del VS
+// o un puesto en el Super 4. Es la base de "Faltante", que es su complemento
+// (faltante = registrado y SIN compromiso). Un atleta del Super 4 tiene sus
+// peleas del torneo, así que NUNCA puede ser faltante — la misma razón por la
+// que el VS lo excluye de los cruces (MatchmakingView) y por la que
+// conflicts.js marca como inválido un cruce del VS de alguien que ya está en el
+// Super 4. Esta es la fuente ÚNICA de esa verdad, para que el conteo, el filtro
+// y la planilla impresa de la lista de peleadores no puedan discrepar entre sí
+// ni con el resto de la app. Devuelve un Set nuevo (no muta sus argumentos).
+export function committedFighterIds(matchups, brackets) {
+  const ids = super4FighterIds(brackets);
+  (matchups || []).forEach(m => {
+    if (m && m.fighterRedId != null) ids.add(m.fighterRedId);
+    if (m && m.fighterBlueId != null) ids.add(m.fighterBlueId);
+  });
+  return ids;
+}
+
 export function availableReplacements(catKey, fighters, brackets, maxFights = null) {
   const pool = filterByMaxFights(fighters, maxFights);
   let eligible;

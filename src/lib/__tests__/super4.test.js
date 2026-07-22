@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds, bracketPrintTitle, normalizeSuper4 } from "../super4.js";
+import { SUPER4_CATEGORIES, SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, eligibleForCategory, eligibleForDivision, pickFour, pairSemis, buildSuper4Brackets, mergeRegenerated, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, filterByMaxFights, bracketMaxFights, super4FighterIds, committedFighterIds, bracketPrintTitle, normalizeSuper4 } from "../super4.js";
 import { dupKey } from "../dedup.js";
 
 let n = 0;
@@ -565,5 +565,77 @@ describe("normalizeSuper4 (repara las llaves truncadas por Firebase)", () => {
     expect(normalizeSuper4(undefined)).toEqual([]);
     expect(normalizeSuper4([])).toEqual([]);
     expect(normalizeSuper4([{ id: "y" }])[0].semis).toHaveLength(2);
+  });
+});
+
+// ============================================================
+// committedFighterIds — REGLA ESTRICTA: quien está en el Super 4
+// NUNCA cuenta como "faltante" en la lista de peleadores.
+// ============================================================
+describe("committedFighterIds (compromiso = VS o Super 4)", () => {
+  const bracket = (semis) => ({ id: "b1", catKey: "x", semis });
+  const semi = (red, blue) => ({ red, blue, winner: null });
+
+  it("junta los ids del VS y los del Super 4", () => {
+    const matchups = [{ fighterRedId: "a", fighterBlueId: "b" }];
+    const s4 = [bracket([semi("c", "d"), semi("e", "f")])];
+    const ids = committedFighterIds(matchups, s4);
+    expect([...ids].sort()).toEqual(["a", "b", "c", "d", "e", "f"]);
+  });
+
+  it("un atleta SOLO en el Super 4 tiene compromiso (no es faltante)", () => {
+    // Omar Urbano: en el Super 4, sin cruce en el VS. Antes contaba como
+    // faltante; ahora está en el set de comprometidos.
+    const ids = committedFighterIds([], [bracket([semi("omar", "rival"), semi("x", "y")])]);
+    expect(ids.has("omar")).toBe(true);
+  });
+
+  it("REGLA ESTRICTA: NINGÚN atleta del Super 4 puede quedar como faltante", () => {
+    // Roster variado, VS que NO incluye a los del Super 4, brackets con y sin
+    // huecos. El faltante set (registrados sin compromiso) no debe cruzarse
+    // jamás con los ids del Super 4, pase lo que pase.
+    const fighters = Array.from({ length: 40 }, (_, i) => ({ id: "F" + i }));
+    const matchups = [
+      { fighterRedId: "F0", fighterBlueId: "F1" },
+      { fighterRedId: "F2", fighterBlueId: "F3" },
+    ];
+    const s4 = [
+      bracket([semi("F10", "F11"), semi("F12", "F13")]),
+      { id: "b2", catKey: "y", semis: [semi("F20", null), semi(null, "F21")] }, // bracket incompleto
+      { id: "b3", catKey: "z", semis: [semi("F30", "F31"), semi("F32", "F33")] },
+    ];
+    const committed = committedFighterIds(matchups, s4);
+    const s4Ids = super4FighterIds(s4);
+    const faltantes = fighters.filter(f => !committed.has(f.id));
+    // La invariante que pidió el dueño: intersección(faltantes, Super 4) = ∅.
+    const faltantesEnS4 = faltantes.filter(f => s4Ids.has(f.id));
+    expect(faltantesEnS4).toEqual([]);
+    // Y los del Super 4 realmente están fuera de la lista de faltantes.
+    for (const id of s4Ids) expect(faltantes.some(f => f.id === id)).toBe(false);
+  });
+
+  it("no cuenta null/undefined como ids (huecos de bracket o matchup a medias)", () => {
+    const ids = committedFighterIds(
+      [{ fighterRedId: "a", fighterBlueId: null }, null],
+      [bracket([semi(null, "b"), semi("c", null)])],
+    );
+    expect([...ids].sort()).toEqual(["a", "b", "c"]);
+    expect(ids.has(null)).toBe(false);
+    expect(ids.has(undefined)).toBe(false);
+  });
+
+  it("tolera entradas vacías o nulas sin reventar", () => {
+    expect([...committedFighterIds([], [])]).toEqual([]);
+    expect([...committedFighterIds(null, null)]).toEqual([]);
+    expect([...committedFighterIds(undefined, undefined)]).toEqual([]);
+  });
+
+  it("no muta sus argumentos", () => {
+    const matchups = [{ fighterRedId: "a", fighterBlueId: "b" }];
+    const s4 = [bracket([semi("c", "d"), semi("e", "f")])];
+    const snapM = JSON.stringify(matchups), snapS = JSON.stringify(s4);
+    committedFighterIds(matchups, s4);
+    expect(JSON.stringify(matchups)).toBe(snapM);
+    expect(JSON.stringify(s4)).toBe(snapS);
   });
 });

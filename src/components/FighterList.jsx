@@ -7,6 +7,7 @@ import { printHtml } from "../lib/printHtml.js";
 import { buildFightersXlsx } from "../lib/xlsxPlanillas.js";
 import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
+import { committedFighterIds } from "../lib/super4.js";
 
 // Chip de filtro: número (en el color de la categoría) + etiqueta, con estado
 // activo destacado. El look (profundidad, hover, resplandor activo) vive en la
@@ -24,20 +25,24 @@ function FilterChip({ n, label, color, active, onClick }) {
 // ============================================
 // COMPONENTE: LISTA PELEADORES
 // ============================================
-export default function FighterList({ fighters, matchups = [], onEdit, onDelete }) {
+export default function FighterList({ fighters, matchups = [], super4 = [], onEdit, onDelete }) {
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showFaltantes, setShowFaltantes] = useState(false);
   const [sexFilter, setSexFilter] = useState("all"); // "all" | "M" | "F"
   const [ageFilter, setAgeFilter] = useState("all"); // "all" | clave de categoría de edad
-  // "Faltantes": peleadores que no quedaron en ninguna pelea del VS —
-  // el matchmaking nunca empareja cruces que rompan las reglas World Boxing
-  // (categoría de edad, sexo), así que quien no tiene rival compatible
-  // queda aquí, con sus datos intactos, a la espera de un rival nuevo.
-  const matchedIds = useMemo(() => { const s = new Set(); matchups.forEach(m => { s.add(m.fighterRedId); s.add(m.fighterBlueId); }); return s; }, [matchups]);
-  const faltantesCount = useMemo(() => fighters.filter(f => !matchedIds.has(f.id)).length, [fighters, matchedIds]);
+  // "Faltantes": peleadores registrados SIN compromiso todavía — ni un cruce
+  // en el VS ni un puesto en el Super 4. El matchmaking nunca empareja cruces
+  // que rompan las reglas World Boxing (categoría de edad, sexo), así que quien
+  // no tiene rival compatible queda aquí, con sus datos intactos, a la espera
+  // de un rival nuevo. REGLA ESTRICTA: quien está en el Super 4 ya tiene sus
+  // peleas del torneo y por eso JAMÁS es faltante — committedFighterIds (en
+  // super4.js) es la única fuente de "quién tiene compromiso", compartida con
+  // el VS, para que la lista no se contradiga con el resto de la app.
+  const committedIds = useMemo(() => committedFighterIds(matchups, super4), [matchups, super4]);
+  const faltantesCount = useMemo(() => fighters.filter(f => !committedIds.has(f.id)).length, [fighters, committedIds]);
   const filtered = useMemo(() => {
     let r = [...fighters];
-    if (showFaltantes) r = r.filter(f => !matchedIds.has(f.id));
+    if (showFaltantes) r = r.filter(f => !committedIds.has(f.id));
     if (sexFilter !== "all") r = r.filter(f => (f.sexo || "M") === sexFilter);
     if (ageFilter === "invalid") r = r.filter(f => { const k = getAgeCategory(f.age).key; return k === "infantil" || k === "veterano"; });
     else if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
@@ -50,7 +55,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
     switch (sortBy) { case "name": r.sort((a, b) => a.fullName.localeCompare(b.fullName)); break; case "weight": r.sort((a, b) => a.weightKg - b.weightKg); break; case "experience": r.sort((a, b) => b.fightCount - a.fightCount); break; default: r.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
     return r;
-  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, sexFilter, ageFilter, matchedIds]);
+  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, sexFilter, ageFilter, committedIds]);
   const stats = useMemo(() => { const e = {}; fighters.forEach(f => { e[f.experienceLevel] = (e[f.experienceLevel] || 0) + 1; }); return e; }, [fighters]);
   // Conteo por sexo para los chips Masculino/Femenino (junto a "Faltante").
   const sexCounts = useMemo(() => { const c = { M: 0, F: 0 }; fighters.forEach(f => { c[(f.sexo || "M") === "F" ? "F" : "M"]++; }); return c; }, [fighters]);
@@ -72,7 +77,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
   // Excel) diga siempre a qué corresponde la lista que trae.
   function subtituloFiltros() {
     const filtros = [];
-    if (showFaltantes) filtros.push("FALTANTES (sin rival asignado en el VS)");
+    if (showFaltantes) filtros.push("FALTANTES (sin cruce en el VS ni puesto en el Super 4)");
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
     if (ageFilter === "invalid") filtros.push("INVÁLIDOS (fuera de rango oficial 13-40)");
     else if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
@@ -157,7 +162,7 @@ export default function FighterList({ fighters, matchups = [], onEdit, onDelete 
         {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2 fade-in">
-        <p className="text-orange-400 text-xs">Peleadores sin rival asignado en el VS: aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival.</p>
+        <p className="text-orange-400 text-xs">Peleadores sin compromiso todavía: ni un cruce en el VS ni un puesto en el Super 4. Aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival. Quien ya está en el Super 4 no aparece aquí: tiene sus peleas del torneo.</p>
       </div>}
       {/* Móvil: búsqueda arriba y filtros abajo, como siempre. Escritorio
           (lg): todo en una sola fila-herramienta para liberar alto visual. */}

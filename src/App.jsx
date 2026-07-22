@@ -520,7 +520,7 @@ export default function App() {
       <main className="flex-1 min-w-0 overflow-y-auto px-4 pt-4 pb-20 lg:px-6 lg:pt-8 lg:pb-12 xl:px-10" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="lg:max-w-6xl lg:mx-auto">
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
-            {view === "list" && <FighterList fighters={fighters} matchups={matchups} onEdit={editFighter} onDelete={delFighter} />}
+            {view === "list" && <FighterList fighters={fighters} matchups={matchups} super4={super4} onEdit={editFighter} onDelete={delFighter} />}
             {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
             {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
             {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
