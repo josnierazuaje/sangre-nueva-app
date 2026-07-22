@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { crc32, zipSync } from "../zip.js";
 import { buildXlsx, colLetter, cellRef, escapeXml } from "../xlsx.js";
-import { buildCarteleraXlsx, buildSuper4Xlsx, buildFightersXlsx } from "../xlsxPlanillas.js";
+import { buildCarteleraXlsx, buildSuper4Xlsx, buildFightersXlsx, buildFaltantesXlsx } from "../xlsxPlanillas.js";
 import { xlsxFilename } from "../download.js";
 
 // El ZIP se escribe SIN comprimir, así que el XML aparece tal cual dentro de
@@ -268,5 +268,58 @@ describe("nombre del archivo descargado", () => {
   });
   it("quita los caracteres que rompen la descarga", () => {
     expect(xlsxFilename("Lista/2026: *final*", "")).toBe("Lista-2026- -final-.xlsx");
+  });
+});
+
+describe("planilla de FALTANTES / emparejamiento forzado en Excel", () => {
+  const F = [
+    { id: "a", fullName: "Rojo Uno", gym: "Iron King", age: 25, weightKg: 61, sexo: "M", fightCount: 3, weightCategory: "m_welter", experienceLevel: "principiante" },
+    { id: "b", fullName: "Azul Dos", gym: "Iron King", age: 40, weightKg: 82, sexo: "M", fightCount: 20, weightCategory: "m_crucero", experienceLevel: "profesional" },
+    { id: "c", fullName: "Sin Rival", gym: "Team C", age: 45, weightKg: 57, sexo: "M", fightCount: 2, weightCategory: "m_ligero", experienceLevel: "principiante" },
+  ];
+  const forzadas = [{ id: "m1", roundNumber: 1, fighterRedId: "a", fighterBlueId: "b", forced: true, nota: "" }];
+  const t = texto(buildFaltantesXlsx(forzadas, [F[2]], F, "1 pelea forzada · 1 sin rival"));
+
+  it("lleva el título, el subtítulo y las columnas propias", () => {
+    expect(t).toContain("Emparejamiento forzado");
+    expect(t).toContain("1 pelea forzada · 1 sin rival");
+    expect(t).toContain("Qué falta para cumplir la norma");
+    expect(t).toContain("Corrección");
+  });
+
+  it("escribe en su celda lo que le falta a la pelea para ser reglamentaria", () => {
+    expect(t).toContain("misma división de peso");
+    expect(t).toContain("escuelas distintas (ambos de Iron King)");
+    expect(t).toContain("Rojo Uno");
+    expect(t).toContain("Azul Dos");
+  });
+
+  it("agrega la hoja 'Sin rival' con los que quedaron sueltos", () => {
+    expect(t).toContain("Sin rival");
+    expect(t).toContain("Sin Rival");        // el atleta
+    expect(t).toContain("Rival propuesto");
+    // dos hojas de verdad en el libro
+    expect(t).toContain("sheet1.xml");
+    expect(t).toContain("sheet2.xml");
+  });
+
+  it("sin atletas sueltos NO agrega la segunda hoja", () => {
+    const solo = texto(buildFaltantesXlsx(forzadas, [], F));
+    expect(solo).toContain("sheet1.xml");
+    expect(solo).not.toContain("sheet2.xml");
+  });
+
+  it("omite una pelea cuyo atleta ya fue eliminado (igual que la impresa)", () => {
+    const conRota = [...forzadas, { id: "m2", roundNumber: 2, fighterRedId: "a", fighterBlueId: "borrado", forced: true }];
+    expect(() => buildFaltantesXlsx(conRota, [], F)).not.toThrow();
+  });
+
+  it("una forzada que sí cumple la norma se marca como tal", () => {
+    const ok = [
+      { id: "x", fullName: "Ok Uno", gym: "A", age: 25, weightKg: 61, sexo: "M", fightCount: 3, weightCategory: "m_welter", experienceLevel: "principiante" },
+      { id: "y", fullName: "Ok Dos", gym: "B", age: 25, weightKg: 63, sexo: "M", fightCount: 3, weightCategory: "m_welter", experienceLevel: "principiante" },
+    ];
+    const t2 = texto(buildFaltantesXlsx([{ id: "m", roundNumber: 1, fighterRedId: "x", fighterBlueId: "y", forced: true }], [], ok));
+    expect(t2).toContain("sí cumple la norma");
   });
 });
