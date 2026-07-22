@@ -138,3 +138,21 @@ describe("orden por peso con weightKg en texto", () => {
     expect(html.indexOf("Ligero · 55-60kg")).toBeLessThan(html.indexOf("Superpesado · +90kg"));
   });
 });
+
+describe("buildCarteleraHtml — peleas FORZADAS", () => {
+  it("una pelea forzada muestra la nota roja 'FORZADA — faltaría: …' con lo que incumple", () => {
+    // Misma edad (adulto) pero divisiones distintas: Wélter vs Crucero.
+    const r = f({ id: "r", age: 25, weightKg: 61, gym: "A" });
+    const b = f({ id: "b", age: 25, weightKg: 82, gym: "B" });
+    const html = buildCarteleraHtml([vs(r, b, { forced: true })], [r, b]);
+    expect(html).toContain("FORZADA");
+    expect(html).toContain("división de peso");
+    expect(html).toContain('class="forzada"');
+  });
+
+  it("una pelea NORMAL no lleva la marca FORZADA", () => {
+    const r = f({ id: "r", age: 25, weightKg: 61, gym: "A" });
+    const b = f({ id: "b", age: 25, weightKg: 63, gym: "B" });
+    expect(buildCarteleraHtml([vs(r, b)], [r, b])).not.toContain("FORZADA");
+  });
+});

@@ -1,4 +1,4 @@
-import { genId, getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
+import { genId, getCategoryInfo, getExperienceInfo, getAgeCategory, getWeightCategory } from "../constants.js";
 
 // Dos atletas de la misma escuela/gimnasio no pueden emparejarse (entrenan
 // juntos). Comparación tolerante a mayúsculas y espacios. Es una regla DURA en
@@ -231,4 +231,103 @@ export function bestMatchAll(fighters, attempts = 250) {
   }
   // Renumerar por prolijidad (el ganador puede venir de una corrida aleatoria).
   return best.map((m, i) => ({ ...m, roundNumber: i + 1 }));
+}
+
+// ============================================
+// EMPAREJAMIENTO FORZADO — la pestaña "Faltantes"
+// ============================================
+// Empareja OBLIGATORIAMENTE a los atletas que quedaron sin pelea, aunque el
+// cruce rompa las reglas World Boxing / FECHIBOX. No es para armar la cartelera
+// (para eso está bestMatchAll, que NUNCA rompe una regla): es el último recurso
+// para que nadie se quede sin subir al ring, dejando cada incumplimiento
+// escrito en rojo para que el organizador lo negocie o lo corrija.
+
+// División de peso oficial recomputada desde peso+sexo (no se confía en el
+// campo guardado, que en registros viejos puede traer una clave que ya no
+// existe), igual que hace la planilla impresa.
+function divisionInfo(f) {
+  const kg = Number(f.weightKg);
+  return Number.isFinite(kg) ? getCategoryInfo(getWeightCategory(kg, f.sexo)) : null;
+}
+
+// Condiciones que FALTARÍAN para que un cruce cumpla la norma. Devuelve una
+// lista de textos claros, cada uno con el desajuste real entre paréntesis. Si
+// la lista está vacía, el cruce SÍ es válido (no hubo que forzarlo). Es la
+// explicación en rojo de una pelea forzada; la comparten la tarjeta VS y la
+// planilla impresa para que nunca se desincronicen. El orden va de lo más grave
+// (sexo, edad) a lo más leve (escuela).
+export function forcedPairingReasons(a, b) {
+  const out = [];
+  const acA = getAgeCategory(a.age), acB = getAgeCategory(b.age);
+  if ((a.sexo || "M") !== (b.sexo || "M")) {
+    const s = x => (x.sexo || "M") === "F" ? "femenino" : "masculino";
+    out.push(`mismo sexo (${s(a)} vs ${s(b)})`);
+  }
+  if (acA.key !== acB.key) {
+    out.push(`misma categoría de edad World Boxing (${acA.label} · ${a.age}a vs ${acB.label} · ${b.age}a)`);
+  } else if (acA.key === "infantil" || acA.key === "veterano") {
+    // Coinciden de categoría, pero ambos están fuera del rango oficial 13-40.
+    out.push(`edad dentro del rango oficial 13-40 (ambos ${acA.label})`);
+  }
+  const dA = divisionInfo(a), dB = divisionInfo(b);
+  if (dA && dB && dA.key !== dB.key) {
+    const wd = Math.abs(Number(a.weightKg) - Number(b.weightKg)).toFixed(1).replace(".", ",");
+    out.push(`misma división de peso (${dA.label} vs ${dB.label}, dif. ${wd}kg)`);
+  }
+  if (!experienceOk(a, b)) {
+    out.push(`diferencia de experiencia de máximo 3 peleas (${a.fightCount || 0} vs ${b.fightCount || 0})`);
+  }
+  if ((a.gym || "").trim().toLowerCase() === (b.gym || "").trim().toLowerCase()) {
+    out.push(`escuelas distintas (ambos de ${(a.gym || "—").trim()})`);
+  }
+  return out;
+}
+
+// Penalización de un cruce forzado: 0 = ideal, más alto = peor. Ordena TODAS
+// las parejas posibles para emparejar primero a las MENOS conflictivas y dejar
+// los cruces más forzados (o el impar suelto) para el final. Cruzar sexos pesa
+// muchísimo: solo ocurre si de verdad no queda alternativa del mismo sexo.
+function pairPenalty(a, b) {
+  let p = 0;
+  const acA = getAgeCategory(a.age), acB = getAgeCategory(b.age);
+  if ((a.sexo || "M") !== (b.sexo || "M")) p += 1000;
+  if (acA.key !== acB.key) p += 300; else p += Math.max(0, Math.abs(a.age - b.age) - 6) * 2;
+  if (acA.key === "infantil" || acA.key === "veterano" || acB.key === "infantil" || acB.key === "veterano") p += 40;
+  const dA = divisionInfo(a), dB = divisionInfo(b);
+  if (dA && dB && dA.key !== dB.key) p += 120;
+  p += Math.abs(Number(a.weightKg) - Number(b.weightKg)) * 3;
+  const lvls = ["debutante", "principiante", "amateur", "profesional"];
+  p += Math.abs(lvls.indexOf(a.experienceLevel) - lvls.indexOf(b.experienceLevel)) * 25;
+  if (!experienceOk(a, b)) p += 80;
+  if ((a.gym || "").trim().toLowerCase() === (b.gym || "").trim().toLowerCase()) p += 40;
+  return p;
+}
+
+// Empareja a TODOS los faltantes (los que no tienen pelea ni están en el Super
+// 4). Recorre las parejas de menos a más conflictivas tomando la mejor pareja
+// disponible en cada paso (emparejamiento voraz por menor penalización). Cada
+// pelea sale marcada `forced: true` y con sus `warnings` para la tarjeta. Si el
+// número de faltantes es IMPAR, uno queda sin rival: se devuelve en `leftover`
+// (la app avisa por su nombre). `startRound` continúa la numeración de la
+// cartelera existente (las forzadas se AGREGAN, no reemplazan). Determinista.
+export function forcedMatchAll(faltantes, startRound = 1) {
+  const pool = (faltantes || []).filter(Boolean);
+  const pairs = [];
+  for (let i = 0; i < pool.length; i++)
+    for (let j = i + 1; j < pool.length; j++)
+      pairs.push({ a: pool[i], b: pool[j], p: pairPenalty(pool[i], pool[j]) });
+  pairs.sort((x, y) => x.p - y.p);
+  const used = new Set();
+  const matchups = [];
+  for (const { a, b } of pairs) {
+    if (used.has(a.id) || used.has(b.id)) continue;
+    used.add(a.id); used.add(b.id);
+    matchups.push({
+      id: genId(), fighterRedId: a.id, fighterBlueId: b.id,
+      roundNumber: startRound + matchups.length,
+      warnings: analyzeMatch(a, b), forced: true, createdAt: new Date().toISOString(),
+    });
+  }
+  const leftover = pool.filter(f => !used.has(f.id)); // 0 o 1 (número impar)
+  return { matchups, leftover };
 }

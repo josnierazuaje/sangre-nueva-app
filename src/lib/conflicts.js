@@ -20,6 +20,12 @@ export function matchupConflicts(matchups, fighters, super4Ids) {
     }
     const enS4 = [r, b].filter(f => super4Ids.has(f.id)).map(f => f.fullName);
     if (enS4.length) out.super4.push({ n: m.roundNumber, id: m.id, texto: `Pelea ${m.roundNumber}: ${enS4.join(" y ")} ya está${enS4.length > 1 ? "n" : ""} en el Super 4` });
+    // Las peleas FORZADAS rompen reglas a propósito (edad/escuela/experiencia):
+    // su incumplimiento ya se explica en su propia nota roja, así que NO se
+    // listan como "problemas a corregir" (si no, la cartelera gritaría por cada
+    // una). Las alertas ESTRUCTURALES de arriba —rival eliminado y Super 4— sí
+    // aplican: un atleta no puede estar a la vez forzado y en el Super 4.
+    if (m.forced) return;
     const c1 = getAgeCategory(r.age), c2 = getAgeCategory(b.age);
     if (c1.key !== c2.key) out.edadMixta.push({ n: m.roundNumber, id: m.id, texto: `Pelea ${m.roundNumber}: ${r.fullName} (${c1.label}, ${r.age}a) vs ${b.fullName} (${c2.label}, ${b.age}a)` });
     if ((r.gym || "").trim().toLowerCase() === (b.gym || "").trim().toLowerCase()) out.mismaEscuela.push({ n: m.roundNumber, id: m.id, texto: `Pelea ${m.roundNumber}: ${r.fullName} vs ${b.fullName} — ${r.gym}` });

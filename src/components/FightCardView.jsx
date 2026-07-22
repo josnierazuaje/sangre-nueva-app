@@ -1,4 +1,5 @@
 import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
+import { forcedPairingReasons } from "../lib/matchmaking.js";
 import { buildCarteleraHtml, carteleraGroups } from "../lib/printCartelera.js";
 import { printHtml } from "../lib/printHtml.js";
 import { buildCarteleraXlsx } from "../lib/xlsxPlanillas.js";
@@ -75,9 +76,12 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
           {conflicts.huerfanas.length > 0 && <p className="text-[10px] text-red-200/60">Las peleas con rival eliminado no salen en la planilla impresa.</p>}
         </div>}
         <div className="divide-y divide-white/5">{matchups.map((m, i) => { const r = fighters.find(f => f.id === m.fighterRedId); const b = fighters.find(f => f.id === m.fighterBlueId); if (!r || !b) return null; const c = getCategoryInfo(r.weightCategory); const main = i === matchups.length - 1;
-          return <div key={m.id} className={"px-4 py-3 " + (main ? "bg-[rgba(200,160,74,0.08)]" : "")}>
-            {main ? <div className="text-center mb-1"><span className="text-[10px] text-boxing-goldBright font-bold uppercase tracking-widest bg-[rgba(200,160,74,0.12)] border border-[rgba(200,160,74,0.4)] px-2.5 py-0.5 rounded-full">{"⭐"} Estelar</span></div> : <div className="text-center mb-1"><span className="text-[10px] text-boxing-muted tracking-[0.18em] uppercase">Pelea {m.roundNumber}</span></div>}
-            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{r.fullName}</p><p className="text-[11px] text-boxing-muted">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="vsx-vs" style={{ fontSize: "16px" }}>VS</span><span className="text-[10px] text-boxing-muted">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{b.fullName}</p><p className="text-[11px] text-boxing-muted">{b.weightKg}kg · {b.gym}</p></div></div></div>; })}</div>
+          const forcedReasons = m.forced ? forcedPairingReasons(r, b) : [];
+          return <div key={m.id} className={"px-4 py-3 " + (main ? "bg-[rgba(200,160,74,0.08)]" : m.forced ? "bg-red-900/10" : "")}>
+            {main ? <div className="text-center mb-1"><span className="text-[10px] text-boxing-goldBright font-bold uppercase tracking-widest bg-[rgba(200,160,74,0.12)] border border-[rgba(200,160,74,0.4)] px-2.5 py-0.5 rounded-full">{"⭐"} Estelar</span></div> : <div className="text-center mb-1 flex items-center justify-center gap-2"><span className="text-[10px] text-boxing-muted tracking-[0.18em] uppercase">Pelea {m.roundNumber}</span>{m.forced && <span className="text-[9px] font-bold text-red-300 bg-red-900/40 border border-red-500/50 px-1.5 py-0.5 rounded-full uppercase tracking-widest">Forzada</span>}</div>}
+            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{r.fullName}</p><p className="text-[11px] text-boxing-muted">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="vsx-vs" style={{ fontSize: "16px" }}>VS</span><span className="text-[10px] text-boxing-muted">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{b.fullName}</p><p className="text-[11px] text-boxing-muted">{b.weightKg}kg · {b.gym}</p></div></div>
+            {forcedReasons.length > 0 && <p className="text-[10px] text-red-300/90 mt-1.5 leading-snug"><span className="font-bold">Faltaría:</span> {forcedReasons.map(x => `(${x})`).join("; ")}.</p>}
+          </div>; })}</div>
         <div className="bg-black/30 px-4 py-2 text-center"><p className="text-boxing-muted text-[10px] tracking-[0.22em] uppercase">Sangre Nueva · La Velada</p></div>
       </div>
     </div>

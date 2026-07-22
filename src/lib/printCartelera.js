@@ -1,5 +1,6 @@
 import { getAgeCategory, getCategoryInfo, getWeightCategory, weightRangeLabel, FECHIBOX_LABEL } from "../constants.js";
 import { escapeHtml } from "./html.js";
+import { forcedPairingReasons } from "./matchmaking.js";
 
 // Orden de bloques en la planilla: categorías World Boxing de menor a mayor
 // edad, y al final "mixta" (cruce prohibido, va resaltado en rojo).
@@ -73,6 +74,15 @@ export function carteleraPeso(r, b) {
   };
 }
 
+// Nota roja de una pelea FORZADA para la columna "Nota" de la planilla impresa:
+// "FORZADA — faltaría: (cond); (cond)". Si el cruce resultó válido, solo marca
+// FORZADA. Comparte forcedPairingReasons con la tarjeta VS de la app.
+function forcedNoteHtml(r, b) {
+  const reasons = forcedPairingReasons(r, b);
+  const detalle = reasons.length ? " — faltaría: " + reasons.map(x => "(" + x + ")").join("; ") : "";
+  return `<div class="forzada">FORZADA${escapeHtml(detalle)}</div>`;
+}
+
 // Genera el HTML imprimible de la cartelera (tabla N°/Escuela/Atleta/VS/Atleta/
 // Escuela/Peso/Nota). Función pura y testeable: recibe los matchups y el arreglo
 // de peleadores y devuelve el documento HTML completo como string. Las peleas se
@@ -93,7 +103,7 @@ export function buildCarteleraHtml(matchups, fighters) {
           <td class="atleta atleta-azul">${escapeHtml(b.fullName)}</td>
           <td class="esc esc-azul">${escapeHtml(b.gym)}</td>
           <td class="${cruce ? "peso peso-cruce" : "peso"}">${escapeHtml(division)}<div class="peso-detalle">${escapeHtml(pesoDetalle)}</div>${cruce ? `<div class="peso-detalle peso-aviso">⚠ ${pesos}</div>` : ""}</td>
-          <td>${escapeHtml(m.nota || "")}</td>
+          <td>${m.forced ? forcedNoteHtml(r, b) : ""}${escapeHtml(m.nota || "")}</td>
         </tr>`;
     }).join("");
     return headerRow + groupRows;
@@ -121,6 +131,7 @@ export function buildCarteleraHtml(matchups, fighters) {
   td.peso-cruce{background:#FEE2E2;color:#B91C1C;}
   .peso-detalle{font-size:10px;color:#374151;font-weight:normal;margin-top:2px;}
   .peso-aviso{color:#B91C1C;font-weight:bold;}
+  .forzada{color:#B91C1C;font-weight:bold;font-size:10px;line-height:1.2;margin-bottom:2px;}
   .nota-final{margin-top:14px;text-align:center;font-size:13px;font-weight:bold;font-style:italic;color:#B91C1C;}
   @page{size:landscape;margin:12mm;}
 </style></head>

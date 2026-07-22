@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, bestMatchAll, experienceOk } from "../matchmaking.js";
+import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, bestMatchAll, experienceOk, forcedMatchAll, forcedPairingReasons } from "../matchmaking.js";
 import { getWeightCategory, getCategoryInfo, getAgeCategory } from "../../constants.js";
 
 function makeFighter(overrides) {
@@ -435,5 +435,112 @@ describe("bestMatchAll — el único botón (fusión justa de Auto VS + sorteo)"
     // Sin escuela declarada, cumple las 4 reglas duras vs otro de escuela conocida → se empareja.
     const m = bestMatchAll([a, b], 20);
     expect(m.length).toBe(1);
+  });
+});
+
+// ============================================================
+// EMPAREJAMIENTO FORZADO (pestaña Faltantes)
+// ============================================================
+describe("forcedMatchAll — obliga a emparejar a TODOS los faltantes", () => {
+  it("empareja a todos cuando el número es par y marca cada pelea como forzada", () => {
+    const fs = [
+      makeFighter({ id: "a", weightKg: 60, age: 20 }),
+      makeFighter({ id: "b", weightKg: 80, age: 35 }),   // división y edad muy distintas
+      makeFighter({ id: "c", weightKg: 61, age: 21 }),
+      makeFighter({ id: "d", weightKg: 62, age: 22 }),
+    ];
+    const { matchups, leftover } = forcedMatchAll(fs, 1);
+    expect(matchups.length).toBe(2);
+    expect(leftover).toEqual([]);
+    expect(matchups.every(m => m.forced === true)).toBe(true);
+    // cada atleta aparece EXACTAMENTE una vez
+    const ids = matchups.flatMap(m => [m.fighterRedId, m.fighterBlueId]).sort();
+    expect(ids).toEqual(["a", "b", "c", "d"]);
+    // numeración continúa desde startRound
+    expect(matchups.map(m => m.roundNumber)).toEqual([1, 2]);
+  });
+
+  it("con número IMPAR deja exactamente 1 en leftover y empareja al resto", () => {
+    const fs = [1, 2, 3, 4, 5].map(i => makeFighter({ id: "f" + i, weightKg: 60 + i, age: 20 }));
+    const { matchups, leftover } = forcedMatchAll(fs, 1);
+    expect(matchups.length).toBe(2);
+    expect(leftover.length).toBe(1);
+    // el leftover NO está en ninguna pelea
+    const ids = new Set(matchups.flatMap(m => [m.fighterRedId, m.fighterBlueId]));
+    expect(ids.has(leftover[0].id)).toBe(false);
+  });
+
+  it("continúa la numeración de la cartelera existente (startRound)", () => {
+    const fs = [makeFighter({ id: "a", weightKg: 60 }), makeFighter({ id: "b", weightKg: 61 })];
+    const { matchups } = forcedMatchAll(fs, 8); // ya hay 7 peleas
+    expect(matchups[0].roundNumber).toBe(8);
+  });
+
+  it("PREFIERE el mismo sexo: no cruza M vs F si hay alternativa del mismo sexo", () => {
+    // 2 mujeres + 2 hombres: debe emparejar M-M y F-F, nunca cruzar sexos.
+    const fs = [
+      makeFighter({ id: "m1", sexo: "M", weightKg: 70, age: 25 }),
+      makeFighter({ id: "m2", sexo: "M", weightKg: 71, age: 25 }),
+      makeFighter({ id: "f1", sexo: "F", weightKg: 60, age: 25 }),
+      makeFighter({ id: "f2", sexo: "F", weightKg: 61, age: 25 }),
+    ];
+    const { matchups } = forcedMatchAll(fs, 1);
+    const sexoDe = id => fs.find(f => f.id === id).sexo;
+    for (const m of matchups) expect(sexoDe(m.fighterRedId)).toBe(sexoDe(m.fighterBlueId));
+  });
+
+  it("cruza sexos SOLO como último recurso (número impar de un sexo)", () => {
+    // 3 mujeres, 1 hombre: 2 mujeres se emparejan; la 3ra no tiene más mujeres,
+    // así que se fuerza F vs M. Nadie queda sin pelea (par total).
+    const fs = [
+      makeFighter({ id: "f1", sexo: "F", weightKg: 60, age: 25 }),
+      makeFighter({ id: "f2", sexo: "F", weightKg: 61, age: 25 }),
+      makeFighter({ id: "f3", sexo: "F", weightKg: 62, age: 25 }),
+      makeFighter({ id: "m1", sexo: "M", weightKg: 63, age: 25 }),
+    ];
+    const { matchups, leftover } = forcedMatchAll(fs, 1);
+    expect(matchups.length).toBe(2);
+    expect(leftover).toEqual([]);
+    const cruces = matchups.filter(m => {
+      const s = id => fs.find(f => f.id === id).sexo;
+      return s(m.fighterRedId) !== s(m.fighterBlueId);
+    });
+    expect(cruces.length).toBe(1); // exactamente un cruce de sexos, el inevitable
+  });
+
+  it("tolera lista vacía o de 1 sin reventar", () => {
+    expect(forcedMatchAll([], 1)).toEqual({ matchups: [], leftover: [] });
+    const uno = [makeFighter({ id: "a", weightKg: 60 })];
+    const { matchups, leftover } = forcedMatchAll(uno, 1);
+    expect(matchups).toEqual([]);
+    expect(leftover.map(f => f.id)).toEqual(["a"]);
+  });
+});
+
+describe("forcedPairingReasons — qué condiciones faltarían para cumplir la norma", () => {
+  it("lista sexo, edad, división, experiencia y escuela cuando todo difiere", () => {
+    const a = makeFighter({ id: "a", sexo: "M", weightKg: 60, age: 17, fightCount: 2, gym: "Iron King", experienceLevel: "debutante" });
+    const b = makeFighter({ id: "b", sexo: "F", weightKg: 80, age: 30, fightCount: 12, gym: "Iron King", experienceLevel: "amateur" });
+    const r = forcedPairingReasons(a, b);
+    const joined = r.join(" | ");
+    expect(joined).toMatch(/sexo/i);
+    expect(joined).toMatch(/edad/i);
+    expect(joined).toMatch(/divisi/i);
+    expect(joined).toMatch(/experiencia/i);
+    expect(joined).toMatch(/escuela/i);
+  });
+
+  it("devuelve [] cuando el cruce SÍ cumple la norma (nada que forzar)", () => {
+    // 61 y 63 kg: ambos Wélter H (60-65), misma edad/nivel, escuelas distintas.
+    const a = makeFighter({ id: "a", sexo: "M", weightKg: 61, age: 25, fightCount: 3, gym: "A", experienceLevel: "principiante" });
+    const b = makeFighter({ id: "b", sexo: "M", weightKg: 63, age: 25, fightCount: 3, gym: "B", experienceLevel: "principiante" });
+    expect(forcedPairingReasons(a, b)).toEqual([]);
+  });
+
+  it("marca 'fuera de rango oficial' cuando ambos comparten categoría inválida (Sub-13)", () => {
+    const a = makeFighter({ id: "a", weightKg: 40, age: 11, gym: "A" });
+    const b = makeFighter({ id: "b", weightKg: 41, age: 12, gym: "B" });
+    const r = forcedPairingReasons(a, b).join(" | ");
+    expect(r).toMatch(/rango oficial/i);
   });
 });
