@@ -41,21 +41,15 @@ export default function TicketPreview({ ticket }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket.id, ticket.status]);
 
-  // Descarga con URL de blob (no toDataURL): un PNG de 2760×750 en base64 son
-  // varios MB metidos en una sola cadena dentro del href. El enlace se cuelga
-  // del documento antes de pulsarlo porque Firefox ignora el click de un <a>
-  // que no está en la página.
-  function descargar(blob) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = archivo;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  // NADA se guarda en el disco por su cuenta. La descarga automática disparaba
+  // la ventana "Guardar como…" de Chrome en mitad de la venta, con la cola
+  // esperando. Solo si copiar al portapapeles falla se ofrece un enlace, y lo
+  // pulsa el vendedor si quiere. La URL temporal se suelta al salir.
+  const descargaRef = useRef(null);
+  function soltarDescarga() {
+    if (descargaRef.current) { URL.revokeObjectURL(descargaRef.current); descargaRef.current = null; }
   }
+  useEffect(() => soltarDescarga, []);
 
   // Hoja de compartir del sistema (celular/iPad). Devuelve "si" cuando ella se
   // hizo cargo —se compartió, o el vendedor la cerró a propósito— y "no" cuando
@@ -82,10 +76,9 @@ export default function TicketPreview({ ticket }) {
   //    detecta por puntero grueso y no por user-agent, porque el iPad se
   //    anuncia como Mac desde iPadOS 13.
   //  · Computadora → la hoja de compartir del Mac no ofrece WhatsApp, así que
-  //    la imagen se DESCARGA (queda el archivo para adjuntar con el clip) y
-  //    además se COPIA al portapapeles cuando el navegador deja, que es lo más
-  //    rápido: ⌘V dentro del chat. Se hacen las dos porque ninguna está
-  //    garantizada.
+  //    la imagen se COPIA AL PORTAPAPELES, en silencio, y se pega en el chat
+  //    con ⌘V. Sin tocar el disco: la descarga automática abría la ventana
+  //    "Guardar como…" justo cuando hay gente esperando.
   // El chat se abre siempre VACÍO: ya no hay texto pre-escrito que se pueda
   // enviar solo, sin el voucher.
   async function compartirWhatsApp() {
@@ -93,6 +86,7 @@ export default function TicketPreview({ ticket }) {
     busyRef.current = true;
     setSharing(true);
     setAviso(null);
+    soltarDescarga();
     const tactil = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
     const url = waChatUrl(ticket.phone, { escritorio: !tactil });
 
@@ -120,23 +114,23 @@ export default function TicketPreview({ ticket }) {
         try {
           await navigator.clipboard.write([new ClipboardItem({ "image/png": file })]);
           copiada = true;
-        } catch { /* sin permiso de portapapeles: queda la descarga */ }
+        } catch { /* sin permiso de portapapeles: abajo se ofrece el enlace */ }
       }
-      descargar(file);
+      // Solo cuando el portapapeles falla se prepara un enlace de descarga, y
+      // lo pulsa el vendedor si quiere: es la única salida que le queda para
+      // adjuntar la imagen con el clip. Nada se guarda solo.
+      if (!copiada) descargaRef.current = URL.createObjectURL(file);
       const win = window.open(url, "_blank");
       setAviso({
-        ok: true,
-        titulo: copiada ? "Voucher copiado y descargado" : "Voucher descargado: " + archivo,
-        pasos: copiada
-          ? ["Se abrió el chat de WhatsApp (vacío, a propósito).",
-             "Pega la imagen con ⌘V (Ctrl+V) y envíala.",
-             "Si no pega, adjunta " + archivo + " con el clip 📎."]
-          : ["Se abrió el chat de WhatsApp (vacío, a propósito).",
-             "Adjunta " + archivo + " con el clip 📎 y envíala."],
+        ok: copiada,
+        texto: copiada
+          ? (tactil ? "Voucher copiado. En el chat mantén pulsado y elige Pegar." : "Voucher copiado. Pégalo en el chat con ⌘V (Ctrl+V) y envía.")
+          : "El navegador no dejó copiar la imagen.",
+        descarga: copiada ? null : descargaRef.current,
         url: win ? null : url,   // si el navegador bloqueó la ventana, se ofrece el enlace
       });
     } catch {
-      setAviso({ ok: false, titulo: "No se pudo preparar el voucher", pasos: ["Intenta de nuevo."], url });
+      setAviso({ ok: false, texto: "No se pudo preparar el voucher. Intenta de nuevo.", url });
     } finally {
       // Se suelta el botón pase lo que pase, también cuando la hoja de compartir
       // termina bien: antes ese camino salía con un return y el botón se quedaba
@@ -177,13 +171,14 @@ export default function TicketPreview({ ticket }) {
         {sharing ? "Preparando voucher..." : "Compartir al WhatsApp"}
       </button>
       {aviso && (
-        <div className={"rounded-xl px-3 py-2.5 text-[12px] leading-snug " + (aviso.ok ? "text-green-300" : "text-yellow-300")}
-             style={{ background: (aviso.ok ? "#25D366" : "#FCD34D") + "14", border: "1px solid " + (aviso.ok ? "#25D366" : "#FCD34D") + "55" }}>
-          <p className="font-bold">{aviso.titulo}</p>
-          <ol className="mt-1 space-y-0.5 list-decimal list-inside opacity-90">
-            {aviso.pasos.map((p, i) => <li key={i}>{p}</li>)}
-          </ol>
-          {aviso.url && <p className="mt-1"><a href={aviso.url} target="_blank" rel="noopener noreferrer" className="underline font-bold">Abrir WhatsApp</a></p>}
+        <div className={"fade-in rounded-lg px-3 py-2 text-[11.5px] leading-snug flex items-start gap-2 " + (aviso.ok ? "text-green-300" : "text-yellow-300")}
+             style={{ background: (aviso.ok ? "#25D366" : "#FCD34D") + "12", border: "1px solid " + (aviso.ok ? "#25D366" : "#FCD34D") + "40" }}>
+          <span aria-hidden="true">{aviso.ok ? "📋" : "⚠️"}</span>
+          <span>
+            {aviso.texto}
+            {aviso.descarga && <> <a href={aviso.descarga} download={archivo} className="underline font-bold">Descárgala</a> y adjúntala con el clip 📎.</>}
+            {aviso.url && <> <a href={aviso.url} target="_blank" rel="noopener noreferrer" className="underline font-bold">Abrir WhatsApp</a>.</>}
+          </span>
         </div>
       )}
     </div>
