@@ -3,6 +3,8 @@ import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants
 import { save } from "../lib/storage.js";
 import { forcedMatchAll } from "../lib/matchmaking.js";
 import { committedFighterIds } from "../lib/super4.js";
+import { buildFaltantesXlsx } from "../lib/xlsxPlanillas.js";
+import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import VSCard from "./VSCard.jsx";
 import PageHeader from "./PageHeader.jsx";
 
@@ -76,6 +78,22 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
     setMatchups(u); save("bm_matchups_v3", u);
   }
 
+  // La MISMA planilla que se ve aquí, en Excel editable: en la mesa de control
+  // las peleas forzadas son justamente las que hay que negociar y corregir a
+  // mano (otro rival, kilos pactados, exhibición). Hoja "Forzadas" con lo que
+  // le falta a cada una y una columna en blanco para la corrección, y hoja
+  // "Sin rival" con los que quedaron sueltos.
+  function excel() {
+    const fecha = new Date().toLocaleDateString("es-CL");
+    const sub = `${forced.length} pelea${forced.length === 1 ? "" : "s"} forzada${forced.length === 1 ? "" : "s"}` +
+      (faltantes.length ? ` · ${faltantes.length} sin rival` : "");
+    downloadBytes(
+      buildFaltantesXlsx(forced, faltantes, fighters, sub),
+      xlsxFilename("Faltantes Sangre Nueva", fecha.replace(/\//g, "-")),
+      XLSX_MIME,
+    );
+  }
+
   // Mientras la cartelera o el Super 4 no lleguen de la nube, TODOS parecerían
   // faltantes (aún no se sabe quién tiene compromiso). Mostrar ahí la lista y el
   // botón rojo gigante sería alarmante y engañoso, así que se espera.
@@ -111,6 +129,12 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
         <div className="text-4xl mb-3" style={{ animation: "vsFlash 0.3s ease-in-out infinite" }}>🥊</div>
         <p className="text-red-400 font-bold text-lg" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "3px" }}>FORZANDO LOS EMPAREJAMIENTOS...</p>
       </div>}
+
+      {/* Descarga editable: lo mismo que se ve aquí, para corregirlo a mano en
+          Numbers / Excel / Google Sheets (igual que en la pestaña Cartelera). */}
+      {(forced.length > 0 || faltantes.length > 0) && !forcing && <button onClick={excel} title="Descargar en Excel para corregir los emparejamientos a mano (Numbers, Excel o Google Sheets)" className="block w-full lg:max-w-xl lg:mx-auto py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">
+        {"📊"} Excel editable
+      </button>}
 
       {/* Peleas forzadas ya creadas (también viven en el VS y la cartelera) */}
       {forced.length > 0 && !forcing && <div className="space-y-3">

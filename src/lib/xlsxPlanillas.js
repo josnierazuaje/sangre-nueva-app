@@ -13,6 +13,7 @@
 
 import { buildXlsx } from "./xlsx.js";
 import { carteleraGroups, carteleraPeso } from "./printCartelera.js";
+import { forcedPairingReasons } from "./matchmaking.js";
 import { bracketPrintTitle, bracketMaxFights } from "./super4.js";
 import { getAgeCategory, getCategoryInfo, getExperienceInfo, weightRangeLabel, EVENT_LABELS } from "../constants.js";
 
@@ -42,6 +43,9 @@ const S = {
   atletaRojo: { bold: true, fill: ROJO_CELDA, align: "center", border: true, wrap: true },
   atletaAzul: { bold: true, fill: AZUL_CELDA, align: "center", border: true, wrap: true },
   nota: { align: "left", border: true, wrap: true },
+  // Lo que le falta a una pelea FORZADA para ser reglamentaria: en rojo sobre
+  // fondo de alerta, igual que la nota roja de la app.
+  faltaria: { color: ALERTA_TEXTO, fill: ALERTA_FONDO, align: "left", border: true, wrap: true },
   pie: { italic: true, bold: true, color: ALERTA_TEXTO, align: "center" },
   campeon: { bold: true, fill: ORO_SUAVE, color: ORO_TEXTO, align: "center", border: true },
   fase: { bold: true, fill: ORO_SUAVE, align: "center", border: true, wrap: true },
@@ -243,4 +247,116 @@ export function buildFightersXlsx(fighters, subtitulo = "Todos los peleadores") 
     rowHeights: { 0: 30 },
     landscape: true,
   }]);
+}
+
+// ============================================
+// 4) FALTANTES / EMPAREJAMIENTO FORZADO
+// ============================================
+// Las peleas armadas A LA FUERZA, para corregirlas a mano. Va en DOS hojas:
+//   "Forzadas" — una fila por pelea, con la columna "Qué falta para cumplir la
+//     norma" (en rojo) y una columna "Corrección" en blanco para anotar el
+//     cambio (otro rival, kilos pactados, exhibición…).
+//   "Sin rival" — los que quedaron sin pelea (p.ej. el impar), con la misma
+//     forma que la planilla de Peleadores y su "Rival propuesto" vacío.
+// Las razones se recalculan con forcedPairingReasons —la MISMA función que
+// pinta la nota roja en la app y en la planilla impresa—, así que las tres
+// salidas dicen siempre exactamente lo mismo.
+export function buildFaltantesXlsx(forzadas, sinRival, fighters, subtitulo = EVENT_LABELS.rango) {
+  const byId = {};
+  (fighters || []).forEach(f => { byId[f.id] = f; });
+  const NCOL = 10;
+  const rows = [];
+  const merges = [];
+  rows.push([{ v: "Sangre Nueva — La Velada · Emparejamiento forzado", s: S.titulo }]);
+  merges.push([0, 0, 0, NCOL - 1]);
+  rows.push([{ v: subtitulo, s: S.subtitulo }]);
+  merges.push([1, 0, 1, NCOL - 1]);
+  rows.push([
+    { v: "N°", s: S.jefe }, { v: "Escuela", s: S.jefe }, { v: "Atleta", s: S.jefeRojo },
+    { v: "VS", s: S.jefe }, { v: "Atleta", s: S.jefeAzul }, { v: "Escuela", s: S.jefe },
+    { v: "Peso", s: S.jefe }, { v: "Categoría", s: S.jefe },
+    { v: "Qué falta para cumplir la norma", s: S.jefe }, { v: "Corrección", s: S.jefe },
+  ]);
+
+  (forzadas || []).forEach((m, i) => {
+    const r = byId[m.fighterRedId], b = byId[m.fighterBlueId];
+    if (!r || !b) return;   // pelea con un atleta ya eliminado: no sale (igual que en la impresa)
+    const { division, detalle, cruce, pesos } = carteleraPeso(r, b);
+    const razones = forcedPairingReasons(r, b);
+    rows.push([
+      { v: i + 1, s: S.celda },
+      { v: (r.gym || "").toUpperCase(), s: S.escuela },
+      { v: r.fullName, s: S.atletaRojo },
+      { v: "-", s: S.celda },
+      { v: b.fullName, s: S.atletaAzul },
+      { v: (b.gym || "").toUpperCase(), s: S.escuela },
+      { v: cruce ? `${division} ⚠ ${pesos}` : division, s: cruce ? S.pesoCruce : S.peso },
+      { v: detalle, s: S.celda },
+      razones.length
+        ? { v: razones.map(x => `(${x})`).join("; "), s: S.faltaria }
+        : { v: "✓ Este cruce sí cumple la norma", s: S.nota },
+      // En blanco con borde: es la columna que se rellena a mano.
+      { v: m.nota || "", s: S.nota },
+    ]);
+  });
+
+  rows.push([]);
+  merges.push([rows.length, 0, rows.length, NCOL - 1]);
+  rows.push([{ v: "Peleas armadas A LA FUERZA: rompen la norma a propósito para que nadie quede sin pelear. Corrige en la última columna.", s: S.pie }]);
+
+  const hojas = [{
+    name: "Forzadas",
+    cols: [5, 22, 24, 4, 24, 22, 22, 20, 52, 26],
+    rows,
+    merges,
+    freeze: 3,
+    rowHeights: { 0: 30 },
+    landscape: true,
+  }];
+
+  if (sinRival && sinRival.length) {
+    const N2 = 11;
+    const r2 = [];
+    const m2 = [];
+    r2.push([{ v: "Sin rival — hay que emparejarlos a mano", s: S.titulo }]);
+    m2.push([0, 0, 0, N2 - 1]);
+    r2.push([{ v: `${sinRival.length} atleta${sinRival.length === 1 ? "" : "s"} sin pelea`, s: S.subtitulo }]);
+    m2.push([1, 0, 1, N2 - 1]);
+    r2.push([
+      { v: "N°", s: S.jefe }, { v: "Nombre", s: S.jefe }, { v: "Sexo", s: S.jefe },
+      { v: "Peso (kg)", s: S.jefe }, { v: "División", s: S.jefe }, { v: "Edad", s: S.jefe },
+      { v: "Categoría", s: S.jefe }, { v: "Peleas", s: S.jefe }, { v: "Nivel", s: S.jefe },
+      { v: "Escuela", s: S.jefe }, { v: "Rival propuesto", s: S.jefe },
+    ]);
+    sinRival.forEach((f, i) => {
+      const cat = getCategoryInfo(f.weightCategory);
+      const ac = getAgeCategory(f.age);
+      const exp = getExperienceInfo(f.experienceLevel);
+      r2.push([
+        { v: i + 1, s: S.celda },
+        { v: f.fullName, s: { bold: true, align: "left", border: true, wrap: true } },
+        { v: (f.sexo || "M") === "F" ? "F" : "M", s: S.celda },
+        { v: Number(f.weightKg), s: S.celda },
+        { v: cat ? `${cat.label} (${weightRangeLabel(cat)})` : "", s: S.celda },
+        { v: Number(f.age), s: S.celda },
+        { v: ac.label, s: S.celda },
+        { v: Number(f.fightCount), s: S.celda },
+        { v: exp ? exp.label : "", s: S.celda },
+        { v: (f.gym || "").toUpperCase(), s: S.celdaIzq },
+        { v: "", s: S.nota },
+      ]);
+    });
+    hojas.push({
+      name: "Sin rival",
+      cols: [5, 26, 6, 10, 22, 7, 12, 8, 18, 22, 24],
+      rows: r2,
+      merges: m2,
+      freeze: 3,
+      autoFilter: 2,
+      rowHeights: { 0: 30 },
+      landscape: true,
+    });
+  }
+
+  return buildXlsx(hojas);
 }
