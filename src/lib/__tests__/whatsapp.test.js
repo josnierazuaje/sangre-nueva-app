@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { waPhone, waChatUrl } from "../whatsapp.js";
+import { waPhone, waChatUrl, telefonoIngresado, PREFIJO_CL } from "../whatsapp.js";
 
 // El teléfono de la venta es texto libre: si waPhone se equivoca, el botón
 // "Compartir al WhatsApp" abre una pantalla de error en vez del chat.
@@ -35,6 +35,31 @@ describe("waPhone — teléfono en el formato que exige wa.me", () => {
   it("no inventa el código de país en un fijo chileno (no es móvil)", () => {
     // 8 dígitos: no cumple la regla del móvil, se manda tal cual.
     expect(waPhone("2 2345 6789")).toBe("223456789");
+  });
+});
+
+// El campo Teléfono viene con "+56 9 " ya escrito para ahorrarle tecleo al
+// vendedor. El riesgo de eso es guardar el prefijo suelto como si fuera un
+// número: la boleta saldría con un WhatsApp roto.
+describe("telefonoIngresado — el prefijo solo no cuenta como teléfono", () => {
+  it("descarta el prefijo intacto y cualquier trozo de él", () => {
+    for (const entrada of [PREFIJO_CL, "+56 9", "+56", "+5", "+", "", "   ", null, undefined]) {
+      expect(telefonoIngresado(entrada), JSON.stringify(entrada)).toBe("");
+    }
+  });
+
+  it("conserva el número en cuanto se teclea el primer dígito propio", () => {
+    expect(telefonoIngresado("+56 9 6")).toBe("+56 9 6");
+    expect(telefonoIngresado("+56 9 6406 1816")).toBe("+56 9 6406 1816");
+  });
+
+  it("no estorba a un número extranjero escrito encima del prefijo", () => {
+    expect(telefonoIngresado("+54 9 11 2345 6789")).toBe("+54 9 11 2345 6789");
+    expect(telefonoIngresado(" +1 415 555 0132 ")).toBe("+1 415 555 0132");
+  });
+
+  it("lo que sobrevive sigue sirviendo para armar el enlace", () => {
+    expect(waPhone(telefonoIngresado(PREFIJO_CL + "6406 1816"))).toBe("56964061816");
   });
 });
 
