@@ -518,16 +518,20 @@ describe("forcedMatchAll — obliga a emparejar a TODOS los faltantes", () => {
 });
 
 describe("forcedPairingReasons — qué condiciones faltarían para cumplir la norma", () => {
-  it("lista sexo, edad, división, experiencia y escuela cuando todo difiere", () => {
+  it("lista edad, división, experiencia y escuela cuando todo difiere (mismo sexo)", () => {
     const a = makeFighter({ id: "a", sexo: "M", weightKg: 60, age: 17, fightCount: 2, gym: "Iron King", experienceLevel: "debutante" });
-    const b = makeFighter({ id: "b", sexo: "F", weightKg: 80, age: 30, fightCount: 12, gym: "Iron King", experienceLevel: "amateur" });
-    const r = forcedPairingReasons(a, b);
-    const joined = r.join(" | ");
-    expect(joined).toMatch(/sexo/i);
+    const b = makeFighter({ id: "b", sexo: "M", weightKg: 80, age: 30, fightCount: 12, gym: "Iron King", experienceLevel: "amateur" });
+    const joined = forcedPairingReasons(a, b).join(" | ");
     expect(joined).toMatch(/edad/i);
     expect(joined).toMatch(/divisi/i);
     expect(joined).toMatch(/experiencia/i);
     expect(joined).toMatch(/escuela/i);
+  });
+
+  it("lista el sexo cuando los sexos difieren", () => {
+    const a = makeFighter({ id: "a", sexo: "M", weightKg: 62, age: 25, gym: "A" });
+    const b = makeFighter({ id: "b", sexo: "F", weightKg: 62, age: 25, gym: "B" });
+    expect(forcedPairingReasons(a, b).join(" | ")).toMatch(/mismo sexo/i);
   });
 
   it("devuelve [] cuando el cruce SÍ cumple la norma (nada que forzar)", () => {
@@ -542,5 +546,32 @@ describe("forcedPairingReasons — qué condiciones faltarían para cumplir la n
     const b = makeFighter({ id: "b", weightKg: 41, age: 12, gym: "B" });
     const r = forcedPairingReasons(a, b).join(" | ");
     expect(r).toMatch(/rango oficial/i);
+  });
+});
+
+describe("forcedPairingReasons — correcciones de la revisión", () => {
+  it("marca 'fuera de rango oficial' también con veteranos (+40), como el caso real del evento", () => {
+    const a = makeFighter({ id: "a", weightKg: 57, age: 45, gym: "A" });
+    const b = makeFighter({ id: "b", weightKg: 58, age: 46, gym: "B" });
+    expect(forcedPairingReasons(a, b).join(" | ")).toMatch(/rango oficial/i);
+  });
+
+  it("en un cruce de SEXOS distintos no inventa una diferencia de división", () => {
+    // Mismo peso exacto: las claves de división llevan prefijo de sexo
+    // (m_welter vs f_welter) y antes se reportaba "Wélter vs Wélter, dif. 0,0kg".
+    const a = makeFighter({ id: "a", sexo: "M", weightKg: 62, age: 25, gym: "A", fightCount: 3 });
+    const b = makeFighter({ id: "b", sexo: "F", weightKg: 62, age: 25, gym: "B", fightCount: 3 });
+    const r = forcedPairingReasons(a, b);
+    expect(r.join(" | ")).toMatch(/mismo sexo/i);
+    expect(r.some(x => /divisi/i.test(x))).toBe(false);
+  });
+
+  it("no revienta ni envenena el orden con un peso no numérico (JSON con coma decimal)", () => {
+    const a = makeFighter({ id: "a", weightKg: "62,5", age: 25, gym: "A" });
+    const b = makeFighter({ id: "b", weightKg: 63, age: 25, gym: "B" });
+    expect(() => forcedPairingReasons(a, b)).not.toThrow();
+    const { matchups, leftover } = forcedMatchAll([a, b], 1);
+    expect(matchups.length).toBe(1); // se empareja igual
+    expect(leftover).toEqual([]);
   });
 });

@@ -22,7 +22,12 @@ export default function VSCard({ matchup, fighters, index, onRemove, onNotaChang
   // los warnings genéricos para no repetir la misma información dos veces.
   const forced = !!matchup.forced;
   const forcedReasons = forced ? forcedPairingReasons(r, b) : [];
-  const warnings = forced ? [] : (matchup.warnings || []);
+  // Si la forzada SÍ incumple algo, su nota roja ya lo explica y los warnings
+  // genéricos solo repetirían. Pero si no incumple ninguna regla dura, los
+  // warnings siguen siendo la única señal de un exceso de peso o de edad dentro
+  // de la misma división/categoría (Δkg sobre la tolerancia), así que se
+  // mantienen: una pelea armada a la fuerza no debe quedar sin ningún aviso.
+  const warnings = forced && forcedReasons.length ? [] : (matchup.warnings || []);
   const hh = forced ? forcedReasons.length > 0 : warnings.some(w => w.severity === "high"); const hm = warnings.some(w => w.severity === "medium");
   return (
     <div className={"rounded-3xl overflow-hidden scale-in relative border " + (hh ? "border-red-500/50" : hm ? "border-boxing-goldDim/50" : "border-white/10")} style={{ background: "linear-gradient(180deg,#120e14,#0b090c)" }}>

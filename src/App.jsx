@@ -19,7 +19,7 @@ const Super4View = lazy(() => import("./components/Super4View.jsx"));
 const FightCardView = lazy(() => import("./components/FightCardView.jsx"));
 const TicketsManager = lazy(() => import("./components/TicketsManager.jsx"));
 
-// Las 6 pestañas de la app, con su ícono (path SVG de Heroicons). Una sola
+// Las 7 pestañas de la app, con su ícono (path SVG de Heroicons). Una sola
 // fuente para las dos navegaciones: la barra inferior (móvil) y el menú
 // lateral de escritorio (≥1024px) — así nunca se desalinean entre sí.
 const NAV_ITEMS = [

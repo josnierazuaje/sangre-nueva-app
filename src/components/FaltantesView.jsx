@@ -21,8 +21,14 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
   const committed = useMemo(() => committedFighterIds(matchups, super4), [matchups, super4]);
   const faltantes = useMemo(() => fighters.filter(f => !committed.has(f.id)), [fighters, committed]);
   // Las peleas forzadas ya creadas (se muestran aquí para gestionarlas: nota,
-  // eliminar) además de en el VS y la cartelera impresa.
-  const forced = useMemo(() => matchups.filter(m => m.forced), [matchups]);
+  // eliminar) además de en el VS y la cartelera impresa. Solo se listan las que
+  // conservan a sus DOS atletas: si a una le eliminaron un peleador, VSCard no
+  // la pinta, así que contarla haría que el encabezado dijera más peleas de las
+  // que se ven. (Esa pelea rota sí se avisa como "imposible" en el VS.)
+  const forced = useMemo(() => {
+    const vivo = id => fighters.some(f => f.id === id);
+    return matchups.filter(m => m.forced && vivo(m.fighterRedId) && vivo(m.fighterBlueId));
+  }, [matchups, fighters]);
 
   function checkReady() {
     if (!ready) { alert("Sincronizando la cartelera con la nube… intenta de nuevo en unos segundos."); return false; }
@@ -69,6 +75,19 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
     const u = matchups.map(m => m.id === id ? { ...m, nota } : m);
     setMatchups(u); save("bm_matchups_v3", u);
   }
+
+  // Mientras la cartelera o el Super 4 no lleguen de la nube, TODOS parecerían
+  // faltantes (aún no se sabe quién tiene compromiso). Mostrar ahí la lista y el
+  // botón rojo gigante sería alarmante y engañoso, así que se espera.
+  if (!ready || !super4Ready) return (
+    <div className="space-y-4">
+      <PageHeader kicker="Los que quedaron sin pelea" title="Faltantes" />
+      <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-3xl">
+        <p className="text-boxing-muted text-sm">Sincronizando con la nube…</p>
+        <p className="text-boxing-muted text-xs opacity-60 mt-1">Un momento: hay que saber quién ya tiene pelea o está en el Super 4.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">

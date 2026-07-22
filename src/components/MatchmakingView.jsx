@@ -82,13 +82,23 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
   function armarPeleas() {
     if (!checkReady()) return;
     setSorting(true);
-    setMatchups([]);
+    // Las peleas FORZADAS (pestaña Faltantes) se PRESERVAN al rearmar: son
+    // decisiones deliberadas sobre atletas que las reglas duras no pueden
+    // emparejar, así que bestMatchAll jamás las reconstruiría y se perderían en
+    // silencio. Sus atletas salen del universo para no quedar doble-agendados.
+    // Para borrarlo TODO está "Limpiar y empezar de nuevo".
+    const forzadas = matchups.filter(m => m.forced);
+    const forzadosIds = new Set(forzadas.flatMap(m => [m.fighterRedId, m.fighterBlueId]));
+    setMatchups(forzadas);
     let count = 0;
     const interval = setInterval(() => {
       count++;
       if (count >= 12) {
         clearInterval(interval);
-        const m = bestMatchAll(elegibles);
+        const generadas = bestMatchAll(elegibles.filter(f => !forzadosIds.has(f.id)));
+        // Las forzadas van al final: así el "estelar" (última pelea) es una
+        // pelea reglamentaria, no una forzada.
+        const m = [...generadas, ...forzadas].map((x, i) => ({ ...x, roundNumber: i + 1 }));
         setMatchups(m);
         save("bm_matchups_v3", m);
         setSorting(false);

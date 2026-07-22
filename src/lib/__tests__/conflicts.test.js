@@ -108,3 +108,40 @@ describe("matchupConflicts", () => {
     expect(c.removibles.sort()).toEqual(["h", "s"]);
   });
 });
+
+// Las peleas FORZADAS (pestaña Faltantes) rompen reglas a propósito y lo
+// explican en su propia nota roja: no deben aparecer como "problemas a
+// corregir". Las alertas ESTRUCTURALES sí siguen aplicando.
+describe("peleas forzadas — exentas de las reglas blandas, no de las estructurales", () => {
+  it("NO reporta edad mixta, misma escuela ni experiencia si la pelea es forzada", () => {
+    const r = f({ id: "r", age: 14, gym: "Iron King", fightCount: 1 });
+    const b = f({ id: "b", age: 30, gym: "Iron King", fightCount: 20 });
+    const c = matchupConflicts([vs(r, b, { forced: true })], [r, b], new Set());
+    expect(c.edadMixta).toEqual([]);
+    expect(c.mismaEscuela).toEqual([]);
+    expect(c.experiencia).toEqual([]);
+    expect(c.total).toBe(0);
+  });
+
+  it("la MISMA pelea sin la marca forzada SÍ reporta los tres problemas", () => {
+    const r = f({ id: "r2", age: 14, gym: "Iron King", fightCount: 1 });
+    const b = f({ id: "b2", age: 30, gym: "Iron King", fightCount: 20 });
+    const c = matchupConflicts([vs(r, b)], [r, b], new Set());
+    expect(c.edadMixta.length).toBe(1);
+    expect(c.mismaEscuela.length).toBe(1);
+    expect(c.experiencia.length).toBe(1);
+  });
+
+  it("una forzada con un atleta ya en el Super 4 SÍ se reporta (estructural)", () => {
+    const r = f({ id: "r3" }), b = f({ id: "b3" });
+    const c = matchupConflicts([vs(r, b, { forced: true })], [r, b], new Set(["r3"]));
+    expect(c.super4.length).toBe(1);
+    expect(c.removibles).toContain("m-r3-b3");
+  });
+
+  it("una forzada con un rival eliminado SÍ se reporta (estructural)", () => {
+    const r = f({ id: "r4" }), b = f({ id: "b4" });
+    const c = matchupConflicts([vs(r, b, { forced: true })], [r], new Set()); // b ya no existe
+    expect(c.huerfanas.length).toBe(1);
+  });
+});

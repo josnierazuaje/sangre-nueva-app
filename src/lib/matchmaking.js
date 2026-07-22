@@ -259,7 +259,8 @@ function divisionInfo(f) {
 export function forcedPairingReasons(a, b) {
   const out = [];
   const acA = getAgeCategory(a.age), acB = getAgeCategory(b.age);
-  if ((a.sexo || "M") !== (b.sexo || "M")) {
+  const mismoSexo = (a.sexo || "M") === (b.sexo || "M");
+  if (!mismoSexo) {
     const s = x => (x.sexo || "M") === "F" ? "femenino" : "masculino";
     out.push(`mismo sexo (${s(a)} vs ${s(b)})`);
   }
@@ -269,8 +270,13 @@ export function forcedPairingReasons(a, b) {
     // Coinciden de categoría, pero ambos están fuera del rango oficial 13-40.
     out.push(`edad dentro del rango oficial 13-40 (ambos ${acA.label})`);
   }
+  // Las claves de división llevan prefijo de sexo (m_/f_), así que entre sexos
+  // distintos SIEMPRE diferirían aunque pesen exactamente lo mismo. Comparar
+  // divisiones solo tiene sentido dentro del mismo sexo; si no, la nota diría
+  // "misma división de peso (Wélter vs Wélter, dif. 0,0kg)", puro ruido encima
+  // del "mismo sexo" que ya está listado.
   const dA = divisionInfo(a), dB = divisionInfo(b);
-  if (dA && dB && dA.key !== dB.key) {
+  if (mismoSexo && dA && dB && dA.key !== dB.key) {
     const wd = Math.abs(Number(a.weightKg) - Number(b.weightKg)).toFixed(1).replace(".", ",");
     out.push(`misma división de peso (${dA.label} vs ${dB.label}, dif. ${wd}kg)`);
   }
@@ -295,7 +301,10 @@ function pairPenalty(a, b) {
   if (acA.key === "infantil" || acA.key === "veterano" || acB.key === "infantil" || acB.key === "veterano") p += 40;
   const dA = divisionInfo(a), dB = divisionInfo(b);
   if (dA && dB && dA.key !== dB.key) p += 120;
-  p += Math.abs(Number(a.weightKg) - Number(b.weightKg)) * 3;
+  // Un peso no numérico (JSON importado con coma decimal, "62,5") daría NaN y
+  // envenenaría el orden de TODAS las parejas: se omite ese término.
+  const wa = Number(a.weightKg), wb = Number(b.weightKg);
+  if (Number.isFinite(wa) && Number.isFinite(wb)) p += Math.abs(wa - wb) * 3;
   const lvls = ["debutante", "principiante", "amateur", "profesional"];
   p += Math.abs(lvls.indexOf(a.experienceLevel) - lvls.indexOf(b.experienceLevel)) * 25;
   if (!experienceOk(a, b)) p += 80;
