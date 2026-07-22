@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { waPhone, waUrl } from "../whatsapp.js";
+import { waPhone, waChatUrl } from "../whatsapp.js";
 
 // El teléfono de la venta es texto libre: si waPhone se equivoca, el botón
 // "Compartir al WhatsApp" abre una pantalla de error en vez del chat.
@@ -38,14 +38,25 @@ describe("waPhone — teléfono en el formato que exige wa.me", () => {
   });
 });
 
-describe("waUrl — enlace al chat con el texto listo", () => {
-  it("arma el enlace con el número normalizado y el texto codificado", () => {
-    const u = waUrl("9 1234 5678", "Hola Ana & Co");
-    expect(u.startsWith("https://wa.me/56912345678?text=")).toBe(true);
-    expect(u).toContain("Hola%20Ana%20%26%20Co");
+describe("waChatUrl — enlace al chat, siempre vacío", () => {
+  // La entrada viaja como imagen. Si el enlace llevara texto pre-escrito, un
+  // Enter de más manda el mensaje SIN el voucher: es el error que se arregló.
+  it("nunca lleva texto pre-escrito", () => {
+    for (const u of [waChatUrl("9 1234 5678"), waChatUrl("9 1234 5678", { escritorio: true }), waChatUrl("")]) {
+      expect(u).not.toContain("text=");
+    }
   });
 
-  it("sin teléfono deja el enlace abierto para elegir contacto", () => {
-    expect(waUrl("", "x")).toBe("https://wa.me/?text=x");
+  it("en el celular abre la app de WhatsApp con el número normalizado", () => {
+    expect(waChatUrl("+56 9 1234 5678")).toBe("https://wa.me/56912345678");
+  });
+
+  it("en el computador va directo a WhatsApp Web, sin la pantalla intermedia de wa.me", () => {
+    expect(waChatUrl("09 1234 5678", { escritorio: true })).toBe("https://web.whatsapp.com/send?phone=56912345678");
+  });
+
+  it("sin teléfono deja abierto el selector de contactos en los dos casos", () => {
+    expect(waChatUrl("")).toBe("https://wa.me/");
+    expect(waChatUrl("", { escritorio: true })).toBe("https://web.whatsapp.com/");
   });
 });
