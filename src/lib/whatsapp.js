@@ -25,8 +25,20 @@ export function waPhone(raw) {
   return d;
 }
 
-// Enlace al chat de WhatsApp con el texto ya escrito. Sin teléfono válido
-// abre el selector de contactos de WhatsApp, que también sirve.
-export function waUrl(telefono, texto) {
-  return "https://wa.me/" + waPhone(telefono) + "?text=" + encodeURIComponent(texto || "");
+// Enlace al chat de WhatsApp SIN texto pre-escrito.
+//
+// La entrada viaja como IMAGEN, nunca como mensaje escrito. Antes el enlace
+// llevaba el texto ya puesto y eso era justamente la trampa: el chat se abría
+// con el mensaje listo, un Enter de más lo mandaba y al comprador le llegaba
+// puro texto sin el voucher. Con el chat vacío lo único que hay para enviar es
+// la imagen.
+//
+// En el celular wa.me abre la aplicación. En el computador se va directo a
+// WhatsApp Web —donde se pega la imagen— porque wa.me mete antes una pantalla
+// intermedia ("Continue to Chat") que solo estorba.
+// Sin teléfono válido se abre WhatsApp para elegir el contacto a mano.
+export function waChatUrl(telefono, { escritorio = false } = {}) {
+  const p = waPhone(telefono);
+  if (escritorio) return p ? "https://web.whatsapp.com/send?phone=" + p : "https://web.whatsapp.com/";
+  return "https://wa.me/" + p;
 }
