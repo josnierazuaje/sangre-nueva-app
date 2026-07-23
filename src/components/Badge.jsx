@@ -9,7 +9,7 @@
 // ============================================
 export default function Badge({ color, variant = "outline", size = "sm", children }) {
   const c = color || "#9CA3AF";
-  const sizeClass = size === "xs" ? "text-[9px] px-1.5 py-0.5" : "text-[10px] px-2 py-0.5";
+  const sizeClass = size === "xs" ? "text-[14px] px-1.5 py-0.5" : "text-[14px] px-2 py-0.5";
   // Alphas en hex sobre el color recibido: tinte 1F≈12% (33≈20% en filled),
   // borde 52≈32% y sombra interior 1A≈10% — luz contenida dentro de la píldora.
   const tint = variant === "filled" ? "33" : "1F";

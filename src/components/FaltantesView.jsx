@@ -102,17 +102,17 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
       <PageHeader kicker="Los que quedaron sin pelea" title="Faltantes" />
       <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-3xl">
         <p className="text-boxing-muted text-sm">Sincronizando con la nube…</p>
-        <p className="text-boxing-muted text-xs opacity-60 mt-1">Un momento: hay que saber quién ya tiene pelea o está en el Super 4.</p>
+        <p className="text-boxing-muted text-sm opacity-60 mt-1">Un momento: hay que saber quién ya tiene pelea o está en el Super 4.</p>
       </div>
     </div>
   );
 
   return (
     <div className="space-y-4">
-      <PageHeader kicker="Los que quedaron sin pelea" title="Faltantes" right={<span className="text-[10px] text-boxing-muted tracking-widest uppercase">{faltantes.length} sin pelea</span>} />
+      <PageHeader kicker="Los que quedaron sin pelea" title="Faltantes" right={<span className="text-[14px] text-boxing-muted tracking-widest uppercase">{faltantes.length} sin pelea</span>} />
 
       <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2">
-        <p className="text-orange-300 text-xs leading-snug">Atletas registrados <b>sin compromiso</b>: ni un cruce en el VS ni un puesto en el Super 4. El <b>emparejamiento forzado</b> los sube al ring aunque el cruce rompa las reglas, dejando cada incumplimiento escrito en rojo para negociarlo o corregirlo.</p>
+        <p className="text-orange-300 text-sm leading-snug">Atletas registrados <b>sin compromiso</b>: ni un cruce en el VS ni un puesto en el Super 4. El <b>emparejamiento forzado</b> los sube al ring aunque el cruce rompa las reglas, dejando cada incumplimiento escrito en rojo para negociarlo o corregirlo.</p>
       </div>
 
       {/* Botón de emparejamiento forzado (gemelo del "Emparejar" del VS, pero en
@@ -122,7 +122,7 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           {forcing ? "EMPAREJANDO..." : "EMPAREJAMIENTO FORZADO"}
         </span>
-        {!forcing && <span className="text-[10px] tracking-[0.2em] uppercase opacity-80">Obliga a todos · rompe reglas · nota en rojo</span>}
+        {!forcing && <span className="text-[14px] tracking-[0.2em] uppercase opacity-80">Obliga a todos · rompe reglas · nota en rojo</span>}
       </button>}
 
       {forcing && <div className="bg-black/60 border border-red-500/30 rounded-3xl p-6 text-center scale-in lg:max-w-xl lg:mx-auto">
@@ -140,7 +140,7 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
       {forced.length > 0 && !forcing && <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm text-boxing-cream font-semibold tracking-wide">{forced.length} pelea{forced.length === 1 ? "" : "s"} forzada{forced.length === 1 ? "" : "s"} en la cartelera</p>
-          <button onClick={quitarForzadas} className="text-xs text-red-400 hover:text-red-300 underline">Quitar todas</button>
+          <button onClick={quitarForzadas} className="text-sm text-red-400 hover:text-red-300 underline">Quitar todas</button>
         </div>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">{forced.map((m, i) => <VSCard key={m.id} matchup={m} fighters={fighters} index={i} onRemove={rmM} onNotaChange={notaChange} />)}</div>
       </div>}
@@ -149,12 +149,12 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
       {faltantes.length === 0
         ? <div className="text-center py-12 border border-dashed border-boxing-lineBright rounded-3xl"><div className="text-4xl mb-3 opacity-40">{"\u{1F94A}"}</div><p className="text-boxing-muted text-sm">No hay atletas sin pelea. Todos tienen un cruce en el VS o un puesto en el Super 4.</p></div>
         : <div>
-          <p className="text-[11px] text-boxing-muted mb-2 tracking-wide uppercase">Faltantes ({faltantes.length}){faltantes.length % 2 === 1 ? " · número impar: uno quedará sin rival" : ""}</p>
+          <p className="text-[14px] text-boxing-muted mb-2 tracking-wide uppercase">Faltantes ({faltantes.length}){faltantes.length % 2 === 1 ? " · número impar: uno quedará sin rival" : ""}</p>
           <div className="space-y-1.5 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-1.5">
             {faltantes.map(f => { const c = getCategoryInfo(f.weightCategory); const e = getExperienceInfo(f.experienceLevel); const ac = getAgeCategory(f.age);
               return <div key={f.id} className="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between fade-in border bg-boxing-panel border-boxing-line">
-                <div className="min-w-0"><span className="text-boxing-cream text-sm truncate block">{f.fullName}</span><span className="text-boxing-muted text-[11px]">{c?.label} · {f.weightKg}kg · {ac.label.split(" ")[0]} · {(f.sexo || "M") === "F" ? "F" : "M"}</span></div>
-                <span className="text-[10px] font-semibold tracking-widest uppercase whitespace-nowrap ml-2" style={{ color: e?.color }}>{f.fightCount || 0}p</span>
+                <div className="min-w-0"><span className="text-boxing-cream text-sm truncate block">{f.fullName}</span><span className="text-boxing-muted text-[14px]">{c?.label} · {f.weightKg}kg · {ac.label.split(" ")[0]} · {(f.sexo || "M") === "F" ? "F" : "M"}</span></div>
+                <span className="text-[14px] font-semibold tracking-widest uppercase whitespace-nowrap ml-2" style={{ color: e?.color }}>{f.fightCount || 0}p</span>
               </div>; })}
           </div>
         </div>}

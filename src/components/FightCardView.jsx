@@ -60,7 +60,7 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
         <div className="p-5 text-center relative" style={{ background: "radial-gradient(300px 130px at 12% 0%, rgba(155,26,42,0.28), transparent 65%), radial-gradient(300px 130px at 88% 0%, rgba(37,99,235,0.18), transparent 65%), rgba(0,0,0,0.35)" }}>
           <h3 className="titulo-cartel" style={{ fontSize: "26px", letterSpacing: "0.04em" }}>SANGRE NUEVA</h3>
           <p className="titulo-oro" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontStyle: "italic", fontSize: "17px", marginTop: "2px" }}>La Velada</p>
-          <p className="text-boxing-muted text-xs mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
+          <p className="text-boxing-muted text-sm mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
         </div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
         {/* Dos acciones a mitad y mitad: imprimir (o guardar en PDF) y bajar la
@@ -71,9 +71,9 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
         </div>
         {/* Aviso de peleas con problemas, visible donde se imprime la planilla */}
         {conflictLines.length > 0 && <div className="bg-red-900/30 border-b border-red-500/40 p-3 space-y-1">
-          <p className="text-red-300 text-xs font-bold">{"⚠️"} {conflictLines.length} problema{conflictLines.length !== 1 ? "s" : ""} en la cartelera — corrígelo{conflictLines.length !== 1 ? "s" : ""} en la pestaña VS</p>
-          {conflictLines.map((v, i) => <p key={v.id + "-" + i} className="text-[11px] text-red-200/80">{v.texto}</p>)}
-          {conflicts.huerfanas.length > 0 && <p className="text-[10px] text-red-200/60">Las peleas con rival eliminado no salen en la planilla impresa.</p>}
+          <p className="text-red-300 text-sm font-bold">{"⚠️"} {conflictLines.length} problema{conflictLines.length !== 1 ? "s" : ""} en la cartelera — corrígelo{conflictLines.length !== 1 ? "s" : ""} en la pestaña VS</p>
+          {conflictLines.map((v, i) => <p key={v.id + "-" + i} className="text-[14px] text-red-200/80">{v.texto}</p>)}
+          {conflicts.huerfanas.length > 0 && <p className="text-[14px] text-red-200/60">Las peleas con rival eliminado no salen en la planilla impresa.</p>}
         </div>}
         {/* El estelar es la ÚLTIMA pelea REAL, no una forzada: las forzadas se
             anexan al final del arreglo, así que sin esto la última forzada se
@@ -81,11 +81,11 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
         <div className="divide-y divide-white/5">{(() => { const mainIdx = (() => { for (let i = matchups.length - 1; i >= 0; i--) if (!matchups[i].forced) return i; return -1; })(); return matchups.map((m, i) => { const r = fighters.find(f => f.id === m.fighterRedId); const b = fighters.find(f => f.id === m.fighterBlueId); if (!r || !b) return null; const c = getCategoryInfo(r.weightCategory); const main = i === mainIdx;
           const forcedReasons = m.forced ? forcedPairingReasons(r, b) : [];
           return <div key={m.id} className={"px-4 py-3 " + (main ? "bg-[rgba(200,160,74,0.08)]" : m.forced ? "bg-red-900/10" : "")}>
-            {main ? <div className="text-center mb-1"><span className="text-[10px] text-boxing-goldBright font-bold uppercase tracking-widest bg-[rgba(200,160,74,0.12)] border border-[rgba(200,160,74,0.4)] px-2.5 py-0.5 rounded-full">{"⭐"} Estelar</span></div> : <div className="text-center mb-1 flex items-center justify-center gap-2"><span className="text-[10px] text-boxing-muted tracking-[0.18em] uppercase">Pelea {m.roundNumber}</span>{m.forced && <span className="text-[9px] font-bold text-red-300 bg-red-900/40 border border-red-500/50 px-1.5 py-0.5 rounded-full uppercase tracking-widest">Forzada</span>}</div>}
-            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{r.fullName}</p><p className="text-[11px] text-boxing-muted">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="vsx-vs" style={{ fontSize: "16px" }}>VS</span><span className="text-[10px] text-boxing-muted">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{b.fullName}</p><p className="text-[11px] text-boxing-muted">{b.weightKg}kg · {b.gym}</p></div></div>
-            {forcedReasons.length > 0 && <p className="text-[10px] text-red-300/90 mt-1.5 leading-snug"><span className="font-bold">Faltaría:</span> {forcedReasons.map(x => `(${x})`).join("; ")}.</p>}
+            {main ? <div className="text-center mb-1"><span className="text-[14px] text-boxing-goldBright font-bold uppercase tracking-widest bg-[rgba(200,160,74,0.12)] border border-[rgba(200,160,74,0.4)] px-2.5 py-0.5 rounded-full">{"⭐"} Estelar</span></div> : <div className="text-center mb-1 flex items-center justify-center gap-2"><span className="text-[14px] text-boxing-muted tracking-[0.18em] uppercase">Pelea {m.roundNumber}</span>{m.forced && <span className="text-[14px] font-bold text-red-300 bg-red-900/40 border border-red-500/50 px-1.5 py-0.5 rounded-full uppercase tracking-widest">Forzada</span>}</div>}
+            <div className="flex items-center"><div className="flex-1 text-left"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{r.fullName}</p><p className="text-[14px] text-boxing-muted">{r.gym} · {r.weightKg}kg</p></div><div className="mx-2 flex flex-col items-center"><span className="vsx-vs" style={{ fontSize: "16px" }}>VS</span><span className="text-[14px] text-boxing-muted">{c?.label}</span></div><div className="flex-1 text-right"><p className={"font-bold truncate " + (main ? "text-base text-boxing-cream" : "text-sm text-boxing-cream/85")}>{b.fullName}</p><p className="text-[14px] text-boxing-muted">{b.weightKg}kg · {b.gym}</p></div></div>
+            {forcedReasons.length > 0 && <p className="text-[14px] text-red-300/90 mt-1.5 leading-snug"><span className="font-bold">Faltaría:</span> {forcedReasons.map(x => `(${x})`).join("; ")}.</p>}
           </div>; }); })()}</div>
-        <div className="bg-black/30 px-4 py-2 text-center"><p className="text-boxing-muted text-[10px] tracking-[0.22em] uppercase">Sangre Nueva · La Velada</p></div>
+        <div className="bg-black/30 px-4 py-2 text-center"><p className="text-boxing-muted text-[14px] tracking-[0.22em] uppercase">Sangre Nueva · La Velada</p></div>
       </div>
     </div>
   );

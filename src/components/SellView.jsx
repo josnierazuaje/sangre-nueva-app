@@ -64,14 +64,14 @@ export default function SellView({ onAdd }) {
   }
 
   // Kicker de campo del rediseño: condensada pequeña en oro apagado.
-  const lbl = "text-[11px] font-semibold mb-1.5 block tracking-[0.22em] uppercase text-[rgba(200,160,74,0.55)]";
+  const lbl = "text-[14px] font-semibold mb-1.5 block tracking-[0.22em] uppercase text-[rgba(200,160,74,0.55)]";
   return (
     <div className="space-y-4">
       <form onSubmit={submit} className="rounded-3xl p-4 lg:p-5 space-y-3.5 border border-white/5" style={{ background: "linear-gradient(170deg, #131016, #0c0a0e)" }}>
         <h3 className="text-boxing-cream" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: "20px" }}>Nueva entrada</h3>
         <div><label className={lbl}>Nombre del asistente</label>
           <input value={name} onChange={e => { setName(e.target.value); if (nameError) setNameError(""); }} placeholder="Nombre completo" required maxLength={60} className="input-ink w-full px-3 py-2.5 text-sm" />
-          {nameError && <p className="text-red-400 text-xs mt-1">{nameError}</p>}</div>
+          {nameError && <p className="text-red-400 text-sm mt-1">{nameError}</p>}</div>
         <div><label className={lbl}>Teléfono (opcional)</label>
           <input value={phone} onChange={e => setPhone(e.target.value)} onFocus={cursorAlFinal} type="tel" inputMode="tel" autoComplete="tel" placeholder={PREFIJO_CL} className="input-ink w-full px-3 py-2.5 text-sm" /></div>
         <div><label className={lbl}>Tipo de entrada</label>
@@ -81,11 +81,11 @@ export default function SellView({ onAdd }) {
           <div className="grid grid-cols-3 gap-2.5">
             {TICKET_TYPES_V2.map(t => (
               <button key={t.key} type="button" onClick={() => setType(t.key)}
-                className={"type-card py-3 px-1 text-xs font-bold active:scale-95" + (type === t.key ? " sel" : "")}
+                className={"type-card py-3 px-1 text-sm font-bold active:scale-95" + (type === t.key ? " sel" : "")}
                 style={{ "--c": TYPE_RGB[t.key] || "168,85,247", color: type === t.key ? t.color : "#6B7280" }}>
                 <div className="text-lg">{t.icon}</div>
                 <div className="tracking-[0.12em] uppercase mt-0.5 text-boxing-cream">{t.label}</div>
-                <div className="text-[10px] mt-0.5" style={{ color: type === t.key ? t.color : "#6b5f6e", fontVariantNumeric: "tabular-nums" }}>{fmt$(t.price)}</div>
+                <div className="text-[14px] mt-0.5" style={{ color: type === t.key ? t.color : "#6b5f6e", fontVariantNumeric: "tabular-nums" }}>{fmt$(t.price)}</div>
               </button>
             ))}
           </div>
@@ -93,7 +93,7 @@ export default function SellView({ onAdd }) {
         <div><label className={lbl}>Método de pago</label>
           <div className="flex gap-2">
             {PAYMENT_METHODS_V2.map(m => (
-              <button key={m} type="button" onClick={() => setMethod(m)} className="flex-1 py-2 rounded-full text-xs font-bold tracking-[0.14em] uppercase transition-all border"
+              <button key={m} type="button" onClick={() => setMethod(m)} className="flex-1 py-2 rounded-full text-sm font-bold tracking-[0.14em] uppercase transition-all border"
                 style={method === m ? { background: "#1c1620", borderColor: "rgba(255,255,255,0.2)", color: "#e8ddd0" } : { background: "transparent", borderColor: "rgba(255,255,255,0.08)", color: "#6b5f6e" }}>{m}</button>
             ))}
           </div>
@@ -104,7 +104,7 @@ export default function SellView({ onAdd }) {
           {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
         </button>
       </form>
-      {last && <div ref={voucherRef} className="space-y-2 fade-in"><p className="text-[11px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview key={last.id} ticket={last} /></div>}
+      {last && <div ref={voucherRef} className="space-y-2 fade-in"><p className="text-[14px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview key={last.id} ticket={last} /></div>}
     </div>
   );
 }

@@ -163,7 +163,7 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
         {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
       </div>
       {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2 fade-in">
-        <p className="text-orange-400 text-xs">Peleadores sin compromiso todavía: ni un cruce en el VS ni un puesto en el Super 4. Aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival. Quien ya está en el Super 4 no aparece aquí: tiene sus peleas del torneo.</p>
+        <p className="text-orange-400 text-sm">Peleadores sin compromiso todavía: ni un cruce en el VS ni un puesto en el Super 4. Aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival. Quien ya está en el Super 4 no aparece aquí: tiene sus peleas del torneo.</p>
       </div>}
       {/* Móvil: búsqueda arriba y filtros abajo, como siempre. Escritorio
           (lg): todo en una sola fila-herramienta para liberar alto visual. */}
@@ -195,7 +195,7 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
                 <div className="avatar-ring"><span>{getInitials(f.fullName)}</span></div>
                 <div className="min-w-0 flex-1">
                   <h3 className="leading-tight truncate text-[17px]" style={{ fontFamily: "'Playfair Display',Georgia,serif", color: "#f2edf4" }}>{f.fullName}</h3>
-                  <p className="text-boxing-muted text-[11px] mt-0.5 truncate tracking-[0.14em] uppercase"><span style={{ color: "rgba(200,160,74,0.6)" }}>· </span>{f.gym}</p>
+                  <p className="text-boxing-muted text-[14px] mt-0.5 truncate tracking-[0.14em] uppercase"><span style={{ color: "rgba(200,160,74,0.6)" }}>· </span>{f.gym}</p>
                 </div>
               </div>
               {/* Acciones que no estorban: en escritorio aparecen al pasar el
@@ -217,8 +217,8 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
                 Antes el enlace solo quitaba el "+" y los espacios llegaban a la
                 URL, así que WhatsApp abría una pantalla de error en vez del
                 chat. waChatUrl normaliza el número (mismas pruebas que la venta). */}
-            {f.phone && <div className="text-xs text-boxing-muted pl-[56px]"><a href={waChatUrl(f.phone)} target="_blank" rel="noopener noreferrer" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
-            {confirmDeleteId === f.id && <p className="text-red-400 text-xs fade-in pl-[56px]">{"⚠️"} Toca de nuevo para eliminar</p>}
+            {f.phone && <div className="text-sm text-boxing-muted pl-[56px]"><a href={waChatUrl(f.phone)} target="_blank" rel="noopener noreferrer" className="hover:text-green-400">{"\u{1F4F1}"} {f.phone}</a></div>}
+            {confirmDeleteId === f.id && <p className="text-red-400 text-sm fade-in pl-[56px]">{"⚠️"} Toca de nuevo para eliminar</p>}
           </div>);
         })}
       </div>

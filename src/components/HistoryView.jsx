@@ -23,17 +23,17 @@ export default function HistoryView({ tickets, onDelete }) {
     <div className="space-y-3">
       <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar nombre o #boleta..." className="input-ink w-full px-3 py-2.5 text-sm" />
       <div className="flex gap-2">
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="input-ink flex-1 px-2.5 py-2 text-xs">
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="input-ink flex-1 px-2.5 py-2 text-sm">
           <option value="all">Todos los tipos</option>
           {TICKET_TYPES_V2.map(t => <option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-ink flex-1 px-2.5 py-2 text-xs">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-ink flex-1 px-2.5 py-2 text-sm">
           <option value="all">Todos los estados</option>
           <option value="activo">● Activo</option>
           <option value="ingresado">✓ Ingresado</option>
         </select>
       </div>
-      <p className="text-[11px] text-gray-500">{filtered.length} entrada{filtered.length !== 1 ? "s" : ""}</p>
+      <p className="text-[14px] text-gray-500">{filtered.length} entrada{filtered.length !== 1 ? "s" : ""}</p>
       {/* Móvil: lista vertical. Escritorio: 2 columnas de boletas. */}
       <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
         {filtered.map(t => {
@@ -43,10 +43,10 @@ export default function HistoryView({ tickets, onDelete }) {
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: ticketTypeInfo.color + "18" }}>{ticketTypeInfo.icon}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold truncate">{t.attendeeName}</p>
-                <p className="text-gray-500 text-[10px]">#{t.id} · {t.paymentMethod}</p>
+                <p className="text-gray-500 text-[14px]">#{t.id} · {t.paymentMethod}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-xs font-bold" style={{ color: ticketTypeInfo.color }}>{fmt$(t.price)}</p>
+                <p className="text-sm font-bold" style={{ color: ticketTypeInfo.color }}>{fmt$(t.price)}</p>
                 <Badge variant="filled" size="xs" color={t.status === "ingresado" ? "#4ADE80" : "#FCD34D"}>{t.status === "ingresado" ? "✓ In" : "● Act"}</Badge>
               </div>
               <button onClick={() => del(t.id)} className={"p-1.5 rounded-[10px] flex-shrink-0 transition-colors " + (confirmDeleteId === t.id ? "text-red-400 bg-red-500/10" : "text-gray-500 hover:text-red-400")} title="Eliminar entrada">

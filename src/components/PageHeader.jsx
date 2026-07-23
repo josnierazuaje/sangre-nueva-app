@@ -11,7 +11,7 @@ export default function PageHeader({ title, count, kicker, right = null }) {
   return (
     <div className="mb-5 lg:mb-7">
       {kicker && (
-        <div className="flex items-center gap-3 text-[10px] lg:text-[11px] font-semibold tracking-[0.4em] uppercase text-boxing-goldFight mb-2" style={{ fontFamily: "'Barlow Condensed',sans-serif" }}>
+        <div className="flex items-center gap-3 text-[14px] lg:text-[14px] font-semibold tracking-[0.4em] uppercase text-boxing-goldFight mb-2" style={{ fontFamily: "'Barlow Condensed',sans-serif" }}>
           <span aria-hidden="true" style={{ width: "26px", height: "1px", background: "#c8a04a", boxShadow: "0 0 8px rgba(200,160,74,0.6)", flexShrink: 0 }} />
           {kicker}
         </div>
