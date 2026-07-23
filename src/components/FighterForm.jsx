@@ -127,7 +127,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
   // cobalto al foco (el único momento de luz azul del formulario).
   const ic = "w-full px-3 py-2.5 input-ink text-base";
   // Kickers de campo: condensada pequeña en oro apagado, como en el cartel.
-  const lbl = "block text-[11px] font-semibold text-[rgba(200,160,74,0.55)] mb-1.5 tracking-[0.22em] uppercase";
+  const lbl = "block text-[14px] font-semibold text-[rgba(200,160,74,0.55)] mb-1.5 tracking-[0.22em] uppercase";
   // Color de la división para la ficha en vivo (aro del avatar y humo de la
   // tarjeta); gris neutro mientras no haya peso válido.
   const catColor = categoryInfo?.color || "#9CA3AF";
@@ -147,22 +147,22 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
           <span className="text-amber-400 text-lg leading-none">⚠️</span>
           <span className="text-amber-300 text-sm font-semibold">{dupNotice}</span>
         </div>}
-        <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(titleCaseLive(e.target.value))} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}</div>
+        <div><label className={lbl}>Nombre</label><input ref={nameRef} type="text" value={fullName} onChange={e => setFullName(titleCaseLive(e.target.value))} placeholder="Martin Vargas" maxLength={60} className={ic} />{errors.fullName && <p className="text-red-400 text-sm mt-1">{errors.fullName}</p>}</div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e => setWeightStr(e.target.value)} placeholder="65" step="0.1" className={ic} />{errors.weightStr && <p className="text-red-400 text-xs mt-1">{errors.weightStr}</p>}</div>
-          <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-xs mt-1">{errors.ageStr}</p>}</div>
+          <div><label className={lbl}>Peso (kg)</label><input type="number" value={weightStr} onChange={e => setWeightStr(e.target.value)} placeholder="65" step="0.1" className={ic} />{errors.weightStr && <p className="text-red-400 text-sm mt-1">{errors.weightStr}</p>}</div>
+          <div><label className={lbl}>Edad</label><input type="number" value={ageStr} onChange={e => setAgeStr(e.target.value)} placeholder="25" className={ic} />{errors.ageStr && <p className="text-red-400 text-sm mt-1">{errors.ageStr}</p>}</div>
         </div>
-        {categoryInfo && <div className="bg-black/60 rounded-xl px-3 py-2 border border-boxing-line fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Categoría (World Boxing): </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label} · {weightRangeLabel(categoryInfo)}</span></div>}
-        {ageCategoryInfo && <div className="bg-black/60 rounded-xl px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-xs text-boxing-muted tracking-widest uppercase">Edad (World Boxing): </span><Badge color={ageCategoryInfo.color}>{ageCategoryInfo.label} · {ageCategoryInfo.formato}</Badge></div>}
+        {categoryInfo && <div className="bg-black/60 rounded-xl px-3 py-2 border border-boxing-line fade-in"><span className="text-sm text-boxing-muted tracking-widest uppercase">Categoría (World Boxing): </span><span className="text-boxing-goldFight font-semibold">{categoryInfo.label} · {weightRangeLabel(categoryInfo)}</span></div>}
+        {ageCategoryInfo && <div className="bg-black/60 rounded-xl px-3 py-2 border border-boxing-line flex items-center gap-2 fade-in"><span className="text-sm text-boxing-muted tracking-widest uppercase">Edad (World Boxing): </span><Badge color={ageCategoryInfo.color}>{ageCategoryInfo.label} · {ageCategoryInfo.formato}</Badge></div>}
         <div><label className={lbl}>Nº peleas</label><input type="number" value={fightCountStr} onChange={e => setFightCountStr(e.target.value)} placeholder="0" min="0" className={ic} />
           {/* Nivel automático pegado al campo: píldora con punto luminoso del
               color del nivel — nace del Nº de peleas y cambia sola. */}
-          {experienceInfo && <span className="inline-flex items-center gap-2 mt-2.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-[0.18em] uppercase fade-in" style={{ color: experienceInfo.color, background: experienceInfo.color + "1A", border: "1px solid " + experienceInfo.color + "52" }}>
+          {experienceInfo && <span className="inline-flex items-center gap-2 mt-2.5 px-3 py-1 rounded-full text-[14px] font-semibold tracking-[0.18em] uppercase fade-in" style={{ color: experienceInfo.color, background: experienceInfo.color + "1A", border: "1px solid " + experienceInfo.color + "52" }}>
             <span aria-hidden="true" className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background: experienceInfo.color, boxShadow: "0 0 6px " + experienceInfo.color }} />
             Nivel: {experienceInfo.label}
           </span>}
         </div>
-        <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" list="gym-options" value={gym} onChange={e => setGym(titleCaseLive(e.target.value))} placeholder="Team Azuaje" maxLength={60} autoComplete="off" className={ic} /><datalist id="gym-options">{gymOptions.map(g => <option key={g} value={g} />)}</datalist>{errors.gym && <p className="text-red-400 text-xs mt-1">{errors.gym}</p>}</div>
+        <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" list="gym-options" value={gym} onChange={e => setGym(titleCaseLive(e.target.value))} placeholder="Team Azuaje" maxLength={60} autoComplete="off" className={ic} /><datalist id="gym-options">{gymOptions.map(g => <option key={g} value={g} />)}</datalist>{errors.gym && <p className="text-red-400 text-sm mt-1">{errors.gym}</p>}</div>
         <div><label className={lbl}>Sexo</label>
           {/* Báscula de pesaje: el pulgar cruza la pista y cambia su resplandor
               de cobalto a rosa. Mismo setter de siempre, solo cambia la piel. */}
@@ -187,7 +187,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
           Cero estado nuevo: todo se deriva de los valores del formulario.
           En pantallas menores no se muestra (el aviso verde ya confirma). */}
       <aside className="hidden xl:block w-[290px] flex-none" aria-hidden="true">
-        <div className="flex items-center gap-2 text-[11.5px] tracking-[0.2em] uppercase text-boxing-muted mb-2.5">
+        <div className="flex items-center gap-2 text-[14px] tracking-[0.2em] uppercase text-boxing-muted mb-2.5">
           <span className="w-[18px] h-px bg-[rgba(200,160,74,0.5)]" />Ficha en vivo
         </div>
         <div className="fighter-card p-[18px] pb-5" style={{ "--cat": catColor }}>
@@ -195,7 +195,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
             <div className="avatar-ring" style={{ "--cat": catColor }}><span>{getInitials(fullName) || "—"}</span></div>
             <div className="min-w-0">
               <div className="text-[19px] leading-tight truncate" style={{ fontFamily: "'Playfair Display',Georgia,serif", color: "#f2edf4" }}>{fullName.trim() || "Nuevo peleador"}</div>
-              <div className="text-[11px] tracking-[0.14em] uppercase text-boxing-muted mt-0.5 truncate">{gym.trim() || "Escuela por definir"}</div>
+              <div className="text-[14px] tracking-[0.14em] uppercase text-boxing-muted mt-0.5 truncate">{gym.trim() || "Escuela por definir"}</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-3.5">
@@ -205,7 +205,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
             <Badge color={sexo === "F" ? "#EC4899" : "#3B82F6"}>{sexo === "F" ? "F" : "M"}</Badge>
           </div>
         </div>
-        <p className="text-xs text-boxing-muted mt-3.5 px-1 leading-relaxed">La tarjeta se completa mientras escribes: nombre, división por peso y nivel por Nº de peleas.</p>
+        <p className="text-sm text-boxing-muted mt-3.5 px-1 leading-relaxed">La tarjeta se completa mientras escribes: nombre, división por peso y nivel por Nº de peleas.</p>
       </aside>
     </div>
   );

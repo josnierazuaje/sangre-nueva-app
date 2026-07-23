@@ -411,11 +411,11 @@ export default function App() {
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },
     { label: "Reiniciar evento", danger: true, run: resetEvent },
   ];
-  const menuItemCls = (danger) => "block w-full text-left text-[11px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");
+  const menuItemCls = (danger) => "block w-full text-left text-[14px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");
   // Botón de sincronización: píldora con punto de estado vivo (verde pulsa
   // lento = sincronizado; naranja pulsa rápido = conectando; la urgencia se
   // comunica con ritmo, no con más resplandor). Mismo look en móvil y escritorio.
-  const syncBtnCls = "flex items-center justify-center gap-1.5 text-[10px] px-3 py-1 rounded-full border font-semibold tracking-[0.18em] uppercase transition-colors " + (sync === "on" ? "text-green-400/80 border-green-500/25" : sync === "connecting" ? "text-yellow-400/90 border-yellow-500/30" : sync === "error" ? "text-red-400 border-red-500/40" : "text-gray-500 border-gray-600/60 hover:text-boxing-goldFight hover:border-boxing-goldDim");
+  const syncBtnCls = "flex items-center justify-center gap-1.5 text-[14px] px-3 py-1 rounded-full border font-semibold tracking-[0.18em] uppercase transition-colors " + (sync === "on" ? "text-green-400/80 border-green-500/25" : sync === "connecting" ? "text-yellow-400/90 border-yellow-500/30" : sync === "error" ? "text-red-400 border-red-500/40" : "text-gray-500 border-gray-600/60 hover:text-boxing-goldFight hover:border-boxing-goldDim");
   const syncDot = <span aria-hidden="true" className={"punto-vivo" + (sync === "connecting" ? " alerta" : sync === "on" ? "" : " apagado")} style={sync === "error" ? { background: "#DC2626", animation: "none" } : undefined} />;
   const syncLabel = <>{syncDot}{sync === "on" ? "Sincronizado" : sync === "connecting" ? "Conectando…" : sync === "error" ? "Error" : "Nube"}</>;
 
@@ -432,7 +432,7 @@ export default function App() {
           derecho) y el ítem activo como ÚNICO glow del chrome (.nav-lado.on). */}
       <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 relative side-frost">
         <div className="flex flex-col items-center pt-7 pb-5 gap-1" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "10px", fontWeight: 600, letterSpacing: "0.35em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.35em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "72px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))", marginTop: "4px" }} />
           <div className="text-center leading-none" style={{ marginTop: "2px" }}>
             <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "26px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
@@ -470,7 +470,7 @@ export default function App() {
                 </div>
               </>}
             </div> :
-              <button onClick={logout} className="text-[10px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
+              <button onClick={logout} className="text-[14px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
           </div>
         </div>
       </aside>
@@ -494,7 +494,7 @@ export default function App() {
                 </div>
               </>}
             </div> :
-              <button onClick={logout} className="text-[10px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
+              <button onClick={logout} className="text-[14px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>}
           </div>
         </div>
         {/* Bloque de marca compacto: en un teléfono la cabecera es chrome FIJO
@@ -502,11 +502,11 @@ export default function App() {
             conserva la jerarquía completa —sello, escudo, oro, itálica y orla—
             en escala de teléfono. El sidebar de escritorio no se toca. */}
         <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "9.5px", fontWeight: 600, letterSpacing: "0.36em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.36em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "58px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 8px 20px rgba(155,26,42,0.4))", marginTop: "2px" }} />
           <div className="text-center leading-none" style={{ marginTop: "1px" }}>
             <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "24px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "13px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "2px" }}>La Velada</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontSize: "14px", color: "rgba(200,160,74,0.9)", letterSpacing: "0.1em", marginTop: "2px" }}>La Velada</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "9px", marginTop: "5px" }}>
             <div style={{ width: "38px", height: "1px", background: "linear-gradient(90deg,transparent,rgba(200,160,74,0.4))" }} />
@@ -538,8 +538,8 @@ export default function App() {
           siempre, ahora como clases para poder ocultarla con lg:hidden. */}
       <div onClick={editEventLabel} className="flex-shrink-0 flex justify-center items-center gap-2 py-[5px] border-t border-boxing-line bg-boxing-panel cursor-pointer lg:hidden">
         <svg className="w-3 h-3 text-boxing-goldFight" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-        <span className="text-[10px] text-boxing-goldFight font-bold tracking-wide">{eventLabel}</span>
-        <span className="text-[9px] text-gray-600">(tocar para editar)</span>
+        <span className="text-[14px] text-boxing-goldFight font-bold tracking-wide">{eventLabel}</span>
+        <span className="text-[14px] text-gray-600">(tocar para editar)</span>
       </div>
 
       {/* Barra de navegación inferior — solo móvil; en escritorio la
@@ -549,7 +549,7 @@ export default function App() {
           {NAV_ITEMS.map(it => (
             <button key={it.key} onClick={() => go(it.key)} className={nav(view === it.key)}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={it.d} /></svg>
-              <span className="text-[10px]">{it.label}</span>
+              <span className="text-[14px]">{it.label}</span>
             </button>
           ))}
         </div>
@@ -574,7 +574,7 @@ export default function App() {
         {undoDelete && <div className="flex items-center gap-3 bg-boxing-panel border border-red-500/50 shadow-lg px-4 py-3 fade-in rounded-2xl" style={{ boxShadow: "0 0 24px rgba(220,38,38,0.25)" }}>
           <span className="text-red-400 text-lg leading-none">🗑️</span>
           <span className="text-boxing-cream text-sm flex-1 min-w-0 truncate">Eliminaste a <b className="text-boxing-cream">{undoDelete.fullName}</b></span>
-          <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 rounded-full bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-xs font-bold tracking-widest uppercase transition-colors">Deshacer</button>
+          <button onClick={undoLastDelete} className="flex-shrink-0 px-3 py-1.5 rounded-full bg-boxing-crimson hover:bg-boxing-crimsonLight text-boxing-cream text-sm font-bold tracking-widest uppercase transition-colors">Deshacer</button>
           <button onClick={() => { clearTimeout(undoTimerRef.current); setUndoDelete(null); }} title="Cerrar" className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-boxing-muted hover:text-boxing-cream transition-colors">✕</button>
         </div>}
       </div>}

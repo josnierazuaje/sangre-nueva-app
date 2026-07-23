@@ -145,25 +145,25 @@ export default function TicketPreview({ ticket }) {
       <div className="rounded-2xl overflow-hidden scale-in" style={{ border: "1px solid " + ticketTypeInfo.color + "50", background: "linear-gradient(135deg,#0a0000,#180505)" }}>
         <div className="px-4 pt-3 pb-2 flex items-center justify-between" style={{ borderBottom: "1px solid " + ticketTypeInfo.color + "25" }}>
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: ticketTypeInfo.color }}>🥊 Sangre Nueva · La Velada</p>
+            <p className="text-[14px] font-bold uppercase tracking-widest" style={{ color: ticketTypeInfo.color }}>🥊 Sangre Nueva · La Velada</p>
             <p className="text-white font-black text-lg leading-tight" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "2px" }}>{ticket.attendeeName}</p>
           </div>
-          <div className="text-right"><span className="text-2xl">{ticketTypeInfo.icon}</span><p className="text-[10px] font-bold" style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</p></div>
+          <div className="text-right"><span className="text-2xl">{ticketTypeInfo.icon}</span><p className="text-[14px] font-bold" style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</p></div>
         </div>
         <div className="flex items-center gap-4 px-4 py-3">
           <div className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96} /></div>
           <div className="flex-1 space-y-2">
-            <div className="flex justify-between"><span className="text-gray-400 text-xs">Boleta</span><span className="font-black text-white text-base" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "1px" }}>#{ticket.id}</span></div>
-            <div className="flex justify-between"><span className="text-gray-400 text-xs">Precio</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmt$(ticket.price)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-400 text-xs">Pago</span><span className="text-white text-xs">{ticket.paymentMethod}</span></div>
-            <div className="flex justify-between"><span className="text-gray-400 text-xs">Estado</span>
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">Boleta</span><span className="font-black text-white text-base" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "1px" }}>#{ticket.id}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">Precio</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmt$(ticket.price)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">Pago</span><span className="text-white text-sm">{ticket.paymentMethod}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">Estado</span>
               <Badge variant="filled" color={estadoColor}>{ticket.status === "ingresado" ? "✓ Ingresado" : "● Activo"}</Badge>
             </div>
           </div>
         </div>
         <div className="px-4 pb-2 flex justify-between" style={{ borderTop: "1px solid " + ticketTypeInfo.color + "15" }}>
-          <span className="text-[9px] text-gray-600 uppercase tracking-widest">Sangre Nueva</span>
-          <span className="text-[9px] text-gray-600">#{ticket.id}</span>
+          <span className="text-[14px] text-gray-600 uppercase tracking-widest">Sangre Nueva</span>
+          <span className="text-[14px] text-gray-600">#{ticket.id}</span>
         </div>
       </div>
       <button onClick={compartirWhatsApp} type="button" disabled={sharing} className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 hover:brightness-110" style={{ background: WA_VERDE }}>
@@ -171,7 +171,7 @@ export default function TicketPreview({ ticket }) {
         {sharing ? "Preparando voucher..." : "Compartir al WhatsApp"}
       </button>
       {aviso && (
-        <div className={"fade-in rounded-lg px-3 py-2 text-[11.5px] leading-snug flex items-start gap-2 " + (aviso.ok ? "text-green-300" : "text-yellow-300")}
+        <div className={"fade-in rounded-lg px-3 py-2 text-[14px] leading-snug flex items-start gap-2 " + (aviso.ok ? "text-green-300" : "text-yellow-300")}
              style={{ background: (aviso.ok ? "#25D366" : "#FCD34D") + "12", border: "1px solid " + (aviso.ok ? "#25D366" : "#FCD34D") + "40" }}>
           <span aria-hidden="true">{aviso.ok ? "📋" : "⚠️"}</span>
           <span>

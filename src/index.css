@@ -176,7 +176,7 @@ input[type="number"] { -moz-appearance:textfield; }
   box-shadow:0 0 14px color-mix(in srgb, var(--c) 25%, transparent);
 }
 .filter-chip .n { font-size:15px; font-weight:700; line-height:1; color:var(--c); }
-.filter-chip .l { font-size:9px; margin-top:3px; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; color:rgba(232,221,208,0.55); }
+.filter-chip .l { font-size:14px; margin-top:3px; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; color:rgba(232,221,208,0.55); }
 .filter-chip.on .l { color:color-mix(in srgb, var(--c) 75%, #e8ddd0); }
 /* MÓVIL: la misma píldora, en una sola línea (número · etiqueta). Apiladas
    ocupaban 4 filas y empujaban la lista fuera de la pantalla; en línea caben
@@ -187,8 +187,8 @@ input[type="number"] { -moz-appearance:textfield; }
    píxeles más (33px es el tamaño estándar de chip táctil). */
 @media (max-width: 63.98rem) {
   .filter-chip { flex-direction:row; align-items:baseline; gap:6px; min-width:0; padding:8px 12px; min-height:33px; }
-  .filter-chip .n { font-size:13px; }
-  .filter-chip .l { font-size:9px; margin-top:0; letter-spacing:0.1em; }
+  .filter-chip .n { font-size:14px; }
+  .filter-chip .l { font-size:14px; margin-top:0; letter-spacing:0.1em; }
 }
 
 /* ============ Tarjeta de peleador ============
@@ -301,7 +301,7 @@ input[type="number"] { -moz-appearance:textfield; }
 }
 .sexo-toggle .opt {
   position:relative; z-index:2; border:0; background:none; cursor:pointer;
-  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:12.5px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
   letter-spacing:0.16em; text-transform:uppercase; color:#6b5f6e;
   transition:color .2s ease .08s;
 }
@@ -359,7 +359,7 @@ input[type="number"] { -moz-appearance:textfield; }
 }
 .tab-pill > button {
   flex:1; text-align:center; padding:8px 0; border-radius:999px; cursor:pointer; border:0; background:none;
-  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
   letter-spacing:0.18em; text-transform:uppercase; color:#6b5f6e;
   transition:color .18s ease, background .18s ease, box-shadow .18s ease;
 }
@@ -483,7 +483,7 @@ input[type="number"] { -moz-appearance:textfield; }
 .nav-lado {
   display:flex; align-items:center; gap:12px; width:100%; text-align:left;
   padding:10px 13px 10px 17px; border-radius:999px; border:0; background:none; cursor:pointer;
-  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
   letter-spacing:0.14em; text-transform:uppercase; color:#8a8494;
   transition:color .18s cubic-bezier(.2,.8,.2,1), background .18s cubic-bezier(.2,.8,.2,1), transform .18s cubic-bezier(.2,.8,.2,1);
 }
@@ -510,7 +510,7 @@ input[type="number"] { -moz-appearance:textfield; }
   display:flex; align-items:center; justify-content:center; gap:8px;
   padding:8px 12px; border-radius:999px; border:1px solid rgba(200,160,74,0.25);
   background:transparent;
-  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:11px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
   letter-spacing:0.16em; text-transform:uppercase; color:rgba(200,160,74,0.8);
   transition:border-color .18s ease;
 }

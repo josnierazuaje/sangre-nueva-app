@@ -58,7 +58,7 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-[1.55fr_1fr] lg:gap-3.5">
         <div className="kpi-tile col-span-2 order-1 p-4 lg:col-span-1 lg:order-2" style={{ "--c": "#6b5f6e" }}>
           <div className="flex justify-between items-baseline">
-            <span className="text-[10px] font-semibold text-boxing-muted uppercase tracking-[0.26em]">Capacidad</span>
+            <span className="text-[14px] font-semibold text-boxing-muted uppercase tracking-[0.26em]">Capacidad</span>
             <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.total}<span className="font-normal" style={{ opacity: 0.35 }}> / {MAX_CAP}</span></span>
           </div>
           {/* Cinturón de capacidad: carril hundido con un tramo redondeado por
@@ -69,32 +69,32 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
           {/* Leyenda etiquetada: da la identidad del color (necesaria porque los
               colores de tipo no se distinguen bien bajo daltonismo). */}
           <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2.5">
-            {TICKET_TYPES_V2.map(tt => <span key={tt.key} className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+            {TICKET_TYPES_V2.map(tt => <span key={tt.key} className="inline-flex items-center gap-1.5 text-[14px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: tt.color }} />{tt.label} <b className="text-boxing-cream font-semibold">{kpis.byType[tt.key] || 0}</b>
             </span>)}
           </div>
         </div>
         <div className="kpi-oro order-2 p-4 lg:order-1 lg:row-span-2 lg:p-7 flex flex-col justify-center min-w-0">
-          <p className="text-[10px] lg:text-xs font-semibold uppercase tracking-[0.32em]" style={{ color: "rgba(200,160,74,0.85)" }}>Ingresos</p>
+          <p className="text-[14px] lg:text-sm font-semibold uppercase tracking-[0.32em]" style={{ color: "rgba(200,160,74,0.85)" }}>Ingresos</p>
           <p className="titulo-oro italic leading-[1.06] mt-1 truncate" style={{ fontSize: "clamp(30px,7vw,64px)", fontVariantNumeric: "tabular-nums", filter: "drop-shadow(0 0 18px rgba(200,160,74,0.35))" }}>{fmt$(kpis.revenue)}</p>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tracking-[0.08em] text-boxing-muted">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[14px] tracking-[0.08em] text-boxing-muted">
             {Object.entries(kpis.byPayment).filter(([, v]) => v > 0).map(([m, v]) => <span key={m}>{m}: <b className="text-boxing-cream font-semibold">{fmt$(v)}</b></span>)}
             <span>{kpis.total} entrada{kpis.total !== 1 ? "s" : ""} emitida{kpis.total !== 1 ? "s" : ""}</span>
           </div>
         </div>
         <div className="kpi-tile order-3 p-4" style={{ "--c": "#22C55E" }}>
           <div className="flex justify-between items-baseline">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "rgba(34,197,94,0.8)" }}>Check-in</span>
+            <span className="text-[14px] font-semibold uppercase tracking-[0.26em]" style={{ color: "rgba(34,197,94,0.8)" }}>Check-in</span>
             <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.checkedIn}<span className="font-normal" style={{ opacity: 0.35 }}> / {kpis.total}</span></span>
           </div>
           <div className="belt-bar mt-2.5">
             {kpis.checkedIn > 0 && <span className="belt-seg transition-all duration-700" style={{ width: (kpis.total ? kpis.checkedIn / kpis.total * 100 : 0) + "%", background: "linear-gradient(90deg,#16a34a,#4ade80)" }} />}
           </div>
           <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2.5">
-            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <span className="inline-flex items-center gap-1.5 text-[14px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#22C55E" }} />Ingresados <b className="text-boxing-cream font-semibold">{kpis.checkedIn}</b>
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <span className="inline-flex items-center gap-1.5 text-[14px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#6b5f6e" }} />Pendientes <b className="text-boxing-cream font-semibold">{kpis.total - kpis.checkedIn}</b>
             </span>
           </div>
