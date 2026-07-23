@@ -444,7 +444,7 @@ export default function App() {
             <div style={{ width: "40px", height: "1px", background: "linear-gradient(90deg,rgba(200,160,74,0.4),transparent)" }} />
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-2">
           {NAV_ITEMS.map(it => (
             <button key={it.key} onClick={() => go(it.key)} className={"nav-lado" + (view === it.key ? " on" : "")}>
               <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={it.d} /></svg>
