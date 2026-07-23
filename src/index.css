@@ -537,25 +537,25 @@ input[type="number"] { -moz-appearance:textfield; }
   content:''; position:absolute; top:0; right:0; width:1px; height:100%;
   background:linear-gradient(180deg, transparent 18%, rgba(200,160,74,0.28) 42%, rgba(200,160,74,0.28) 58%, transparent 82%);
 }
+/* Ítem del menú lateral (solo escritorio). Icono + etiqueta CENTRADOS como un
+   bloque, con aire vertical para que cada categoría respire (pedido del
+   organizador, jul 2026). El aire entre ítems lo pone el contenedor
+   (space-y-2 en App.jsx); acá el padding interno da el resto. */
 .nav-lado {
-  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
-  padding:10px 13px 10px 17px; border-radius:999px; border:0; background:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:11px; width:100%; text-align:center;
+  padding:13px 16px; border-radius:999px; border:0; background:none; cursor:pointer;
   font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
-  letter-spacing:0.14em; text-transform:uppercase; color:#8a8494;
-  transition:color .18s cubic-bezier(.2,.8,.2,1), background .18s cubic-bezier(.2,.8,.2,1), transform .18s cubic-bezier(.2,.8,.2,1);
+  letter-spacing:0.16em; text-transform:uppercase; color:#8a8494;
+  transition:color .18s cubic-bezier(.2,.8,.2,1), background .18s cubic-bezier(.2,.8,.2,1);
 }
-.nav-lado:hover { color:#d8d2df; background:rgba(255,255,255,0.05); transform:translateX(2px); }
+.nav-lado:hover { color:#d8d2df; background:rgba(255,255,255,0.05); }
+/* Activo: píldora simétrica (aro y glow de oro a los dos lados), coherente con
+   el texto centrado. Antes tenía una barra solo a la izquierda y las esquinas
+   izquierdas casi rectas, que con el texto al centro quedaban descuadradas. */
 .nav-lado.on {
-  position:relative; color:#e5c76b; border-radius:6px 20px 20px 6px;
-  background:linear-gradient(90deg, rgba(200,160,74,0.16), rgba(200,160,74,0.04) 70%, transparent);
-  box-shadow:0 0 22px rgba(200,160,74,0.22), inset 0 0 0 1px rgba(229,199,107,0.18), inset 0 1px 0 rgba(229,199,107,0.22);
-  transform:none;
-}
-.nav-lado.on::before {
-  content:''; position:absolute; left:0; top:50%; width:3px; height:68%;
-  transform:translateY(-50%); border-radius:999px;
-  background:linear-gradient(180deg,#e5c76b,#c8a04a);
-  box-shadow:0 0 10px rgba(229,199,107,0.55);
+  color:#e5c76b; border-radius:999px;
+  background:linear-gradient(90deg, transparent, rgba(200,160,74,0.16) 50%, transparent);
+  box-shadow:0 0 22px rgba(200,160,74,0.22), inset 0 0 0 1px rgba(229,199,107,0.2), inset 0 1px 0 rgba(229,199,107,0.22);
 }
 /* Nombre de marca en oro (sidebar y header móvil) */
 .marca-oro {
