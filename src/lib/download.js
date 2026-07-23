@@ -21,11 +21,17 @@ export function downloadBytes(bytes, filename, mime = "application/octet-stream"
 // Tipo MIME oficial de los libros de Excel. Sin esto macOS puede abrir el
 // archivo con la app equivocada.
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+// Tipo MIME del PDF de llaves del Super 4. Con esto WhatsApp y el celular lo
+// reconocen como documento y lo abren en el visor en vez de ofrecer guardarlo
+// como archivo desconocido.
+export const PDF_MIME = "application/pdf";
 
 // Nombre de archivo seguro: sin barras ni dos puntos (rompen la descarga en
 // algunos navegadores) y con la fecha al final para no pisar el anterior
 // cuando se baja la planilla varias veces el mismo día del evento.
-export function xlsxFilename(base, fecha) {
+function safeFilename(base, fecha, ext) {
   const limpio = String(base).replace(/[\\/:*?"<>|]/g, "-").trim();
-  return `${limpio}${fecha ? " " + fecha : ""}.xlsx`;
+  return `${limpio}${fecha ? " " + fecha : ""}.${ext}`;
 }
+export function xlsxFilename(base, fecha) { return safeFilename(base, fecha, "xlsx"); }
+export function pdfFilename(base, fecha) { return safeFilename(base, fecha, "pdf"); }

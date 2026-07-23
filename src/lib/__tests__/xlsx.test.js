@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { crc32, zipSync } from "../zip.js";
 import { buildXlsx, colLetter, cellRef, escapeXml } from "../xlsx.js";
-import { buildCarteleraXlsx, buildSuper4Xlsx, buildFightersXlsx, buildFaltantesXlsx } from "../xlsxPlanillas.js";
+import { buildCarteleraXlsx, buildFightersXlsx, buildFaltantesXlsx } from "../xlsxPlanillas.js";
 import { xlsxFilename } from "../download.js";
 
 // El ZIP se escribe SIN comprimir, así que el XML aparece tal cual dentro de
@@ -206,59 +206,6 @@ describe("planilla de peleadores en Excel", () => {
   });
   it("no revienta con la lista vacía", () => {
     expect(() => buildFightersXlsx([], "Sin peleadores — 0 peleadores")).not.toThrow();
-  });
-});
-
-describe("planilla del Super 4 en Excel", () => {
-  const bracket = {
-    id: "b1", catKey: "cadete__m_ligero", catLabel: "Cadete Ligero",
-    regla: "U17 (15-16) · Ligero 55-60kg · Masculino", ageKey: "cadete", divKey: "m_ligero", maxFights: 3,
-    semis: [{ red: "1", blue: "2", winner: "1" }, { red: "3", blue: "4", winner: null }],
-    finalWinner: null,
-  };
-  it("lista las tres fases con sus dos esquinas", () => {
-    const t = texto(buildSuper4Xlsx([bracket], byId, "20-07-2026"));
-    expect(t).toContain("Semifinal 1");
-    expect(t).toContain("Semifinal 2");
-    expect(t).toContain("FINAL");
-    expect(t).toContain("Rojo");
-    expect(t).toContain("Azul");
-  });
-  it("deja el hueco del finalista que aún no se conoce", () => {
-    const t = texto(buildSuper4Xlsx([bracket], byId, ""));
-    expect(t).toContain("Ganador Semifinal 2");
-  });
-  it("anuncia al campeón cuando ya hay final resuelta", () => {
-    const t = texto(buildSuper4Xlsx([{ ...bracket, semis: [{ red: "1", blue: "2", winner: "1" }, { red: "3", blue: "4", winner: "3" }], finalWinner: "1" }], byId, ""));
-    expect(t).toContain("Campeón: Amaro Velazquez");
-  });
-  it("no revienta si la llave vuelve de la nube con una sola semifinal", () => {
-    // Firebase no guarda las claves en null: una semifinal entera vacía
-    // desaparece y `semis` vuelve con largo 1. Antes esto tiraba
-    // "Cannot read properties of undefined (reading 'red')".
-    const truncada = { ...bracket, semis: [{ red: "1", blue: "2", winner: null }] };
-    expect(() => buildSuper4Xlsx([truncada], byId, "")).not.toThrow();
-    const t = texto(buildSuper4Xlsx([truncada], byId, ""));
-    expect(t).toContain("Semifinal 2");
-    expect(t).toContain("Por definir");
-  });
-  it("pone el tope de peleas de cada llave cuando no todas comparten el mismo", () => {
-    const a = { ...bracket, id: "a", maxFights: 3 };
-    const b = { ...bracket, id: "b", maxFights: 10 };
-    const iguales = texto(buildSuper4Xlsx([a, { ...a, id: "c" }], byId, ""));
-    expect(iguales).toContain("Torneo limitado a peleadores con hasta 3 peleas");
-    const distintos = texto(buildSuper4Xlsx([a, b], byId, ""));
-    expect(distintos).not.toContain("Torneo limitado a peleadores");
-    expect(distintos).toContain("hasta 3 peleas");
-    expect(distintos).toContain("hasta 10 peleas");
-  });
-  it("aguanta llaves sin torneo, con byId incompleto y cinturones antiguos", () => {
-    expect(() => buildSuper4Xlsx([], {}, "")).not.toThrow();
-    expect(() => buildSuper4Xlsx(null, {}, "")).not.toThrow();
-    expect(() => buildSuper4Xlsx([bracket], {}, "")).not.toThrow();
-    // Cinturón "legacy": sin ageKey/divKey, solo catLabel.
-    const legacy = { id: "old", catKey: "cadete71", catLabel: "Cadetes 71kg", regla: "Cadete · hasta 71kg", semis: bracket.semis, finalWinner: null };
-    expect(() => buildSuper4Xlsx([legacy], byId, "")).not.toThrow();
   });
 });
 

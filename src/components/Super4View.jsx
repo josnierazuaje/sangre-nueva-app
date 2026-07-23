@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
 import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weightRangeLabel } from "../constants.js";
 import { dupKey, normName } from "../lib/dedup.js";
-import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights } from "../lib/super4.js";
+import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights, bracketConditions } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
 import { printHtml } from "../lib/printHtml.js";
-import { buildSuper4Xlsx } from "../lib/xlsxPlanillas.js";
-import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
+import { buildSuper4Pdf } from "../lib/pdfSuper4.js";
+import { downloadBytes, pdfFilename, PDF_MIME } from "../lib/download.js";
 import PageHeader from "./PageHeader.jsx";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
@@ -57,17 +57,6 @@ function Pildora({ c, children }) {
       {children}
     </span>
   );
-}
-
-// Edad y división de una llave, para pintar sus píldoras de condición.
-// Cinturones legacy (catKey sin "__" ni ageKey/divKey) devuelven null y la
-// cabecera cae al texto de la regla guardada, como siempre.
-function condicionesLlave(b) {
-  let ageKey = b.ageKey, divKey = b.divKey;
-  if ((!ageKey || !divKey) && b.catKey && b.catKey.includes("__")) [ageKey, divKey] = b.catKey.split("__");
-  const ageInfo = AGE_CATEGORIES.find(a => a.key === ageKey);
-  const div = WEIGHT_CATEGORIES.find(d => d.key === divKey);
-  return ageInfo && div ? { ageInfo, div } : null;
 }
 
 // ============================================
@@ -250,16 +239,19 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
     printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL")));
   }
-  // Las mismas llaves como archivo de Excel editable: en la planilla van como
-  // lista (una fila por peleador, agrupada por llave y fase), que es lo que se
-  // puede corregir a mano si cambia un resultado o un participante.
-  function excelSuper4() {
+  // Las mismas llaves como PDF: el dibujo del torneo (semifinales, final y las
+  // líneas que las unen) tal como se ve acá, en un archivo cerrado que se manda
+  // por WhatsApp y se imprime igual en cualquier teléfono. Reemplazó a la
+  // descarga en Excel: una llave metida en una planilla dejaba de ser una llave
+  // (era una lista de filas), y editable no servía de nada porque las llaves se
+  // corrigen ACÁ, que es donde están las reglas del torneo.
+  function descargarPdf() {
     if (!super4.length) { alert("No hay llaves para descargar. Toca GENERAR LLAVES primero."); return; }
     const fecha = new Date().toLocaleDateString("es-CL");
     downloadBytes(
-      buildSuper4Xlsx(super4, byId, fecha),
-      xlsxFilename("Super 4 Sangre Nueva", fecha.replace(/\//g, "-")),
-      XLSX_MIME,
+      buildSuper4Pdf(super4, byId, fecha),
+      pdfFilename("Super 4 Sangre Nueva", fecha.replace(/\//g, "-")),
+      PDF_MIME,
     );
   }
 
@@ -359,7 +351,10 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           GENERAR LLAVES
         </button>
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
-        <button onClick={excelSuper4} title="Descargar las llaves en Excel para editarlas (Numbers, Excel o Google Sheets)" className="px-4 text-xl rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
+        <button onClick={descargarPdf} title="Descargar las llaves en PDF (listo para mandar por WhatsApp o imprimir)" className="px-3 rounded-2xl bg-boxing-crimson hover:bg-boxing-crimsonLight text-white transition-colors flex flex-col items-center justify-center leading-none gap-0.5">
+          <span className="text-lg" aria-hidden="true">📄</span>
+          <span className="text-[14px] font-bold tracking-widest">PDF</span>
+        </button>
       </div>
 
       <button onClick={() => setShowPosibles(o => !o)} className="w-full lg:max-w-xl lg:mx-auto py-2.5 rounded-2xl bg-blue-600/10 border border-blue-500/50 text-blue-300 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-blue-600/20 flex items-center justify-center gap-2">
@@ -495,7 +490,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
         // Cabecera de cinturón: título en serif dorada por tramos y píldoras
         // de condición (edad · kg · sexo) cuando la llave trae sus claves;
         // los cinturones legacy caen al texto de la regla, como siempre.
-        const cond = condicionesLlave(b);
+        const cond = bracketConditions(b);
         return (
           <div key={b.id} className="rounded-3xl border border-white/5 overflow-hidden scale-in relative" style={{ background: "linear-gradient(170deg, rgba(22,17,26,0.75), rgba(11,9,12,0.85))" }}>
             <div className="px-4 py-3 bg-black/30 border-b border-white/5 flex items-center justify-between gap-2 flex-wrap">
