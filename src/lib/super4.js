@@ -268,6 +268,19 @@ export function bracketPrintTitle(b) {
   return `${ageInfo.label}${fechibox ? " · " + fechibox : ""} · ${div.label} (${gen})`;
 }
 
+// Condiciones de una llave (edad y división) para las píldoras de la cabecera:
+// las de la pestaña Super 4 y las del PDF de llaves salen de acá, así que no
+// pueden decir cosas distintas. Los cinturones legacy (catKey sin "__" y sin
+// ageKey/divKey) devuelven null y quien las muestra cae al texto de `regla`.
+export function bracketConditions(b) {
+  if (!b) return null;
+  let ageKey = b.ageKey, divKey = b.divKey;
+  if ((!ageKey || !divKey) && b.catKey && b.catKey.includes("__")) [ageKey, divKey] = b.catKey.split("__");
+  const ageInfo = AGE_CATEGORIES.find(a => a.key === ageKey);
+  const div = WEIGHT_CATEGORIES.find(d => d.key === divKey);
+  return ageInfo && div ? { ageInfo, div } : null;
+}
+
 // Fusiona las llaves recién regeneradas con las existentes que NO se
 // regeneraron (distinta combinación): regenerar un subconjunto nunca borra
 // ni pisa las demás (ni sus campeones ya coronados). Para quitar categorías
