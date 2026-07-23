@@ -193,9 +193,12 @@ export function createPdf({ width = A4.width, height = A4.height, title = "", au
   let ops = null;          // operadores de la página en curso
   let pageH = height;      // alto de la página en curso (para invertir la Y)
   const alphas = new Set();
+  const shadings = [];     // degradados declarados (uno por uso)
 
   const y = v => pageH - v; // web (Y hacia abajo) → PDF (Y hacia arriba)
   const put = (...s) => { if (ops) ops.push(...s); };
+  // Función de interpolación de un degradado de dos colores.
+  const fn = (c1, c2) => `<< /FunctionType 2 /Domain [0 1] /C0 [${rgb(c1).map(num).join(" ")}] /C1 [${rgb(c2).map(num).join(" ")}] /N 1 >>`;
 
   const doc = {
     width, height,
@@ -235,7 +238,10 @@ export function createPdf({ width = A4.width, height = A4.height, title = "", au
     // encabezado (redondeada solo arriba) y el resaltado del ganador
     // (redondeado solo abajo, en la última fila) sin que asomen puntas fuera
     // del borde de la tarjeta.
-    roundRect(x, yTop, w, h, r, { fill, stroke, lineWidth = 1 } = {}) {
+    // Con `clip:true` no se pinta: la figura queda como RECORTE para lo que se
+    // dibuje después (así un degradado se mete dentro de la tarjeta y no se
+    // desborda). Va siempre entre save() y restore().
+    roundRect(x, yTop, w, h, r, { fill, stroke, lineWidth = 1, clip = false } = {}) {
       const lim = v => Math.max(0, Math.min(v, w / 2, h / 2));
       const [tl, tr, br, bl] = (Array.isArray(r) ? r : [r, r, r, r]).map(lim);
       const x0 = x, x1 = x + w, yb = y(yTop + h), yt = y(yTop); // yb = borde inferior
@@ -250,7 +256,30 @@ export function createPdf({ width = A4.width, height = A4.height, title = "", au
       if (tl) put(`${num(x0 + tl - tl * KAPPA)} ${num(yt)} ${num(x0)} ${num(yt - tl + tl * KAPPA)} ${num(x0)} ${num(yt - tl)} c`);
       put(`${num(x0)} ${num(yb + bl)} l`);
       if (bl) put(`${num(x0)} ${num(yb + bl - bl * KAPPA)} ${num(x0 + bl - bl * KAPPA)} ${num(yb)} ${num(x0 + bl)} ${num(yb)} c`);
-      put("h", fill && stroke ? "B" : stroke ? "S" : "f");
+      put("h", clip ? "W n" : fill && stroke ? "B" : stroke ? "S" : "f");
+      return doc;
+    },
+
+    // --- degradados ---
+    // El PDF no tiene "background: linear-gradient": hay que declarar un
+    // sombreado y pintarlo dentro del recorte vigente. Con esto se logran el
+    // fondo de la página, la tinta de las tarjetas y —sobre todo— el aura
+    // dorada de la final y del campeón, que en la app son degradados radiales.
+    // Pintan TODO el área recortada, así que van entre save()/roundRect(clip)/
+    // restore().
+    shadeLinear(x1, y1, x2, y2, c1, c2) {
+      const id = shadings.length;
+      shadings.push(`<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [${num(x1)} ${num(y(y1))} ${num(x2)} ${num(y(y2))}] /Function ${fn(c1, c2)} /Extend [true true] >>`);
+      put(`/Sh${id} sh`);
+      return doc;
+    },
+    // Halo circular: del color del centro al del borde. `extend:false` en el
+    // radio exterior deja SIN pintar lo que queda fuera, que es lo que hace
+    // que el resplandor se apague en vez de teñir la página entera.
+    shadeRadial(cx, cy, r1, r2, c1, c2) {
+      const id = shadings.length;
+      shadings.push(`<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [${num(cx)} ${num(y(cy))} ${num(r1)} ${num(cx)} ${num(y(cy))} ${num(r2)}] /Function ${fn(c1, c2)} /Extend [true false] >>`);
+      put(`/Sh${id} sh`);
       return doc;
     },
     line(x1, y1, x2, y2, { stroke = "#000000", lineWidth = 1, cap = 0, dash = null } = {}) {
@@ -320,7 +349,7 @@ export function createPdf({ width = A4.width, height = A4.height, title = "", au
     },
 
     // Bytes finales del archivo .pdf.
-    build() { return serialize(pages, alphas, { title, author }); },
+    build() { return serialize(pages, alphas, shadings, { title, author }); },
   };
   doc.addPage();
   return doc;
@@ -361,7 +390,7 @@ export function cubicSegments(p, steps) {
 // Arma el archivo: cabecera, objetos numerados, tabla xref y trailer. Todo el
 // contenido es Latin-1, así que se construye como string (1 carácter = 1 byte)
 // y recién al final se pasa a bytes.
-function serialize(pages, alphas, info) {
+function serialize(pages, alphas, shadings, info) {
   const objs = [];              // objs[i] = cuerpo del objeto i+1
   const ref = i => `${i} 0 R`;
   const add = body => { objs.push(body); return objs.length; };
@@ -379,7 +408,9 @@ function serialize(pages, alphas, info) {
   const fontRes = Object.entries(fontIds).map(([alias, id]) => `/${alias} ${ref(id)}`).join(" ");
   const gsRes = [...alphas].sort((a, b) => a - b)
     .map(a => `/GA${a} << /Type /ExtGState /ca ${a / 100} /CA ${a / 100} >>`).join(" ");
-  const resources = `<< /ProcSet [/PDF /Text] /Font << ${fontRes} >>${gsRes ? ` /ExtGState << ${gsRes} >>` : ""} >>`;
+  const shRes = shadings.map((s, i) => `/Sh${i} ${s}`).join(" ");
+  const resources = `<< /ProcSet [/PDF /Text /ImageC] /Font << ${fontRes} >>${
+    gsRes ? ` /ExtGState << ${gsRes} >>` : ""}${shRes ? ` /Shading << ${shRes} >>` : ""} >>`;
 
   const pageIds = [];
   pages.forEach(p => {

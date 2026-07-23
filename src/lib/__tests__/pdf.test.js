@@ -144,6 +144,18 @@ describe("estructura del archivo PDF", () => {
     const decl = Number(t.slice(t.lastIndexOf("startxref") + 9).trim().split("\n")[0]);
     expect(t.slice(decl, decl + 4)).toBe("xref");
   });
+  it("los degradados se pintan dentro del recorte y no se desbordan", () => {
+    // Un sombreado pinta TODA la región recortada: sin el recorte (W n) se
+    // comería la página entera. Ese fue un error real al pasar a fondo oscuro.
+    const d = createPdf();
+    d.save();
+    d.roundRect(10, 10, 50, 30, 6, { clip: true });
+    d.shadeLinear(10, 10, 10, 40, "#000000", "#FFFFFF");
+    d.restore();
+    const s = texto(d.build());
+    expect(s).toMatch(/W n[\s\S]*\/Sh0 sh/);
+    expect(s).toContain("/Extend [true true]");
+  });
   it("declara las fuentes base sin incrustar tipografías", () => {
     expect(t).toContain("/BaseFont /Helvetica-Bold");
     expect(t).toContain("/Encoding /WinAnsiEncoding");
@@ -167,12 +179,65 @@ describe("estructura del archivo PDF", () => {
 describe("PDF de las llaves del Super 4", () => {
   it("dibuja el título de la llave, las tres fases y los datos de cada atleta", () => {
     const t = texto(buildSuper4Pdf([llave()], byId, "23-07-2026"));
-    expect(t).toContain("Elite · Adulto/Elite · Ligero \\(M\\)"); // World Boxing · FECHIBOX · división
     expect(t).toContain("SEMIFINAL 1");
     expect(t).toContain("SEMIFINAL 2");
     expect(t).toContain("FINAL");
     expect(t).toContain("Sebastián Riquelme");
     expect(t).toContain("TEAM ALBINO · 59kg · 20a");
+  });
+
+  // El título del cinturón se dibuja por tramos —cada uno en oro y el "·" que
+  // los separa en carmesí— igual que el TituloLlave de la pestaña Super 4, así
+  // que en el archivo aparece troceado y no como una sola tirada de texto.
+  it("dibuja el título del cinturón por tramos, con los separadores aparte", () => {
+    const t = texto(buildSuper4Pdf([llave()], byId, ""));
+    expect(t).toContain("(Elite) Tj");
+    expect(t).toContain("(Adulto/Elite) Tj");
+    expect(t).toContain("(Ligero \\(M\\)) Tj");
+    expect(t).toContain("( · ) Tj");
+  });
+
+  it("declara los degradados y la transparencia del diseño oscuro", () => {
+    const t = texto(buildSuper4Pdf([llave()], byId, ""));
+    expect(t).toContain("/Shading <<");
+    expect(t).toContain("/ShadingType 2"); // lineal: fondo de página y tinta de las tarjetas
+    expect(t).toContain("/ShadingType 3"); // radial: el resplandor dorado de la final
+    expect(t).toContain("/ExtGState <<"); // transparencia: halos y venas
+  });
+
+  // Los dos temas son el MISMO dibujo con otra paleta: mismo contenido, mismas
+  // páginas, distinta tinta. Si alguien tocara la maqueta de uno solo, esto lo
+  // caza.
+  describe("temas oscuro y claro", () => {
+    const cerrada = llave({
+      semis: [{ red: "r1", blue: "b1", winner: "r1" }, { red: "r2", blue: "b2", winner: "b2" }],
+      finalWinner: "b2",
+    });
+    const oscuro = texto(buildSuper4Pdf([cerrada], byId, "23-07-2026", "oscuro"));
+    const claro = texto(buildSuper4Pdf([cerrada], byId, "23-07-2026", "claro"));
+
+    it("dicen exactamente lo mismo", () => {
+      const soloTexto = s => (s.match(/\((?:[^()\\]|\\.)*\) Tj/g) || []).join("|");
+      expect(soloTexto(claro)).toBe(soloTexto(oscuro));
+    });
+    it("pero no se pintan igual", () => {
+      expect(claro).not.toBe(oscuro);
+      // El claro no pinta el fondo de la página: el papel ya es blanco.
+      expect((claro.match(/\/ShadingType 2/g) || []).length)
+        .toBeLessThan((oscuro.match(/\/ShadingType 2/g) || []).length);
+    });
+    it("el tema por defecto es el oscuro (el de la app)", () => {
+      expect(texto(buildSuper4Pdf([cerrada], byId, "23-07-2026"))).toBe(oscuro);
+    });
+    it("un tema desconocido no rompe la descarga: cae al oscuro", () => {
+      expect(texto(buildSuper4Pdf([cerrada], byId, "23-07-2026", "arcoiris"))).toBe(oscuro);
+    });
+    it("los dos son archivos PDF válidos", () => {
+      [oscuro, claro].forEach(t => {
+        expect(t.startsWith("%PDF-1.4")).toBe(true);
+        expect(t.trimEnd().endsWith("%%EOF")).toBe(true);
+      });
+    });
   });
 
   it("mantiene el cupo de la final como promesa hasta que haya ganador de semi", () => {

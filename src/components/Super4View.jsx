@@ -245,12 +245,17 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // descarga en Excel: una llave metida en una planilla dejaba de ser una llave
   // (era una lista de filas), y editable no servía de nada porque las llaves se
   // corrigen ACÁ, que es donde están las reglas del torneo.
-  function descargarPdf() {
+  //
+  // Dos versiones del MISMO dibujo: "oscuro" (idéntico a esta pestaña, para
+  // mirar y compartir) y "claro" (sobre papel blanco, para imprimir sin gastar
+  // un cartucho de tinta). El nombre del archivo las distingue para que no se
+  // pisen entre sí en la carpeta de descargas.
+  function descargarPdf(tema) {
     if (!super4.length) { alert("No hay llaves para descargar. Toca GENERAR LLAVES primero."); return; }
     const fecha = new Date().toLocaleDateString("es-CL");
     downloadBytes(
-      buildSuper4Pdf(super4, byId, fecha),
-      pdfFilename("Super 4 Sangre Nueva", fecha.replace(/\//g, "-")),
+      buildSuper4Pdf(super4, byId, fecha, tema),
+      pdfFilename("Super 4 Sangre Nueva" + (tema === "claro" ? " (claro)" : ""), fecha.replace(/\//g, "-")),
       PDF_MIME,
     );
   }
@@ -351,9 +356,25 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
           GENERAR LLAVES
         </button>
         <button onClick={printSuper4} title="Imprimir las llaves del Super 4" className="btn-gold px-4 text-xl">🖨️</button>
-        <button onClick={descargarPdf} title="Descargar las llaves en PDF (listo para mandar por WhatsApp o imprimir)" className="px-3 rounded-2xl bg-boxing-crimson hover:bg-boxing-crimsonLight text-white transition-colors flex flex-col items-center justify-center leading-none gap-0.5">
+      </div>
+
+      {/* Las llaves como ARCHIVO PDF, en sus dos versiones. El color de cada
+          botón dice cuál es: el rojo baja el PDF oscuro (igual a esta
+          pantalla) y el de papel baja el claro, pensado para la impresora. */}
+      <div className="flex gap-2 w-full lg:max-w-xl lg:mx-auto">
+        <button onClick={() => descargarPdf("oscuro")} title="Descargar las llaves en PDF con el diseño de la app (para mandar por WhatsApp)" className="flex-1 py-2.5 px-3 rounded-2xl bg-boxing-crimson hover:bg-boxing-crimsonLight text-white transition-colors flex items-center justify-center gap-2">
           <span className="text-lg" aria-hidden="true">📄</span>
-          <span className="text-[14px] font-bold tracking-widest">PDF</span>
+          <span className="text-left leading-tight">
+            <span className="block text-[14px] font-bold tracking-widest">PDF OSCURO</span>
+            <span className="block text-[14px] opacity-75">para compartir</span>
+          </span>
+        </button>
+        <button onClick={() => descargarPdf("claro")} title="Descargar las llaves en PDF sobre fondo blanco (para imprimir sin gastar tinta)" className="flex-1 py-2.5 px-3 rounded-2xl bg-boxing-cream hover:bg-white text-black transition-colors flex items-center justify-center gap-2">
+          <span className="text-lg" aria-hidden="true">📄</span>
+          <span className="text-left leading-tight">
+            <span className="block text-[14px] font-bold tracking-widest">PDF CLARO</span>
+            <span className="block text-[14px] opacity-65">para imprimir</span>
+          </span>
         </button>
       </div>
 

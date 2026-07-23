@@ -11,35 +11,85 @@
 // ve idéntico en cualquier teléfono y se puede imprimir tal cual para la mesa
 // de control. Se dibuja con el generador propio (pdf.js), sin librerías.
 //
-// DECISIÓN DE DISEÑO: la app es oscura (el "Foso de Luz"), pero un PDF negro a
-// página completa es ilegible impreso y se come la tinta. Se traslada la MISMA
-// identidad a papel: negro y oro solo en las franjas, tarjetas claras, esquinas
-// roja y azul, y el oro reservado —como en la app— para la final y el campeón.
+// SALE EN DOS TEMAS, con el MISMO dibujo y las mismas medidas:
+//   · "oscuro" — el "Foso de Luz" de la app: tinta negra, venas de neón y el
+//     oro reservado para la final y el campeón. Es el que se mira y se comparte
+//     por WhatsApp, y el que se ve idéntico a la pestaña Super 4.
+//   · "claro"  — el mismo torneo sobre papel blanco, para imprimir de verdad:
+//     una hoja negra entera gasta muchísima tinta y en impresora casera sale
+//     apagada. Conserva la identidad (franja negra con el título en oro,
+//     esquinas roja y azul, oro solo en la final y el campeón).
+// Lo único que cambia entre los dos es la PALETA: la maqueta, las medidas y el
+// contenido son el mismo código, así que no pueden desincronizarse.
 
 import { createPdf, A4, F, textWidth, ellipsize, mixColor, cubicSegments } from "./pdf.js";
 import { bracketPrintTitle, bracketMaxFights, bracketConditions } from "./super4.js";
 import { EVENT_LABELS, weightRangeLabel } from "../constants.js";
 
-// ---------- Paleta ----------
-// Los mismos tonos de la app, ajustados al papel (los grises de la app son
-// luces sobre negro; acá son tintas sobre blanco).
-const NEGRO = "#0B0A0C";
-const ORO = "#C8A04A";        // oro de la app (boxing-goldFight)
-const ORO_CLARO = "#E5C76B";  // oro brillante (títulos sobre negro)
-const ORO_TENUE = "#F7EFD8";  // fondo de la final y del ganador
-const ORO_PAPEL = "#FBF3DF";  // fondo de la cinta del campeón
-const ORO_TEXTO = "#7A5B0A";  // texto sobre fondo dorado
-const CREMA = "#EFE7D6";
-const ROJO = "#C42438";       // esquina roja
-const AZUL = "#2563EB";       // esquina azul
-const VERDE = "#1A7A2E";      // ✓ del que avanza
-const TINTA = "#141210";      // texto principal
-const TINTA_SUAVE = "#4A443B";
-const GRIS_TEXTO = "#8C8578";
-const GRIS_APAGADO = "#A9A296"; // perdedores y cupos libres
-const LINEA = "#CFC8BA";
-const LINEA_SUAVE = "#E3DDD0";
-const CINTA = "#F4F1E9";      // encabezado de cada tarjeta
+// ---------- Paletas ----------
+// Los valores del tema oscuro son los MISMOS del CSS de la app (index.css): si
+// allá cambia el oro o el carmesí, acá tiene que cambiar igual.
+const TEMAS = {
+  oscuro: {
+    pintarFondo: true,
+    fondoAlto: "#16111A", fondoBajo: "#08070A",   // degradado de la página (boxing-raised → negro)
+    bandaAlto: "#1C1524", bandaBajo: "#0B090E",   // franja del encabezado
+    bandaGlow: "#33270F", bandaGlowFin: "#0F0B13",// resplandor dorado tras el título
+    bandaTitulo: "#E5C76B", bandaSub: "#E8DDD0",
+    subtitulo: "#E8DDD0",                          // línea de fechas bajo la franja
+    panelAlto: "#171219", panelBajo: "#0C0A0E",   // tinta de las tarjetas
+    altarAlto: "#191320", altarBajo: "#0D0A10",   // tinta de la final (.s4-altar)
+    altarLuz: 0.84,                                // luz que baja del borde superior (null = sin luz)
+    borde: "#2A2430", bordeOro: "#B08F45",
+    cinta: "#1E1824", cintaOro: "#241C15", cintaLineaOro: "#3A2E1C",
+    linea: "#241E2A",
+    oro: "#C8A04A", oroTexto: "#E5C76B", oroSuave: "#8A6D2F",
+    titulo: "#E5C76B",                             // título del cinturón
+    texto: "#E8DDD0", muted: "#8A7F92", apagado: "#5C5262", placeholder: "#6B5F6E",
+    carmesi: "#C42438", azul: "#2563EB", verde: "#22C55E",
+    ganador: { color: "#8A6D2F", alfa: 0.16 },     // resaltado de la fila del que avanza
+    haloAlfa: 0.055, haloCapas: 9,
+    venaAlfa: 0.22, venaGrosor: 1.6, venaFin: "#E5C76B",
+    campeonAlto: "#241B12", campeonBajo: "#120E10",
+    campeonLuz: "#1B1410", campeonLuzAlfa: 0.74,   // radial interior (null = plano)
+    campeonNombre: "#E5C76B", campeonLabel: "#8A6D2F",
+    correa: "#8A6D2F", hebilla: "#241B12",         // icono del cinturón
+    chipTinte: 0.86, chipBorde: 0.5, chipOscurecer: 0,
+    pie: "#6B5F6E",
+  },
+  claro: {
+    pintarFondo: false,                            // el papel ya es blanco: no se gasta tinta
+    fondoAlto: "#FFFFFF", fondoBajo: "#FFFFFF",
+    bandaAlto: "#0B0A0C", bandaBajo: "#0B0A0C",
+    bandaGlow: null, bandaGlowFin: null,
+    bandaTitulo: "#E5C76B", bandaSub: "#EFE7D6",
+    subtitulo: "#4A443B",
+    panelAlto: "#FFFFFF", panelBajo: "#FFFFFF",
+    altarAlto: "#FFFDF6", altarBajo: "#FFFFFF",
+    altarLuz: null,
+    borde: "#CFC8BA", bordeOro: "#C8A04A",
+    cinta: "#F4F1E9", cintaOro: "#F7EFD8", cintaLineaOro: "#E2CE9A",
+    linea: "#E3DDD0",
+    oro: "#C8A04A", oroTexto: "#7A5B0A", oroSuave: "#A98A3E",
+    titulo: "#141210",
+    texto: "#141210", muted: "#8C8578", apagado: "#A9A296", placeholder: "#A9A296",
+    carmesi: "#C42438", azul: "#2563EB", verde: "#1A7A2E",
+    ganador: { color: "#F7EFD8", alfa: 1 },
+    haloAlfa: 0.085, haloCapas: 7,
+    venaAlfa: 0.12, venaGrosor: 1.5, venaFin: "#C8A04A",
+    campeonAlto: "#FBF3DF", campeonBajo: "#FBF3DF",
+    campeonLuz: null, campeonLuzAlfa: 0,
+    campeonNombre: "#141210", campeonLabel: "#A98A3E",
+    correa: "#E3CFA4", hebilla: "#F7EFD8",
+    chipTinte: 0.9, chipBorde: 0.5, chipOscurecer: 0.22,
+    pie: "#8C8578",
+  },
+};
+
+// Paleta en uso. La fija buildSuper4Pdf antes de dibujar nada y no se vuelve a
+// tocar: todo el dibujo es síncrono y estas funciones son privadas del módulo,
+// así que no hay forma de que dos temas se pisen a mitad de una planilla.
+let P = TEMAS.oscuro;
 
 // ---------- Medidas (en puntos: 1 pt = 1/72") ----------
 const MARGEN = 36;
@@ -58,12 +108,21 @@ const BLOQUE_SEP = 26;                        // aire entre cinturones
 const PIE_Y = A4.height - 48;                 // línea del pie
 const FONDO_LIBRE = A4.height - 60;           // hasta acá puede llegar un bloque
 
+// Color del fondo a una altura dada. Los resplandores dorados se apagan
+// FUNDIÉNDOSE con el fondo (un degradado del PDF no tiene transparencia), así
+// que hay que saber exactamente de qué color es el papel ahí.
+function fondoEn(y) {
+  return mixColor(P.fondoAlto, P.fondoBajo, Math.max(0, Math.min(1, y / A4.height)));
+}
+
 // ============================================
 // API
 // ============================================
 // Devuelve los bytes del .pdf. Función pura y testeable: recibe las llaves, el
 // índice de peleadores y la fecha ya formateada (no llama a new Date()).
-export function buildSuper4Pdf(super4, byId, fecha = "") {
+// `tema`: "oscuro" (el de la app, por defecto) o "claro" (para imprimir).
+export function buildSuper4Pdf(super4, byId, fecha = "", tema = "oscuro") {
+  P = TEMAS[tema] || TEMAS.oscuro;
   const llaves = Array.isArray(super4) ? super4 : [];
   const doc = createPdf({ title: "Torneo Super 4 — Sangre Nueva", author: "Sangre Nueva — La Velada" });
 
@@ -79,8 +138,7 @@ export function buildSuper4Pdf(super4, byId, fecha = "") {
   const paginas = [];
   let actual = null;
   llaves.forEach(b => {
-    const inicio = actual ? actual.y : alturaCabecera(true, topeComun);
-    if (!actual || inicio + BLOQUE_ALTO > FONDO_LIBRE) {
+    if (!actual || actual.y + BLOQUE_ALTO > FONDO_LIBRE) {
       actual = { primera: paginas.length === 0, bloques: [], y: alturaCabecera(paginas.length === 0, topeComun) };
       paginas.push(actual);
     }
@@ -91,11 +149,12 @@ export function buildSuper4Pdf(super4, byId, fecha = "") {
 
   paginas.forEach((p, i) => {
     if (i > 0) doc.addPage();
+    fondoPagina(doc);
     dibujarCabecera(doc, p.primera, topeComun);
     p.bloques.forEach(({ b, y }) => dibujarLlave(doc, b, byId, MARGEN, y, topeComun));
     if (!p.bloques.length) {
       doc.text("No hay llaves generadas todavía.", A4.width / 2, 260,
-        { font: F.serifItalic, size: 13, color: GRIS_APAGADO, align: "center" });
+        { font: F.serifItalic, size: 13, color: P.placeholder, align: "center" });
     }
     dibujarPie(doc, fecha, i + 1, paginas.length);
   });
@@ -110,46 +169,67 @@ function alturaCabecera(primera, topeComun) {
 }
 
 // ============================================
-// Cabecera y pie
+// Fondo, cabecera y pie
 // ============================================
+// La página entera en tinta (solo en el tema oscuro: sobre papel blanco no se
+// pinta nada, que para eso es blanco).
+function fondoPagina(doc) {
+  if (!P.pintarFondo) return;
+  doc.save();
+  doc.shadeLinear(0, 0, 0, A4.height, P.fondoAlto, P.fondoBajo);
+  doc.restore();
+}
+
 function dibujarCabecera(doc, primera, topeComun) {
   if (!primera) {
-    // Páginas siguientes: una franja fina, para que el papel respire y se siga
-    // sabiendo de qué documento es cada hoja suelta.
-    doc.rect(0, 0, A4.width, 46, { fill: NEGRO });
-    doc.rect(0, 46, A4.width, 1.5, { fill: ORO });
+    // Páginas siguientes: franja fina, para que se siga sabiendo de qué
+    // documento es cada hoja suelta.
+    banda(doc, 46);
+    doc.rect(0, 46, A4.width, 1.2, { fill: P.oroSuave });
     doc.text("TORNEO SUPER 4 — SANGRE NUEVA", A4.width / 2, 29,
-      { font: F.sansBold, size: 12.5, color: ORO_CLARO, align: "center", tracking: 3 });
+      { font: F.sansBold, size: 12.5, color: P.bandaTitulo, align: "center", tracking: 3 });
     return;
   }
-  doc.rect(0, 0, A4.width, 86, { fill: NEGRO });
-  doc.rect(0, 86, A4.width, 2.2, { fill: ORO });
+  banda(doc, 88, true);
+  doc.rect(0, 88, A4.width, 2, { fill: P.oro });
+
   doc.text("TORNEO SUPER 4", A4.width / 2, 45,
-    { font: F.sansBold, size: 25, color: ORO_CLARO, align: "center", tracking: 6.5 });
+    { font: F.sansBold, size: 25, color: P.bandaTitulo, align: "center", tracking: 6.5 });
   // Filetes a los lados del subtítulo: el aire de un programa de velada.
   const sub = "SANGRE NUEVA · LA VELADA · DISPUTA DE CINTURONES";
   const wSub = textWidth(sub, F.sans, 8, 3.1);
-  doc.text(sub, A4.width / 2, 67, { font: F.sans, size: 8, color: CREMA, align: "center", tracking: 3.1 });
-  doc.line(A4.width / 2 - wSub / 2 - 26, 64.4, A4.width / 2 - wSub / 2 - 10, 64.4, { stroke: ORO, lineWidth: 0.7 });
-  doc.line(A4.width / 2 + wSub / 2 + 10, 64.4, A4.width / 2 + wSub / 2 + 26, 64.4, { stroke: ORO, lineWidth: 0.7 });
+  doc.text(sub, A4.width / 2, 67, { font: F.sans, size: 8, color: P.bandaSub, align: "center", tracking: 3.1 });
+  doc.line(A4.width / 2 - wSub / 2 - 26, 64.4, A4.width / 2 - wSub / 2 - 10, 64.4, { stroke: P.oro, lineWidth: 0.7 });
+  doc.line(A4.width / 2 + wSub / 2 + 10, 64.4, A4.width / 2 + wSub / 2 + 26, 64.4, { stroke: P.oro, lineWidth: 0.7 });
 
   doc.text(`Semifinales: ${EVENT_LABELS.semiLong}  ·  Finales por el cinturón: ${EVENT_LABELS.finalLong}`,
-    A4.width / 2, 109, { font: F.sansBold, size: 10, color: TINTA_SUAVE, align: "center" });
+    A4.width / 2, 111, { font: F.sansBold, size: 10, color: P.subtitulo, align: "center" });
 
   if (topeComun != null) {
     const t = `Torneo limitado a peleadores con hasta ${topeComun} pelea${topeComun === 1 ? "" : "s"}`;
     const w = textWidth(t, F.sansBold, 8.6, 0.4) + 30;
-    doc.roundRect(A4.width / 2 - w / 2, 120, w, 19, 9.5, { fill: ORO_PAPEL, stroke: ORO, lineWidth: 0.8 });
-    doc.text(t, A4.width / 2, 129.5, { font: F.sansBold, size: 8.6, color: ORO_TEXTO, align: "center", tracking: 0.4, valign: "middle" });
+    doc.roundRect(A4.width / 2 - w / 2, 122, w, 19, 9.5,
+      { fill: mixColor(P.oro, fondoEn(130), P.pintarFondo ? 0.87 : 0.9), stroke: mixColor(P.oro, fondoEn(130), 0.45), lineWidth: 0.8 });
+    doc.text(t, A4.width / 2, 131.5, { font: F.sansBold, size: 8.6, color: P.oroTexto, align: "center", tracking: 0.4, valign: "middle" });
   }
 }
 
+// Franja negra del encabezado, con el resplandor dorado detrás del título
+// cuando el tema lo tiene (en el claro la franja va plana).
+function banda(doc, alto, conGlow = false) {
+  doc.save();
+  doc.roundRect(0, 0, A4.width, alto, 0, { clip: true });
+  doc.shadeLinear(0, 0, 0, alto, P.bandaAlto, P.bandaBajo);
+  if (conGlow && P.bandaGlow) doc.shadeRadial(A4.width / 2, alto * 0.59, 10, 300, P.bandaGlow, P.bandaGlowFin);
+  doc.restore();
+}
+
 function dibujarPie(doc, fecha, pagina, total) {
-  doc.line(MARGEN, PIE_Y, MARGEN + ANCHO, PIE_Y, { stroke: LINEA_SUAVE, lineWidth: 0.6 });
+  doc.line(MARGEN, PIE_Y, MARGEN + ANCHO, PIE_Y, { stroke: P.linea, lineWidth: 0.7 });
   doc.text("Llaves sujetas a modificaciones.", MARGEN, PIE_Y + 14,
-    { font: F.sansItalic, size: 7.5, color: GRIS_TEXTO });
+    { font: F.sansItalic, size: 7.5, color: P.pie });
   const der = `${fecha ? "Generado el " + fecha + "  ·  " : ""}Página ${pagina} de ${total}`;
-  doc.text(der, MARGEN + ANCHO, PIE_Y + 14, { font: F.sans, size: 7.5, color: GRIS_TEXTO, align: "right" });
+  doc.text(der, MARGEN + ANCHO, PIE_Y + 14, { font: F.sans, size: 7.5, color: P.pie, align: "right" });
 }
 
 // ============================================
@@ -162,29 +242,26 @@ function dibujarLlave(doc, b, byId, x, top, topeComun) {
   const chips = [];
   if (cond) {
     chips.push({ t: `${cond.ageInfo.label} · ${cond.ageInfo.minAge}-${cond.ageInfo.maxAge} años`, c: cond.ageInfo.color });
-    chips.push({ t: weightRangeLabel(cond.div), c: "#6366F1" });
-    chips.push({ t: cond.div.genero === "F" ? "Femenino" : "Masculino", c: cond.div.genero === "F" ? "#EC4899" : "#3B82F6" });
+    chips.push({ t: weightRangeLabel(cond.div), c: P.pintarFondo ? "#8189F5" : "#6366F1" });
+    chips.push({ t: cond.div.genero === "F" ? "Femenino" : "Masculino", c: cond.div.genero === "F" ? "#EC4899" : (P.pintarFondo ? "#4B8CF7" : "#3B82F6") });
   }
   // Si las llaves NO comparten tope, cada una anuncia el suyo acá.
   const topePropio = topeComun == null ? bracketMaxFights(b) : null;
-  if (topePropio != null) chips.push({ t: `hasta ${topePropio} pelea${topePropio === 1 ? "" : "s"}`, c: ORO_TEXTO });
+  if (topePropio != null) chips.push({ t: `hasta ${topePropio} pelea${topePropio === 1 ? "" : "s"}`, c: P.oro });
 
   const anchoChips = chips.reduce((s, c) => s + anchoChip(c.t) + 5, 0);
-  const titulo = bracketPrintTitle(b) || b.catLabel || "";
-  doc.text(titulo, x + 21, top + 12, {
-    font: F.serifBold, size: 14.5, color: TINTA, maxWidth: ANCHO - 21 - anchoChips - 12,
-  });
+  tituloLlave(doc, bracketPrintTitle(b) || b.catLabel || "", x + 21, top + 12, ANCHO - 21 - anchoChips - 12);
   let cx = x + ANCHO;
   [...chips].reverse().forEach(c => { cx -= anchoChip(c.t); dibujarChip(doc, cx, top + 1.5, c.t, c.c); cx -= 5; });
   // Sin condiciones (cinturón legacy): se muestra la regla guardada, que es la
   // única descripción que tienen esas llaves viejas.
   if (!cond && b.regla) {
-    doc.text(b.regla, x + ANCHO, top + 12, { font: F.sans, size: 7.6, color: GRIS_TEXTO, align: "right", maxWidth: 220 });
+    doc.text(b.regla, x + ANCHO, top + 12, { font: F.sans, size: 7.6, color: P.muted, align: "right", maxWidth: 220 });
   }
-  // Filete bajo el título: gris fino de lado a lado y un tramo de oro al
+  // Filete bajo el título: línea tenue de lado a lado y un tramo de oro al
   // principio (el mismo gesto que la cabecera dorada de la app).
-  doc.line(x, top + 19.5, x + ANCHO, top + 19.5, { stroke: LINEA_SUAVE, lineWidth: 0.7 });
-  doc.line(x, top + 19.5, x + 62, top + 19.5, { stroke: ORO, lineWidth: 1.7 });
+  doc.line(x, top + 19.5, x + ANCHO, top + 19.5, { stroke: P.linea, lineWidth: 0.7 });
+  doc.line(x, top + 19.5, x + 62, top + 19.5, { stroke: P.oro, lineWidth: 1.7 });
 
   // --- La llave ---
   const bt = top + TITULO_ALTO;
@@ -193,8 +270,8 @@ function dibujarLlave(doc, b, byId, x, top, topeComun) {
   const finalY = bt + (BRACKET_ALTO - CARD_ALTO) / 2;
 
   // Venas primero: las tarjetas se dibujan encima y tapan los extremos.
-  vena(doc, x + CARD_SEMI, bt + CARD_ALTO / 2, finalX, finalY + CINTA_ALTO + FILA_ALTO / 2, ROJO);
-  vena(doc, x + CARD_SEMI, bt + CARD_ALTO + SEMI_SEP + CARD_ALTO / 2, finalX, finalY + CINTA_ALTO + FILA_ALTO * 1.5, AZUL);
+  vena(doc, x + CARD_SEMI, bt + CARD_ALTO / 2, finalX, finalY + CINTA_ALTO + FILA_ALTO / 2, P.carmesi);
+  vena(doc, x + CARD_SEMI, bt + CARD_ALTO + SEMI_SEP + CARD_ALTO / 2, finalX, finalY + CINTA_ALTO + FILA_ALTO * 1.5, P.azul);
 
   tarjeta(doc, byId, x, bt, CARD_SEMI, {
     etiqueta: `${EVENT_LABELS.semiAbbr} · Semifinal 1`,
@@ -219,30 +296,47 @@ function dibujarLlave(doc, b, byId, x, top, topeComun) {
   if (b.finalWinner) cintaCampeon(doc, finalX, bt + BRACKET_ALTO - 34, CARD_FINAL, byId[b.finalWinner]?.fullName || "—");
 }
 
+// Título del cinturón en serif con los separadores "·" en carmesí, como el
+// TituloLlave de la pestaña Super 4. Si no cabe entero se recorta en una sola
+// tirada (partirlo por tramos ya no tendría sentido).
+function tituloLlave(doc, t, x, base, maxWidth) {
+  const size = 14.5;
+  if (!t) return;
+  if (textWidth(t, F.serifBold, size) > maxWidth) {
+    doc.text(t, x, base, { font: F.serifBold, size, color: P.titulo, maxWidth });
+    return;
+  }
+  let cx = x;
+  t.split(" · ").forEach((p, i) => {
+    if (i) cx += doc.text(" · ", cx, base, { font: F.serifBold, size, color: P.carmesi });
+    cx += doc.text(p, cx, base, { font: F.serifBold, size, color: P.titulo });
+  });
+}
+
 // ============================================
 // Piezas
 // ============================================
 
 // Tarjeta de una fase (semifinal o final): cinta con el día arriba y dos filas
-// de peleador. La final va con borde y aura de oro — el mismo privilegio que
-// tiene en la app.
+// de peleador. La final va con borde de oro y aura contenida — el mismo
+// privilegio que tiene en la app (.s4-altar).
 function tarjeta(doc, byId, x, y, w, { etiqueta, filas, winner, final = false }) {
-  if (final) {
-    // Aura contenida: dos halos muy tenues, que en papel se leen como un
-    // resplandor y no como un marco doble.
-    doc.save().alpha(0.09);
-    doc.roundRect(x - 4.5, y - 4.5, w + 9, CARD_ALTO + 9, 11, { fill: ORO });
-    doc.restore();
-    doc.save().alpha(0.13);
-    doc.roundRect(x - 2, y - 2, w + 4, CARD_ALTO + 4, 9, { fill: ORO });
-    doc.restore();
-  }
-  doc.roundRect(x, y, w, CARD_ALTO, 7, { fill: "#FFFFFF" });
+  // Aura de la final: el único resplandor en reposo de toda la llave.
+  if (final) halo(doc, x, y, w, CARD_ALTO, 7);
+  // Tinta de la tarjeta: degradado en diagonal, como el de la app.
+  doc.save();
+  doc.roundRect(x, y, w, CARD_ALTO, 7, { clip: true });
+  doc.shadeLinear(x + w, y, x, y + CARD_ALTO, final ? P.altarAlto : P.panelAlto, final ? P.altarBajo : P.panelBajo);
+  // Luz que baja desde el borde superior de la final (el radial-gradient
+  // interior de .s4-altar). Va DENTRO del recorte de la tarjeta, así que no
+  // puede escaparse al resto de la página.
+  if (final && P.altarLuz != null) doc.shadeRadial(x + w / 2, y - 6, 6, 120, mixColor(P.oro, P.altarAlto, P.altarLuz), P.altarAlto);
+  doc.restore();
   // Cinta del encabezado: redondeada solo arriba, para que calce con la tarjeta.
-  doc.roundRect(x, y, w, CINTA_ALTO, [7, 7, 0, 0], { fill: final ? ORO_TENUE : CINTA });
-  doc.line(x, y + CINTA_ALTO, x + w, y + CINTA_ALTO, { stroke: final ? "#E2CE9A" : LINEA_SUAVE, lineWidth: 0.6 });
+  doc.roundRect(x, y, w, CINTA_ALTO, [7, 7, 0, 0], { fill: final ? P.cintaOro : P.cinta });
+  doc.line(x, y + CINTA_ALTO, x + w, y + CINTA_ALTO, { stroke: final ? P.cintaLineaOro : P.linea, lineWidth: 0.6 });
   doc.text(etiqueta, x + 9, y + CINTA_ALTO / 2, {
-    font: F.sansBold, size: 6.7, color: final ? "#8A6D2F" : "#7C7466",
+    font: F.sansBold, size: 6.7, color: final ? P.oroTexto : P.muted,
     tracking: 1.5, upper: true, valign: "middle", maxWidth: w - 18,
   });
 
@@ -251,7 +345,7 @@ function tarjeta(doc, byId, x, y, w, { etiqueta, filas, winner, final = false })
   }));
 
   // El borde va al final para que quede por encima de los rellenos.
-  doc.roundRect(x, y, w, CARD_ALTO, 7, { stroke: final ? ORO : LINEA, lineWidth: final ? 1.2 : 0.9 });
+  doc.roundRect(x, y, w, CARD_ALTO, 7, { stroke: final ? P.bordeOro : P.borde, lineWidth: final ? 1.1 : 0.9 });
 }
 
 // Una fila = un peleador del cupo.
@@ -264,64 +358,86 @@ function fila(doc, byId, x, y, w, { fid, lado, vacio, winner, ultima, final }) {
   if (gana) {
     // Resaltado del que avanza. En la última fila se redondea abajo para no
     // asomar fuera del borde de la tarjeta.
+    if (P.ganador.alfa < 1) doc.save().alpha(P.ganador.alfa);
     doc.roundRect(x + 1, y, w - 2, ultima ? FILA_ALTO - 1 : FILA_ALTO,
-      ultima ? [0, 0, 6, 6] : 0, { fill: ORO_TENUE });
+      ultima ? [0, 0, 6, 6] : 0, { fill: P.ganador.color });
+    if (P.ganador.alfa < 1) doc.restore();
   }
   // Venda de esquina: la barrita roja o azul del rincón, dorada si ganó y
-  // pálida si el cupo está libre (igual que en la pestaña Super 4).
-  const base = rojo ? ROJO : AZUL;
-  const color = gana ? ORO : f ? base : mixColor(base, "#FFFFFF", 0.68);
+  // apagada si el cupo está libre (igual que en la pestaña Super 4).
+  const base = rojo ? P.carmesi : P.azul;
+  const color = gana ? P.oro : f ? base : mixColor(base, fondoEn(y), P.pintarFondo ? 0.6 : 0.68);
   doc.roundRect(x + 1.6, y + 3.4, 3.2, FILA_ALTO - 6.8, 1.6, { fill: color });
 
   if (!f) {
     // Cupo sin peleador: en la final es la promesa del ganador que vendrá; en
     // una semifinal es un cupo por llenar en la app.
     doc.text(vacio || "Cupo libre", x + 13, y + FILA_ALTO / 2, {
-      font: F.serifItalic, size: 9.2, color: GRIS_APAGADO, valign: "middle", maxWidth: w - 24,
+      font: F.serifItalic, size: 9.2, color: P.placeholder, valign: "middle", maxWidth: w - 24,
     });
     return;
   }
 
   const anchoNombre = w - 13 - (gana ? 24 : 10);
-  const colorNombre = gana ? ORO_TEXTO : pierde ? GRIS_APAGADO : TINTA;
+  const colorNombre = gana ? P.oroTexto : pierde ? P.apagado : P.texto;
   const nombre = ellipsize(f.fullName || "—", anchoNombre, F.sansBold, 9.6);
   const wNombre = doc.text(nombre, x + 13, y + 11.6, { font: F.sansBold, size: 9.6, color: colorNombre });
   // Al perdedor se le tacha el nombre, como en la app.
-  if (pierde) doc.line(x + 13, y + 8.9, x + 13 + wNombre, y + 8.9, { stroke: GRIS_APAGADO, lineWidth: 0.7 });
+  if (pierde) doc.line(x + 13, y + 8.9, x + 13 + wNombre, y + 8.9, { stroke: P.apagado, lineWidth: 0.7 });
 
   const detalle = [(f.gym || "").toUpperCase(), f.weightKg != null ? `${f.weightKg}kg` : "", f.age != null ? `${f.age}a` : ""]
     .filter(Boolean).join(" · ");
   doc.text(detalle, x + 13, y + 19.2, {
-    font: F.sans, size: 6.7, color: pierde ? "#BCB6AA" : GRIS_TEXTO, maxWidth: anchoNombre, tracking: 0.2,
+    font: F.sans, size: 6.7, color: pierde ? P.apagado : P.muted, maxWidth: anchoNombre, tracking: 0.2,
   });
 
-  if (gana) check(doc, x + w - 15, y + FILA_ALTO / 2, final ? ORO_TEXTO : VERDE);
+  if (gana) check(doc, x + w - 15, y + FILA_ALTO / 2, final ? P.oroTexto : P.verde);
 }
 
 // Vena de luz entre una semifinal y la final: curva que nace del color del
 // rincón y funde a oro. El PDF no sabe degradar un trazo, así que la curva se
 // parte en tramos y cada uno se pinta con su color interpolado; debajo va un
-// trazo grueso y translúcido que hace de resplandor.
+// trazo grueso y translúcido que hace de neón difuso, como en la app.
 function vena(doc, x1, y1, x2, y2, colorRincon) {
   const p = [x1, y1, x1 + 32, y1, x2 - 32, y2, x2, y2];
-  doc.save().alpha(0.12);
-  doc.curve(p, { stroke: ORO, lineWidth: 5.5 });
+  doc.save().alpha(P.venaAlfa);
+  doc.curve(p, { stroke: P.oro, lineWidth: 6.5 });
   doc.restore();
   const tramos = cubicSegments(p, 7);
   tramos.forEach((seg, i) => {
-    doc.curve(seg, { stroke: mixColor(colorRincon, ORO, (i + 0.5) / tramos.length), lineWidth: 1.5 });
+    doc.curve(seg, { stroke: mixColor(colorRincon, P.venaFin, (i + 0.5) / tramos.length), lineWidth: P.venaGrosor });
   });
-  doc.circle(x2, y2, 1.9, { fill: ORO });
+  doc.circle(x2, y2, 1.9, { fill: P.venaFin });
 }
 
-// Cinta del campeón, bajo la final: fondo de oro pálido, dos estrellas y el
-// nombre. Solo aparece cuando la final ya tiene ganador.
+// Cinta del campeón, bajo la final: aura dorada, dos estrellas y el nombre en
+// serif. Solo aparece cuando la final ya tiene ganador.
 function cintaCampeon(doc, x, y, w, nombre) {
-  doc.roundRect(x, y, w, 34, 9, { fill: ORO_PAPEL, stroke: ORO, lineWidth: 1 });
-  estrella(doc, x + 15, y + 17, 5.4, ORO);
-  estrella(doc, x + w - 15, y + 17, 5.4, ORO);
-  doc.text("CAMPEÓN", x + w / 2, y + 12, { font: F.sansBold, size: 6.4, color: "#A98A3E", align: "center", tracking: 2.4 });
-  doc.text(nombre, x + w / 2, y + 25.5, { font: F.serifBold, size: 12, color: TINTA, align: "center", maxWidth: w - 44 });
+  halo(doc, x, y, w, 34, 9);
+  doc.save();
+  doc.roundRect(x, y, w, 34, 9, { clip: true });
+  doc.shadeLinear(x, y, x, y + 34, P.campeonAlto, P.campeonBajo);
+  if (P.campeonLuz) doc.shadeRadial(x + w / 2, y, 4, 110, mixColor(P.oro, P.campeonLuz, P.campeonLuzAlfa), P.campeonLuz);
+  doc.restore();
+  doc.roundRect(x, y, w, 34, 9, { stroke: P.oro, lineWidth: 1 });
+  estrella(doc, x + 15, y + 17, 5.4, P.oro);
+  estrella(doc, x + w - 15, y + 17, 5.4, P.oro);
+  doc.text("CAMPEÓN", x + w / 2, y + 12, { font: F.sansBold, size: 6.4, color: P.campeonLabel, align: "center", tracking: 2.4 });
+  doc.text(nombre, x + w / 2, y + 25.5, { font: F.serifBold, size: 12, color: P.campeonNombre, align: "center", maxWidth: w - 44 });
+}
+
+// Resplandor alrededor de una figura (el `box-shadow: 0 0 24px` del oro en la
+// app). El PDF no tiene desenfoque: se imita con varios contornos concéntricos
+// cada vez más grandes y más tenues. Se pisan entre sí (avanzan 1,4 pt y son de
+// 4,2 pt de grosor), así que no se leen como anillos sueltos sino como un
+// degradado. Van hacia AFUERA: la figura se dibuja después y tapa el centro.
+function halo(doc, x, y, w, h, r) {
+  for (let i = P.haloCapas; i >= 1; i--) {
+    const d = i * 1.4;
+    doc.save().alpha(P.haloAlfa * (1 - (i - 1) / P.haloCapas));
+    doc.roundRect(x - d, y - d, w + d * 2, h + d * 2, r + d, { stroke: P.oro, lineWidth: 4.2 });
+    doc.restore();
+  }
 }
 
 // ---------- Ornamentos vectoriales ----------
@@ -332,9 +448,9 @@ function cintaCampeon(doc, x, y, w, nombre) {
 // correa, la hebilla y su piedra. Es lo que está en disputa, así que encabeza
 // cada llave (en la app ese lugar lo ocupa el 🏆).
 function iconoCinturon(doc, x, y) {
-  doc.roundRect(x, y + 3.4, 17, 4.6, 2.3, { fill: mixColor(ORO, "#FFFFFF", 0.5) });
-  doc.roundRect(x + 5, y, 7.4, 11, 2.2, { fill: ORO_TENUE, stroke: ORO, lineWidth: 0.9 });
-  doc.circle(x + 8.7, y + 5.5, 1.5, { fill: ORO });
+  doc.roundRect(x, y + 3.4, 17, 4.6, 2.3, { fill: P.correa });
+  doc.roundRect(x + 5, y, 7.4, 11, 2.2, { fill: P.hebilla, stroke: P.oro, lineWidth: 0.9 });
+  doc.circle(x + 8.7, y + 5.5, 1.5, { fill: P.oro });
 }
 
 // ✓ del que avanza.
@@ -358,11 +474,13 @@ const CHIP_TXT = 6.6, CHIP_TRACK = 1.1, CHIP_PAD = 7;
 function anchoChip(t) { return textWidth(t.toUpperCase(), F.sansBold, CHIP_TXT, CHIP_TRACK) + CHIP_PAD * 2; }
 function dibujarChip(doc, x, y, t, color) {
   const w = anchoChip(t);
-  // El tinte se calcula mezclando con blanco en vez de usar transparencia: en
-  // papel se imprime igual y no depende de que el lector respete el alfa.
-  doc.roundRect(x, y, w, 13, 6.5, { fill: mixColor(color, "#FFFFFF", 0.9), stroke: mixColor(color, "#FFFFFF", 0.5), lineWidth: 0.7 });
+  // Tinte y borde de SU color sobre el fondo, como las píldoras de condición de
+  // la app. Sobre papel blanco el color se oscurece un poco para que el texto
+  // chico no quede lavado.
+  const bg = fondoEn(y);
+  doc.roundRect(x, y, w, 13, 6.5, { fill: mixColor(color, bg, P.chipTinte), stroke: mixColor(color, bg, P.chipBorde), lineWidth: 0.7 });
   doc.text(t, x + w / 2, y + 6.5, {
-    font: F.sansBold, size: CHIP_TXT, color: mixColor(color, "#000000", 0.22),
+    font: F.sansBold, size: CHIP_TXT, color: P.chipOscurecer ? mixColor(color, "#000000", P.chipOscurecer) : color,
     align: "center", tracking: CHIP_TRACK, upper: true, valign: "middle",
   });
 }
