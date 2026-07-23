@@ -156,39 +156,96 @@ input[type="number"] { -moz-appearance:textfield; }
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 
-/* ============ Chips de filtro (lista de Peleadores) ============
-   Píldoras luminosas: apagada es materia (fondo neutro, borde tenue),
-   activa es luz (lavado y aura de su color --c). API igual que siempre:
-   --c por estilo inline, .on para la activa, .n número y .l etiqueta. */
-.filter-chip {
-  --c: #E5C76B;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-width:66px; padding:7px 13px; border-radius:999px;
-  border:1px solid rgba(255,255,255,0.07);
-  background:rgba(255,255,255,0.03);
-  transition:border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .08s ease;
+/* ============ Banda de filtros (lista de Peleadores) ============
+   Antes cada filtro era una píldora con SU color: verde el debutante, azul el
+   principiante, naranja el faltante, rosa el femenino… Doce colores distintos
+   en la misma franja le quitaban seriedad a la página (pedido del organizador,
+   jul 2026).
+   Ahora la banda es TIPOGRÁFICA, no de píldoras: la cifra en oro —el único
+   color de la casa— y la etiqueta en blanco. Lo que separa los grupos ya no es
+   un borde por cada filtro, sino un hilo que va del carmesí al cobalto: los
+   dos rincones del ring, que es la firma de la marca.
+   API: .filtro-grupo (una banda), .filtro (un filtro, con .on cuando está
+   activo), .n la cifra y .l la etiqueta. */
+.filtro-banda { display:flex; flex-direction:column; gap:11px; }
+.filtro-grupo { display:flex; flex-direction:column; gap:7px; }
+/* Rótulo del grupo (NIVEL / SEXO / CATEGORÍA): solo en escritorio, donde hay
+   ancho de sobra. En móvil el hilo ya separa los grupos y esas tres líneas
+   extra empujarían la lista fuera de la pantalla. */
+.filtro-titulo { display:none; }
+.filtro-items { display:flex; flex-wrap:wrap; align-items:flex-end; gap:7px 20px; }
+
+/* Un filtro. Sin píldora: lo que marca el activo es el FILO DE ORO de abajo,
+   el mismo gesto que la tarjeta de peleador — así la página habla un idioma
+   solo. El área de toque se mantiene en 33px de alto (el staff lo toca a dedo
+   y con prisa durante la velada). */
+.filtro {
+  position:relative; display:flex; flex-direction:column; align-items:center;
+  padding:2px 3px 8px; min-height:33px;
+  transition:transform .08s ease;
 }
-.filter-chip:hover { border-color:color-mix(in srgb, var(--c) 45%, transparent); background:color-mix(in srgb, var(--c) 8%, #0b090b); }
-.filter-chip:active { transform:translateY(1px); }
-.filter-chip.on {
-  border-color:color-mix(in srgb, var(--c) 45%, transparent);
-  background:linear-gradient(180deg, color-mix(in srgb, var(--c) 16%, transparent), color-mix(in srgb, var(--c) 5%, transparent));
-  box-shadow:0 0 14px color-mix(in srgb, var(--c) 25%, transparent);
+.filtro:active { transform:translateY(1px); }
+.filtro .n {
+  font-family:'Playfair Display','Didot','Bodoni 72',Georgia,serif;
+  font-size:23px; line-height:1; color:#c8a04a;
+  transition:color .2s ease, text-shadow .2s ease;
 }
-.filter-chip .n { font-size:15px; font-weight:700; line-height:1; color:var(--c); }
-.filter-chip .l { font-size:14px; margin-top:3px; letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; color:rgba(232,221,208,0.55); }
-.filter-chip.on .l { color:color-mix(in srgb, var(--c) 75%, #e8ddd0); }
-/* MÓVIL: la misma píldora, en una sola línea (número · etiqueta). Apiladas
-   ocupaban 4 filas y empujaban la lista fuera de la pantalla; en línea caben
-   en menos alto y el primer peleador se ve sin hacer scroll. En escritorio se
-   conserva la versión apilada, que respira mejor con el ancho disponible.
-   El alto NO baja de 33px: es un filtro que el staff toca a dedo y con prisa
-   durante la velada, así que la comodidad de toque manda sobre ahorrar dos
-   píxeles más (33px es el tamaño estándar de chip táctil). */
+.filtro .l {
+  font-size:14px; margin-top:4px; letter-spacing:0.16em; text-transform:uppercase;
+  white-space:nowrap; color:rgba(255,255,255,0.62); transition:color .2s ease;
+}
+.filtro::after {
+  content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px;
+  background:linear-gradient(90deg, transparent, #c8a04a 25%, #e5c76b 50%, #c8a04a 75%, transparent);
+  opacity:0; transition:opacity .2s ease, box-shadow .2s ease;
+  pointer-events:none;
+}
+.filtro:hover .l { color:rgba(255,255,255,0.9); }
+.filtro:hover::after { opacity:.35; }
+.filtro.on .n { color:#e5c76b; text-shadow:0 0 16px rgba(229,199,107,0.45); }
+.filtro.on .l { color:#fff; }
+.filtro.on::after { opacity:1; box-shadow:0 0 10px rgba(200,160,74,0.45); }
+
+/* "Todos" limpia TODOS los filtros, no solo el nivel: va primero y con un
+   filete vertical que lo despega del grupo, para que se lea como el reinicio
+   que es y no como un nivel más. */
+.filtro-sep {
+  align-self:stretch; width:1px; margin:3px 4px 6px;
+  background:linear-gradient(180deg, transparent, rgba(200,160,74,0.35), transparent);
+}
+
+/* El hilo que separa los grupos: carmesí (rincón rojo) fundiendo a cobalto
+   (rincón azul), apagándose en los dos extremos. */
+.hilo-ring {
+  height:1px; border:0; margin:0;
+  background:linear-gradient(90deg, transparent 0%, #c42438 3%, #c42438 58%, #7b3358 74%, #2563eb 93%, transparent 100%);
+  opacity:.7;
+}
+
+@media (min-width: 64rem) {
+  /* Escritorio: el rótulo del grupo en una columna fija a la izquierda, con
+     los filtros alineados en la misma cuadrícula — se lee como una tabla de
+     datos y no como una nube de botones. */
+  .filtro-grupo { display:grid; grid-template-columns:112px 1fr; align-items:start; gap:0 16px; }
+  /* El rótulo se alinea con la ETIQUETA de la primera línea (2px de padding +
+     23px de cifra + 4px de aire). Va anclado arriba y no al centro: si el grupo
+     se parte en dos líneas —una ventana angosta, o categorías de nombre largo—
+     el rótulo tiene que quedar junto a donde EMPIEZA el grupo, no flotando al
+     final. */
+  .filtro-titulo {
+    display:block; padding-top:29px;
+    font-size:14px; letter-spacing:0.24em; text-transform:uppercase;
+    color:rgba(232,221,208,0.3); white-space:nowrap;
+  }
+  .filtro-items { gap:9px 26px; }
+}
+/* MÓVIL: cifra y etiqueta en una sola línea. Apiladas ocupaban demasiado alto
+   y empujaban al primer peleador fuera de la pantalla. */
 @media (max-width: 63.98rem) {
-  .filter-chip { flex-direction:row; align-items:baseline; gap:6px; min-width:0; padding:8px 12px; min-height:33px; }
-  .filter-chip .n { font-size:14px; }
-  .filter-chip .l { font-size:14px; margin-top:0; letter-spacing:0.1em; }
+  .filtro { flex-direction:row; align-items:baseline; gap:7px; padding:4px 2px 7px; }
+  .filtro .n { font-size:19px; }
+  .filtro .l { margin-top:0; letter-spacing:0.1em; }
+  .filtro-items { gap:4px 16px; }
 }
 
 /* ============ Tarjeta de peleador ============
@@ -539,5 +596,5 @@ input[type="number"] { -moz-appearance:textfield; }
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .scale-in, .vs-pulse, .punto-vivo, .s4-vena { animation:none !important; }
   .s4-vena { display:none; }
-  .fighter-card, .filter-chip, .nav-lado, .type-card { transition:none; }
+  .fighter-card, .filtro, .filtro .n, .filtro .l, .filtro::after, .nav-lado, .type-card { transition:none; }
 }

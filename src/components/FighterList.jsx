@@ -8,42 +8,43 @@ import { printHtml } from "../lib/printHtml.js";
 import { buildFightersXlsx } from "../lib/xlsxPlanillas.js";
 import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
-import { committedFighterIds } from "../lib/super4.js";
 
-// Chip de filtro: número (en el color de la categoría) + etiqueta, con estado
-// activo destacado. El look (profundidad, hover, resplandor activo) vive en la
-// clase .filter-chip de index.css; aquí solo se pasa el color por la variable
-// CSS --c y se marca "on" cuando el filtro está activo.
-function FilterChip({ n, label, color, active, onClick }) {
+// Un filtro de la banda: la cifra en oro y la etiqueta en blanco, sin píldora.
+// El activo se marca con el filo de oro de abajo (.filtro.on en index.css), el
+// mismo gesto que la tarjeta de peleador. Ya no recibe color: doce colores
+// distintos en la misma franja le quitaban seriedad a la página.
+function Filtro({ n, label, active, onClick }) {
   return (
-    <button type="button" onClick={onClick} className={"filter-chip flex-shrink-0" + (active ? " on" : "")} style={{ "--c": color }}>
+    <button type="button" onClick={onClick} className={"filtro flex-shrink-0" + (active ? " on" : "")}>
       <span className="n">{n}</span>
       <span className="l">{label}</span>
     </button>
   );
 }
 
+// Una banda de filtros con su rótulo (NIVEL / SEXO / CATEGORÍA). El rótulo solo
+// se ve en escritorio; en móvil los grupos se distinguen por el hilo.
+function GrupoFiltros({ titulo, children }) {
+  return (
+    <div className="filtro-grupo">
+      <span className="filtro-titulo">{titulo}</span>
+      <div className="filtro-items">{children}</div>
+    </div>
+  );
+}
+
 // ============================================
 // COMPONENTE: LISTA PELEADORES
 // ============================================
-export default function FighterList({ fighters, matchups = [], super4 = [], onEdit, onDelete }) {
+// Ojo: acá NO hay filtro de "Faltantes". Los peleadores sin compromiso tienen
+// su propia pestaña en el menú de la izquierda (FaltantesView), que además
+// sabe emparejarlos; repetirlo como filtro solo llenaba la franja.
+export default function FighterList({ fighters, onEdit, onDelete }) {
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [showFaltantes, setShowFaltantes] = useState(false);
   const [sexFilter, setSexFilter] = useState("all"); // "all" | "M" | "F"
   const [ageFilter, setAgeFilter] = useState("all"); // "all" | clave de categoría de edad
-  // "Faltantes": peleadores registrados SIN compromiso todavía — ni un cruce
-  // en el VS ni un puesto en el Super 4. El matchmaking nunca empareja cruces
-  // que rompan las reglas World Boxing (categoría de edad, sexo), así que quien
-  // no tiene rival compatible queda aquí, con sus datos intactos, a la espera
-  // de un rival nuevo. REGLA ESTRICTA: quien está en el Super 4 ya tiene sus
-  // peleas del torneo y por eso JAMÁS es faltante — committedFighterIds (en
-  // super4.js) es la única fuente de "quién tiene compromiso", compartida con
-  // el VS, para que la lista no se contradiga con el resto de la app.
-  const committedIds = useMemo(() => committedFighterIds(matchups, super4), [matchups, super4]);
-  const faltantesCount = useMemo(() => fighters.filter(f => !committedIds.has(f.id)).length, [fighters, committedIds]);
   const filtered = useMemo(() => {
     let r = [...fighters];
-    if (showFaltantes) r = r.filter(f => !committedIds.has(f.id));
     if (sexFilter !== "all") r = r.filter(f => (f.sexo || "M") === sexFilter);
     if (ageFilter === "invalid") r = r.filter(f => { const k = getAgeCategory(f.age).key; return k === "infantil" || k === "veterano"; });
     else if (ageFilter !== "all") r = r.filter(f => getAgeCategory(f.age).key === ageFilter);
@@ -56,21 +57,21 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
     if (experienceFilter !== "all") r = r.filter(f => f.experienceLevel === experienceFilter);
     switch (sortBy) { case "name": r.sort((a, b) => a.fullName.localeCompare(b.fullName)); break; case "weight": r.sort((a, b) => a.weightKg - b.weightKg); break; case "experience": r.sort((a, b) => b.fightCount - a.fightCount); break; default: r.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); }
     return r;
-  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, showFaltantes, sexFilter, ageFilter, committedIds]);
+  }, [fighters, searchQuery, categoryFilter, experienceFilter, sortBy, sexFilter, ageFilter]);
   const stats = useMemo(() => { const e = {}; fighters.forEach(f => { e[f.experienceLevel] = (e[f.experienceLevel] || 0) + 1; }); return e; }, [fighters]);
-  // Conteo por sexo para los chips Masculino/Femenino (junto a "Faltante").
+  // Conteo por sexo para los filtros Masculino/Femenino.
   const sexCounts = useMemo(() => { const c = { M: 0, F: 0 }; fighters.forEach(f => { c[(f.sexo || "M") === "F" ? "F" : "M"]++; }); return c; }, [fighters]);
-  // Conteo por categoría de edad (World Boxing) para las chips de edad.
+  // Conteo por categoría de edad (World Boxing) para los filtros de edad.
   const ageCounts = useMemo(() => { const c = {}; fighters.forEach(f => { const k = getAgeCategory(f.age).key; c[k] = (c[k] || 0) + 1; }); return c; }, [fighters]);
   // Atletas fuera de los rangos oficiales (menores de 13 o mayores de 40).
   const invalidCount = (ageCounts.infantil || 0) + (ageCounts.veterano || 0);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
-  // Chip "Todos": limpia todos los filtros para ver a todos los registrados.
-  const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && !showFaltantes && sexFilter === "all" && ageFilter === "all";
-  function verTodos() { setSearchQuery(""); setCategoryFilter("all"); setExperienceFilter("all"); setShowFaltantes(false); setSexFilter("all"); setAgeFilter("all"); }
+  // "Todos": limpia todos los filtros para ver a todos los registrados.
+  const sinFiltros = !searchQuery.trim() && categoryFilter === "all" && experienceFilter === "all" && sexFilter === "all" && ageFilter === "all";
+  function verTodos() { setSearchQuery(""); setCategoryFilter("all"); setExperienceFilter("all"); setSexFilter("all"); setAgeFilter("all"); }
 
-  // Imprime exactamente la lista que se está viendo (respeta el filtro de
-  // Faltante, la búsqueda, la categoría, el nivel y el orden activos), con
+  // Imprime exactamente la lista que se está viendo (respeta la búsqueda, el
+  // sexo, la categoría de edad, la división, el nivel y el orden activos), con
   // los datos útiles para buscarle rival a cada uno: división de peso,
   // categoría de edad World Boxing, nivel de experiencia y escuela. El
   // subtítulo deja claro qué filtro estaba activo al imprimir.
@@ -78,7 +79,6 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
   // Excel) diga siempre a qué corresponde la lista que trae.
   function subtituloFiltros() {
     const filtros = [];
-    if (showFaltantes) filtros.push("FALTANTES (sin cruce en el VS ni puesto en el Super 4)");
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
     if (ageFilter === "invalid") filtros.push("INVÁLIDOS (fuera de rango oficial 13-40)");
     else if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
@@ -147,24 +147,31 @@ export default function FighterList({ fighters, matchups = [], super4 = [], onEd
   return (
     <div className="space-y-3">
       <PageHeader kicker="Base de datos de atletas" title="Peleadores" count={fighters.length} />
-      <div className="flex flex-wrap gap-2">
-        <FilterChip n={fighters.length} label="Todos" color="#E5C76B" active={sinFiltros} onClick={verTodos} />
-        {/* "Amateur Avanzado" es la etiqueta más larga de la fila: en móvil se
-            corta a "Amateur" para que quepan más chips por fila. */}
-        {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; const label = e.key === "amateur" ? <>Amateur<span className="hidden lg:inline"> Avanzado</span></> : e.label; return <FilterChip key={e.key} n={c} label={label} color={e.color} active={experienceFilter === e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} />; })}
-        {faltantesCount > 0 && <FilterChip n={faltantesCount} label="Faltante" color="#F97316" active={showFaltantes} onClick={() => setShowFaltantes(!showFaltantes)} />}
-        <FilterChip n={sexCounts.M} label="Masculino" color="#3B82F6" active={sexFilter === "M"} onClick={() => setSexFilter(sexFilter === "M" ? "all" : "M")} />
-        <FilterChip n={sexCounts.F} label="Femenino" color="#EC4899" active={sexFilter === "F"} onClick={() => setSexFilter(sexFilter === "F" ? "all" : "F")} />
-        {/* En móvil solo el nombre World Boxing (U15, U17, U19, Elite); la
-            equivalencia FECHIBOX —útil pero larga— aparece en escritorio, que
-            es donde hay ancho de sobra. Las planillas impresas la siguen
-            llevando siempre. */}
-        {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <FilterChip key={a.key} n={c} label={<>{a.label}<span className="hidden lg:inline"> · {FECHIBOX_LABEL[a.key] || a.label}</span></>} color={a.color} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
-        {invalidCount > 0 && <FilterChip n={invalidCount} label="Inválidos" color="#DC2626" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
+      {/* Banda de filtros: tres grupos (nivel, sexo, categoría) separados por el
+          hilo carmesí→cobalto en vez de por una píldora de color por filtro. */}
+      <div className="filtro-banda">
+        <GrupoFiltros titulo="Nivel">
+          <Filtro n={fighters.length} label="Todos" active={sinFiltros} onClick={verTodos} />
+          <span className="filtro-sep" aria-hidden="true" />
+          {/* "Amateur Avanzado" es la etiqueta más larga de la fila: en móvil se
+              corta a "Amateur" para que quepan más filtros por línea. */}
+          {EXPERIENCE_LEVELS.map(e => { const c = stats[e.key] || 0; if (!c) return null; const label = e.key === "amateur" ? <>Amateur<span className="hidden lg:inline"> Avanzado</span></> : e.label; return <Filtro key={e.key} n={c} label={label} active={experienceFilter === e.key} onClick={() => setExperienceFilter(experienceFilter === e.key ? "all" : e.key)} />; })}
+        </GrupoFiltros>
+        <hr className="hilo-ring" />
+        <GrupoFiltros titulo="Sexo">
+          <Filtro n={sexCounts.M} label="Masculino" active={sexFilter === "M"} onClick={() => setSexFilter(sexFilter === "M" ? "all" : "M")} />
+          <Filtro n={sexCounts.F} label="Femenino" active={sexFilter === "F"} onClick={() => setSexFilter(sexFilter === "F" ? "all" : "F")} />
+        </GrupoFiltros>
+        <hr className="hilo-ring" />
+        <GrupoFiltros titulo="Categoría">
+          {/* En móvil solo el nombre World Boxing (U15, U17, U19, Elite); la
+              equivalencia FECHIBOX —útil pero larga— aparece en escritorio, que
+              es donde hay ancho de sobra. Las planillas impresas la siguen
+              llevando siempre. */}
+          {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <Filtro key={a.key} n={c} label={<>{a.label}<span className="hidden lg:inline"> · {FECHIBOX_LABEL[a.key] || a.label}</span></>} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
+          {invalidCount > 0 && <Filtro n={invalidCount} label="Inválidos" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
+        </GrupoFiltros>
       </div>
-      {showFaltantes && <div className="border border-orange-500/30 bg-orange-900/10 rounded-2xl px-3 py-2 fade-in">
-        <p className="text-orange-400 text-sm">Peleadores sin compromiso todavía: ni un cruce en el VS ni un puesto en el Super 4. Aún no hay un contrincante compatible (peso, sexo y categoría de edad World Boxing). Sus datos quedan guardados a la espera de un rival. Quien ya está en el Super 4 no aparece aquí: tiene sus peleas del torneo.</p>
-      </div>}
       {/* Móvil: búsqueda arriba y filtros abajo, como siempre. Escritorio
           (lg): todo en una sola fila-herramienta para liberar alto visual. */}
       <div className="space-y-3 lg:space-y-0 lg:flex lg:gap-2 lg:items-stretch">
