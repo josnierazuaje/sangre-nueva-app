@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ticketQty } from "../constants.js";
 import Badge from "./Badge.jsx";
 
 // ============================================
@@ -16,6 +17,8 @@ export default function CheckInWelcome({ ticket, ticketTypeInfo, onClose }) {
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(28px,7vw,40px)", letterSpacing: "0.04em", color: "#e8ddd0", lineHeight: 1.1, marginTop: "6px" }}>¡BIENVENIDO A<br />LA VELADA!</div>
       <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "22px", color: "#e8ddd0", marginTop: "16px" }}>{ticket.attendeeName}</div>
       <div style={{ marginTop: "12px" }}><Badge color={ticketTypeInfo.color}>{ticketTypeInfo.icon} {ticketTypeInfo.label} · #{ticket.id}</Badge></div>
+      {ticketQty(ticket) > 1 &&
+        <div style={{ marginTop: "14px", fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(20px,5vw,28px)", letterSpacing: "0.06em", color: "#e3c07a" }}>👥 ADMITE {ticketQty(ticket)} PERSONAS</div>}
       {/* Único protagonista de la pantalla: el CTA carmesí del sistema */}
       <button onClick={onClose} type="button" className="btn-primary active:scale-95 transition-transform" style={{ marginTop: "36px", padding: "14px 40px", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em", cursor: "pointer" }}>Escanear siguiente</button>
     </div>

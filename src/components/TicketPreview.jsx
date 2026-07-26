@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { TICKET_TYPES_V2, fmt$ } from "../constants.js";
+import { TICKET_TYPES_V2, fmt$, ticketQty, ticketUnitPrice } from "../constants.js";
 import { waChatUrl } from "../lib/whatsapp.js";
 import { buildVoucherFile, voucherFileName } from "../lib/voucher.js";
 import Badge from "./Badge.jsx";
@@ -12,6 +12,10 @@ const WA_PATH = "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.
 
 export default function TicketPreview({ ticket }) {
   const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === ticket.ticketType) || TICKET_TYPES_V2[0];
+  // Cantidad de entradas de la boleta (1 en boletas viejas) y precio por
+  // entrada, derivado del total guardado.
+  const qty = ticketQty(ticket);
+  const unit = ticketUnitPrice(ticket);
   const qrData = location.origin + location.pathname + "?ticket=" + encodeURIComponent(ticket.id) + (ticket.token ? "&t=" + encodeURIComponent(ticket.token) : "");
   const busyRef = useRef(false);
   const listoRef = useRef(null);   // voucher ya dibujado, listo para compartir al instante
@@ -20,7 +24,7 @@ export default function TicketPreview({ ticket }) {
   const archivo = voucherFileName(ticket);
   // Pie de foto que acompaña a la imagen en la hoja de compartir del celular.
   // Viaja PEGADO al archivo, no en el enlace: o llegan los dos o no llega nada.
-  const shareText = "Sangre Nueva - La Velada\nEntrada: " + ticketTypeInfo.label + "\nBoleta: #" + ticket.id + "\nA nombre de: " + ticket.attendeeName + "\n\nPresenta este codigo QR en la entrada.";
+  const shareText = "Sangre Nueva - La Velada\n" + (qty > 1 ? "Entradas: " + qty + " x " + ticketTypeInfo.label : "Entrada: " + ticketTypeInfo.label) + "\nBoleta: #" + ticket.id + "\nA nombre de: " + ticket.attendeeName + "\n\nPresenta este codigo QR en la entrada.";
   // Mismo símbolo que la píldora de la tarjeta en pantalla (✓ / ●).
   const estadoTexto = ticket.status === "ingresado" ? "✓ INGRESADO" : "● ACTIVO";
   const estadoColor = ticket.status === "ingresado" ? "#4ADE80" : "#FCD34D";
@@ -154,7 +158,8 @@ export default function TicketPreview({ ticket }) {
           <div className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96} /></div>
           <div className="flex-1 space-y-2">
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Boleta</span><span className="font-black text-white text-base" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "1px" }}>#{ticket.id}</span></div>
-            <div className="flex justify-between"><span className="text-gray-400 text-sm">Precio</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmt$(ticket.price)}</span></div>
+            {qty > 1 && <div className="flex justify-between"><span className="text-gray-400 text-sm">Cantidad</span><span className="text-white text-sm font-semibold">{qty} entradas · {fmt$(unit)} c/u</span></div>}
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">{qty > 1 ? "Total" : "Precio"}</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmt$(ticket.price)}</span></div>
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Pago</span><span className="text-white text-sm">{ticket.paymentMethod}</span></div>
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Estado</span>
               <Badge variant="filled" color={estadoColor}>{ticket.status === "ingresado" ? "✓ Ingresado" : "● Activo"}</Badge>
