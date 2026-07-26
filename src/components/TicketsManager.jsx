@@ -15,15 +15,16 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     // de verdad llena el recinto); el check-in sigue en boletas (un escaneo por
     // boleta). La recaudación suma `price` (que ya es el total de la boleta).
     const byType = {}, byPayment = {}, peopleByType = {};
-    let people = 0;
+    let people = 0, peopleCheckedIn = 0;
     tickets.forEach(t => {
       const q = ticketQty(t);
       byType[t.ticketType] = (byType[t.ticketType] || 0) + 1;
       peopleByType[t.ticketType] = (peopleByType[t.ticketType] || 0) + q;
       people += q;
+      if (t.status === "ingresado") peopleCheckedIn += q;
       byPayment[t.paymentMethod] = (byPayment[t.paymentMethod] || 0) + t.price;
     });
-    return { total: tickets.length, people, revenue: tickets.reduce((s, t) => s + t.price, 0), byType, peopleByType, byPayment, checkedIn: tickets.filter(t => t.status === "ingresado").length };
+    return { total: tickets.length, people, peopleCheckedIn, revenue: tickets.reduce((s, t) => s + t.price, 0), byType, peopleByType, byPayment, checkedIn: tickets.filter(t => t.status === "ingresado").length };
   }, [tickets]);
 
   // El id se genera con un contador transaccional en Firebase (atómico entre
@@ -106,17 +107,20 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
         <div className="kpi-tile order-3 p-4" style={{ "--c": "#22C55E" }}>
           <div className="flex justify-between items-baseline">
             <span className="text-[14px] font-semibold uppercase tracking-[0.26em]" style={{ color: "rgba(34,197,94,0.8)" }}>Check-in</span>
-            <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.checkedIn}<span className="font-normal" style={{ opacity: 0.35 }}> / {kpis.total}</span></span>
+            {/* Personas que han entrado (suma de cantidades de las boletas
+                ingresadas) sobre el total de personas esperadas. */}
+            <span className="text-boxing-cream text-xl font-semibold" style={{ fontVariantNumeric: "tabular-nums" }}>{kpis.peopleCheckedIn}<span className="font-normal" style={{ opacity: 0.35 }}> / {kpis.people}</span></span>
           </div>
+          <p className="text-[12px] text-boxing-muted mt-0.5 tracking-[0.16em] uppercase">personas dentro</p>
           <div className="belt-bar mt-2.5">
-            {kpis.checkedIn > 0 && <span className="belt-seg transition-all duration-700" style={{ width: (kpis.total ? kpis.checkedIn / kpis.total * 100 : 0) + "%", background: "linear-gradient(90deg,#16a34a,#4ade80)" }} />}
+            {kpis.peopleCheckedIn > 0 && <span className="belt-seg transition-all duration-700" style={{ width: (kpis.people ? kpis.peopleCheckedIn / kpis.people * 100 : 0) + "%", background: "linear-gradient(90deg,#16a34a,#4ade80)" }} />}
           </div>
           <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2.5">
             <span className="inline-flex items-center gap-1.5 text-[14px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#22C55E" }} />Ingresados <b className="text-boxing-cream font-semibold">{kpis.checkedIn}</b>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#22C55E" }} />Ingresados <b className="text-boxing-cream font-semibold">{kpis.peopleCheckedIn}</b>
             </span>
             <span className="inline-flex items-center gap-1.5 text-[14px] uppercase tracking-[0.14em] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#6b5f6e" }} />Pendientes <b className="text-boxing-cream font-semibold">{kpis.total - kpis.checkedIn}</b>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#6b5f6e" }} />Pendientes <b className="text-boxing-cream font-semibold">{kpis.people - kpis.peopleCheckedIn}</b>
             </span>
           </div>
         </div>

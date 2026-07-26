@@ -112,6 +112,10 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
 
   const checked = tickets.filter(t => t.status === "ingresado");
   const pending = tickets.filter(t => t.status === "activo");
+  // Personas (no boletas): una boleta de grupo mete/deja pendientes a varias.
+  // El conteo de boletas se conserva como dato secundario abajo.
+  const peopleIn = checked.reduce((s, t) => s + ticketQty(t), 0);
+  const peoplePending = pending.reduce((s, t) => s + ticketQty(t), 0);
   const checkedInLog = useMemo(() => [...checked].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)), [checked]);
   if (justCheckedIn) {
     const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === justCheckedIn.ticketType) || TICKET_TYPES_V2[0];
@@ -121,12 +125,14 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-2xl p-3 text-center border" style={{ background: "linear-gradient(158deg, rgba(34,197,94,0.08), transparent 48%), linear-gradient(168deg, #14101a, #0b090c)", borderColor: "rgba(34,197,94,0.25)" }}>
-          <p className="text-2xl font-black text-green-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{checked.length}</p>
-          <p className="text-[14px] text-boxing-muted uppercase tracking-[0.18em]">Ingresados</p>
+          <p className="text-2xl font-black text-green-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{peopleIn}</p>
+          <p className="text-[14px] text-boxing-muted uppercase tracking-[0.18em]">Personas dentro</p>
+          <p className="text-[12px] text-boxing-muted mt-0.5" style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{checked.length} boleta{checked.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="rounded-2xl p-3 text-center border" style={{ background: "linear-gradient(158deg, rgba(245,158,11,0.08), transparent 48%), linear-gradient(168deg, #14101a, #0b090c)", borderColor: "rgba(245,158,11,0.25)" }}>
-          <p className="text-2xl font-black text-yellow-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{pending.length}</p>
-          <p className="text-[14px] text-boxing-muted uppercase tracking-[0.18em]">Pendientes</p>
+          <p className="text-2xl font-black text-yellow-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{peoplePending}</p>
+          <p className="text-[14px] text-boxing-muted uppercase tracking-[0.18em]">Por entrar</p>
+          <p className="text-[12px] text-boxing-muted mt-0.5" style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{pending.length} boleta{pending.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
       {scanning && <div className="rounded-2xl overflow-hidden relative scale-in" style={{ border: "1px solid rgba(220,38,38,0.4)" }}>
@@ -185,7 +191,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         <div className="space-y-1.5">{checkedInLog.map(t => {
           const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
           const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "--:--";
-          return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span></div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[14px] text-gray-500">{time}</span><span className="text-[14px] text-green-400">#{t.id}</span></div></div>;
+          return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span>{ticketQty(t) > 1 && <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: "#e3c07a" }}>×{ticketQty(t)}</span>}</div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[14px] text-gray-500">{time}</span><span className="text-[14px] text-green-400">#{t.id}</span></div></div>;
         })}</div>
       </div>}
     </div>
