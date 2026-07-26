@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken } from "../constants.js";
+import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty } from "../constants.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
 export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken }) {
@@ -147,6 +147,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
       </form>
       {result && result !== "notfound" && (() => {
         const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === result.ticketType) || TICKET_TYPES_V2[0];
+        const cantidad = ticketQty(result);
         const inAt = result.checkedInAt ? new Date(result.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : null;
         // QR falsificado: el token no coincide con la boleta. Se bloquea el
         // ingreso; si de verdad es el dueño, el staff puede validar a mano.
@@ -165,6 +166,8 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
               <span className="text-3xl">{result.status === "ingresado" ? "✅" : "🎫"}</span>
               <div><p className="text-white font-bold">{result.attendeeName}</p><p className="text-sm text-gray-400">#{result.id} · <span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.label}</span></p></div>
             </div>
+            {cantidad > 1 &&
+              <p className="text-center font-black py-2 rounded-lg" style={{ background: "rgba(200,160,74,0.14)", color: "#e3c07a", letterSpacing: "0.04em" }}>👥 Admite {cantidad} personas</p>}
             {verify === "warn" && result.status === "activo" &&
               <p className="text-yellow-300/90 text-sm text-center py-1.5 rounded-lg" style={{ background: "rgba(245,158,11,0.1)" }}>⚠️ Sin verificación por QR — coteja la identidad antes de marcar</p>}
             {result.status === "ingresado"

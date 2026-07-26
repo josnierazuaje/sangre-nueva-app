@@ -121,6 +121,32 @@ export const TICKET_TYPES_V2 = [
 export const PAYMENT_METHODS_V2 = ["Efectivo", "Transferencia", "Otro"];
 export const MAX_CAP = 320;
 
+// Cuántas entradas se pueden cobrar en UNA sola boleta. Tope generoso para un
+// grupo/familia en la puerta; más que eso conviene emitir dos boletas. La
+// boleta guarda `quantity` y su `price` es el TOTAL (precio_unitario × cantidad),
+// así la recaudación —que suma price— sale correcta sin tocar nada más.
+export const MAX_TICKET_QTY = 20;
+// Redondea y acota una cantidad tecleada/pasada al rango válido [1, MAX]. Pura
+// y testeable: la usa el alta de boletas como última defensa aunque el paso
+// (stepper) de la venta ya no deje salirse del rango.
+export function clampTicketQty(q) {
+  const n = Math.round(Number(q));
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(MAX_TICKET_QTY, n));
+}
+// Precio por entrada de una boleta: el total dividido entre la cantidad. Para
+// boletas viejas (sin `quantity`) la cantidad es 1, así que devuelve el precio
+// tal cual. Se deriva del total guardado (no del precio actual del tipo) para
+// que una boleta emitida antes de un cambio de tarifa siga cuadrando.
+export function ticketUnitPrice(ticket) {
+  const q = (ticket && ticket.quantity) || 1;
+  return q > 0 ? Math.round((ticket.price || 0) / q) : (ticket.price || 0);
+}
+// Cantidad de entradas que ampara una boleta (compat: sin campo = 1).
+export function ticketQty(ticket) {
+  return (ticket && ticket.quantity) || 1;
+}
+
 // Helpers
 export function getWeightCategory(kg, sexo) {
   const list = (sexo || "M") === "F" ? WEIGHT_CATEGORIES_F : WEIGHT_CATEGORIES_M;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { TICKET_TYPES_V2, PAYMENT_METHODS_V2, fmt$ } from "../constants.js";
+import { TICKET_TYPES_V2, PAYMENT_METHODS_V2, MAX_TICKET_QTY, fmt$ } from "../constants.js";
 import { PREFIJO_CL, telefonoIngresado } from "../lib/whatsapp.js";
 import TicketPreview from "./TicketPreview.jsx";
 
@@ -12,10 +12,14 @@ export default function SellView({ onAdd }) {
   const [nameError, setNameError] = useState("");
   const [phone, setPhone] = useState(PREFIJO_CL);
   const [type, setType] = useState("preventa");
+  const [qty, setQty] = useState(1);
   const [method, setMethod] = useState("Efectivo");
   const [last, setLast] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === type);
+  // Total en vivo: precio del tipo elegido × cantidad. Es lo que se cobra y lo
+  // que se guarda como `price` de la boleta.
+  const total = ticketTypeInfo.price * qty;
   async function submit(e) {
     e.preventDefault();
     if (submitting) return;
@@ -26,8 +30,8 @@ export default function SellView({ onAdd }) {
     setNameError("");
     setSubmitting(true);
     try {
-      const t = await onAdd({ attendeeName: trimmedName, phone: telefonoIngresado(phone), ticketType: type, paymentMethod: method });
-      setLast(t); setName(""); setPhone(PREFIJO_CL);
+      const t = await onAdd({ attendeeName: trimmedName, phone: telefonoIngresado(phone), ticketType: type, paymentMethod: method, quantity: qty });
+      setLast(t); setName(""); setPhone(PREFIJO_CL); setQty(1);
     } finally {
       setSubmitting(false);
     }
@@ -90,6 +94,26 @@ export default function SellView({ onAdd }) {
             ))}
           </div>
         </div>
+        <div><label className={lbl}>Cantidad</label>
+          {/* Stepper sobrio (− n +) y, a la derecha, el cobro que se actualiza
+              al instante: arriba la multiplicación, abajo el total en oro. Con
+              una boleta se cobra ese tipo N veces (grupo/familia). */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Quitar una entrada"
+                className="w-11 h-11 rounded-full border text-2xl leading-none font-bold flex items-center justify-center active:scale-95 disabled:opacity-30 transition-all"
+                style={{ borderColor: "rgba(255,255,255,0.14)", color: "#e8ddd0", background: "#1c1620" }}>−</button>
+              <span className="text-2xl font-black text-boxing-cream w-9 text-center" style={{ fontVariantNumeric: "tabular-nums" }} aria-live="polite">{qty}</span>
+              <button type="button" onClick={() => setQty(q => Math.min(MAX_TICKET_QTY, q + 1))} disabled={qty >= MAX_TICKET_QTY} aria-label="Agregar una entrada"
+                className="w-11 h-11 rounded-full border text-2xl leading-none font-bold flex items-center justify-center active:scale-95 disabled:opacity-30 transition-all"
+                style={{ borderColor: "rgba(255,255,255,0.14)", color: "#e8ddd0", background: "#1c1620" }}>+</button>
+            </div>
+            <div className="text-right leading-tight">
+              <div className="text-[14px] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>{qty} × {fmt$(ticketTypeInfo.price)}</div>
+              <div className="titulo-oro text-2xl" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt$(total)}</div>
+            </div>
+          </div>
+        </div>
         <div><label className={lbl}>Método de pago</label>
           <div className="flex gap-2">
             {PAYMENT_METHODS_V2.map(m => (
@@ -101,7 +125,7 @@ export default function SellView({ onAdd }) {
         {/* La campana de la venta: único glow permanente del panel. */}
         <button type="submit" disabled={submitting} className="btn-primary w-full py-3.5 font-black"
           style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px", fontVariantNumeric: "tabular-nums" }}>
-          {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(ticketTypeInfo.price)}
+          {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(total) + (qty > 1 ? " (" + qty + ")" : "")}
         </button>
       </form>
       {last && <div ref={voucherRef} className="space-y-2 fade-in"><p className="text-[14px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview key={last.id} ticket={last} /></div>}

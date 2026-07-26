@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TICKET_TYPES_V2, fmt$ } from "../constants.js";
+import { TICKET_TYPES_V2, fmt$, ticketQty } from "../constants.js";
 import Badge from "./Badge.jsx";
 import { normName } from "../lib/dedup.js";
 
@@ -43,7 +43,7 @@ export default function HistoryView({ tickets, onDelete }) {
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: ticketTypeInfo.color + "18" }}>{ticketTypeInfo.icon}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold truncate">{t.attendeeName}</p>
-                <p className="text-gray-500 text-[14px]">#{t.id} · {t.paymentMethod}</p>
+                <p className="text-gray-500 text-[14px]">#{t.id} · {t.paymentMethod}{ticketQty(t) > 1 ? " · ×" + ticketQty(t) : ""}</p>
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold" style={{ color: ticketTypeInfo.color }}>{fmt$(t.price)}</p>

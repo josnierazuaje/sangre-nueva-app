@@ -11,7 +11,7 @@
 //  · Cero dependencias nuevas: en la puerta del recinto la app carga con red
 //    mala, y ya son 700 KB de firebase + react.
 import QRCode from "qrcode";
-import { fmt$ } from "../constants.js";
+import { fmt$, ticketQty, ticketUnitPrice } from "../constants.js";
 
 // Dibuja un rectángulo redondeado (roundRect no existe en navegadores viejos).
 function roundRect(ctx, x, y, w, h, r) {
@@ -59,9 +59,15 @@ export async function buildVoucherCanvas({ ticket, tipo, qrData, estadoTexto, es
       await document.fonts.ready;
     } catch { /* si falla, se dibuja con lo que haya */ }
   }
+  // Cantidad de entradas y precio unitario: si la boleta cubre varias, se
+  // añade una fila ("Entradas: N × $u") y una de "Total", así que el alto sube
+  // para que la píldora de Estado y el pie no crucen esas filas de más.
+  const qty = ticketQty(ticket);
+  const unit = ticketUnitPrice(ticket);
   // Alto suficiente para que la línea del pie NO cruce el QR ni la píldora de
-  // Estado: QR 90→202, píldora 189→210, línea del pie en 222.
-  const W = 920, H = 250, ESC = 3;          // 2760×750 px reales: nítido en WhatsApp
+  // Estado: QR 90→202, píldora 189→210, línea del pie en 222. Con cantidad >1
+  // hay una fila extra, así que el alto sube a 278.
+  const W = 920, H = qty > 1 ? 278 : 250, ESC = 3;   // 2760×750 px reales: nítido en WhatsApp
   const PAD = 26;
   const col = tipo.color;
   const canvas = document.createElement("canvas");
@@ -120,11 +126,20 @@ export async function buildVoucherCanvas({ ticket, tipo, qrData, estadoTexto, es
   ctx.drawImage(qrCanvas, qrX + qrPad, qrY + qrPad, qrBox - qrPad * 2, qrBox - qrPad * 2);
 
   // ---- Filas: etiqueta a la izquierda, valor a la derecha ----
-  const filas = [
-    ["Boleta", "#" + ticket.id, "#f2edf4", "400 24px 'Bebas Neue', sans-serif"],
-    ["Precio", fmt$(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
-    ["Pago", ticket.paymentMethod || "", "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
-  ];
+  // Con cantidad >1 se desglosa: "Entradas: N × $u" y "Total". Con una sola,
+  // la fila de siempre "Precio".
+  const filas = qty > 1
+    ? [
+        ["Boleta", "#" + ticket.id, "#f2edf4", "400 24px 'Bebas Neue', sans-serif"],
+        ["Entradas", qty + " × " + fmt$(unit), "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
+        ["Total", fmt$(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
+        ["Pago", ticket.paymentMethod || "", "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
+      ]
+    : [
+        ["Boleta", "#" + ticket.id, "#f2edf4", "400 24px 'Bebas Neue', sans-serif"],
+        ["Precio", fmt$(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
+        ["Pago", ticket.paymentMethod || "", "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
+      ];
   const labelX = qrX + qrBox + 26;
   const valueX = W - PAD;
   let y = 114;

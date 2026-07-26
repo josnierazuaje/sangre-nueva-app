@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken } from "../constants.js";
+import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken, clampTicketQty } from "../constants.js";
 import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode } from "../lib/storage.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
@@ -22,9 +22,14 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === data.ticketType);
     const prefix = ticketTypeInfo.label.substring(0, 3).toUpperCase();
     const id = await nextTicketId(data.ticketType, prefix, tickets);
+    // Una sola boleta puede cubrir varias entradas (grupo/familia): `quantity`
+    // guarda cuántas y `price` es el TOTAL (unitario × cantidad). Así la
+    // recaudación —que suma price— cuadra sin tocar el resto. Se acota por si
+    // llegara un valor fuera de rango (última defensa; el stepper ya lo limita).
+    const quantity = clampTicketQty(data.quantity);
     // token: acompaña al id en el QR para que el check-in pueda distinguir una
     // boleta legítima de un correlativo adivinado (ver verifyTicketToken).
-    const newT = { ...data, id, token: genTicketToken(), price: ticketTypeInfo.price, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
+    const newT = { ...data, id, token: genTicketToken(), quantity, price: ticketTypeInfo.price * quantity, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
     setTickets([...tickets, newT]);
     addTicketNode(newT);
     return newT;

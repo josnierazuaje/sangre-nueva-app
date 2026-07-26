@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractTicketData, extractTicketCode, verifyTicketToken, genTicketToken } from "../../constants.js";
+import { extractTicketData, extractTicketCode, verifyTicketToken, genTicketToken, clampTicketQty, ticketUnitPrice, ticketQty, MAX_TICKET_QTY } from "../../constants.js";
 
 const ORIGIN = "https://sangre-nueva-la-velada.pages.dev/";
 
@@ -60,6 +60,47 @@ describe("verifyTicketToken", () => {
   });
   it("boleta inexistente → bad", () => {
     expect(verifyTicketToken(null, "K7QX9M", false)).toBe("bad");
+  });
+});
+
+describe("clampTicketQty (cantidad de entradas por boleta)", () => {
+  it("acota por debajo a 1", () => {
+    expect(clampTicketQty(0)).toBe(1);
+    expect(clampTicketQty(-5)).toBe(1);
+  });
+  it("acota por arriba al máximo", () => {
+    expect(clampTicketQty(MAX_TICKET_QTY + 10)).toBe(MAX_TICKET_QTY);
+  });
+  it("redondea decimales", () => {
+    expect(clampTicketQty(2.4)).toBe(2);
+    expect(clampTicketQty(2.6)).toBe(3);
+  });
+  it("valores inválidos → 1", () => {
+    expect(clampTicketQty(undefined)).toBe(1);
+    expect(clampTicketQty(null)).toBe(1);
+    expect(clampTicketQty("abc")).toBe(1);
+    expect(clampTicketQty(NaN)).toBe(1);
+  });
+  it("deja pasar un valor válido intermedio", () => {
+    expect(clampTicketQty(3)).toBe(3);
+  });
+});
+
+describe("ticketQty / ticketUnitPrice (compat con boletas viejas)", () => {
+  it("boleta sin quantity → 1 entrada, precio unitario = price", () => {
+    const t = { price: 7000 };
+    expect(ticketQty(t)).toBe(1);
+    expect(ticketUnitPrice(t)).toBe(7000);
+  });
+  it("boleta con quantity → precio unitario derivado del total", () => {
+    const t = { price: 21000, quantity: 3 };
+    expect(ticketQty(t)).toBe(3);
+    expect(ticketUnitPrice(t)).toBe(7000);
+  });
+  it("no divide por cero si quantity fuese 0 (defensivo)", () => {
+    const t = { price: 5000, quantity: 0 };
+    expect(ticketQty(t)).toBe(1);        // 0 → compat, cuenta como 1
+    expect(ticketUnitPrice(t)).toBe(5000);
   });
 });
 
