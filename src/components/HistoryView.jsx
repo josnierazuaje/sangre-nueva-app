@@ -2,6 +2,9 @@ import { useState, useMemo } from "react";
 import { TICKET_TYPES_V2, fmt$, ticketQty } from "../constants.js";
 import Badge from "./Badge.jsx";
 import { normName } from "../lib/dedup.js";
+import { buildEntradasCsv, buildEntradasHtml } from "../lib/entradasReporte.js";
+import { printHtml } from "../lib/printHtml.js";
+import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 
 export default function HistoryView({ tickets, onDelete }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,6 +21,24 @@ export default function HistoryView({ tickets, onDelete }) {
     if (statusFilter !== "all") r = r.filter(t => t.status === statusFilter);
     return r;
   }, [tickets, searchQuery, typeFilter, statusFilter]);
+  // Registro para imprimir/exportar: el MISMO conjunto que se ve (con los
+  // filtros activos) pero en orden cronológico (de la 1ª boleta a la última),
+  // como se lee una hoja de cierre. `filtered` viene al revés (la más nueva
+  // arriba), así que se invierte.
+  const paraReporte = useMemo(() => [...filtered].reverse(), [filtered]);
+  function subtituloReporte() {
+    const partes = [];
+    if (typeFilter !== "all") { const t = TICKET_TYPES_V2.find(x => x.key === typeFilter); if (t) partes.push(t.label); }
+    if (statusFilter !== "all") partes.push(statusFilter === "ingresado" ? "Solo ingresados" : "Solo activas");
+    if (searchQuery.trim()) partes.push(`Búsqueda: "${searchQuery.trim()}"`);
+    const base = partes.length ? partes.join(" · ") : "Todas las entradas";
+    return `${base} — impreso ${new Date().toLocaleDateString("es-CL")}`;
+  }
+  function imprimirRegistro() { printHtml(buildEntradasHtml(paraReporte, subtituloReporte())); }
+  function descargarRegistro() {
+    const fecha = new Date().toLocaleDateString("es-CL").replace(/\//g, "-");
+    downloadBytes(buildEntradasCsv(paraReporte, subtituloReporte()), csvFilename("Entradas Sangre Nueva", fecha), CSV_MIME);
+  }
   if (!tickets.length) return <div className="text-center py-12"><div className="text-5xl mb-3">🎫</div><p className="text-gray-400 text-sm">No hay entradas emitidas aún</p></div>;
   return (
     <div className="space-y-3">
@@ -32,6 +53,12 @@ export default function HistoryView({ tickets, onDelete }) {
           <option value="activo">● Activo</option>
           <option value="ingresado">✓ Ingresado</option>
         </select>
+      </div>
+      {/* Imprimir la hoja final del registro y bajar el CSV para Google Sheets,
+          igual que en Cartelera. Se exporta lo que se ve (con los filtros). */}
+      <div className="flex gap-2">
+        <button onClick={imprimirRegistro} title="Imprimir la hoja final del registro de entradas (o guardar como PDF)" className="btn-gold flex-1 font-bold py-2.5 text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase">🖨️ Imprimir</button>
+        <button onClick={descargarRegistro} title="Descargar el registro para abrir y editar en Google Sheets o Numbers (archivo CSV)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-2xl text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">📊 Google Sheets</button>
       </div>
       <p className="text-[14px] text-gray-500">{filtered.length} entrada{filtered.length !== 1 ? "s" : ""}</p>
       {/* Móvil: lista vertical. Escritorio: 2 columnas de boletas. */}
