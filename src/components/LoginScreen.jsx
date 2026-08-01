@@ -4,8 +4,8 @@ import { FB } from "../lib/firebase.js";
 
 // PANTALLA DE INICIO DE SESIÓN
 // ============================================
-export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+export default function LoginScreen({ scanMode = false, initialEmail = "" }) {
+  const [email, setEmail] = useState(initialEmail);
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,18 +35,19 @@ export default function LoginScreen() {
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ width: "86px", height: "auto", display: "block", margin: "0 auto 10px", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))" }} />
           <div className="marca-oro" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "28px", letterSpacing: "0.14em", lineHeight: 1 }}>SANGRE NUEVA</div>
           <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "14.5px", color: "rgba(200,160,74,0.9)", marginTop: "3px" }}>La Velada</div>
-          <div className="mt-3 text-[14px] font-semibold text-boxing-muted tracking-[0.3em] uppercase">Acceso privado</div>
+          <div className="mt-3 text-[14px] font-semibold text-boxing-muted tracking-[0.3em] uppercase">{scanMode ? "Escáner de entradas" : "Acceso privado"}</div>
+          {scanMode && <p className="mt-2 text-[13px] text-boxing-muted/90 leading-snug">Ingresa la clave del escáner para validar entradas en la puerta.</p>}
         </div>
         <div><label className="block text-[14px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Correo</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" className="input-ink w-full px-3 py-2.5 text-base" /></div>
-        <div><label className="block text-[14px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">Contraseña</label>
-          <input type="password" value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password" className="input-ink w-full px-3 py-2.5 text-base" /></div>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required readOnly={scanMode} autoComplete="username" className={"input-ink w-full px-3 py-2.5 text-base" + (scanMode ? " opacity-70" : "")} /></div>
+        <div><label className="block text-[14px] font-semibold text-boxing-muted mb-1.5 tracking-[0.3em] uppercase">{scanMode ? "Clave del escáner" : "Contraseña"}</label>
+          <input type="password" value={pass} onChange={e => setPass(e.target.value)} required autoFocus={scanMode} autoComplete="current-password" className="input-ink w-full px-3 py-2.5 text-base" /></div>
         {err && <p className="text-red-400 text-sm">{err}</p>}
         {resetSent && <p className="text-green-400 text-sm">Te enviamos un correo para restablecer tu contraseña.</p>}
         <button type="submit" disabled={loading} className="btn-primary w-full py-3.5" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "20px", letterSpacing: "0.1em" }}>
-          {loading ? "Entrando..." : "Iniciar Sesión"}
+          {loading ? "Entrando..." : (scanMode ? "Entrar a escanear" : "Iniciar Sesión")}
         </button>
-        <button type="button" onClick={resetPw} className="w-full text-center text-boxing-muted text-sm tracking-wide hover:text-boxing-goldFight transition-colors">¿Olvidaste tu contraseña?</button>
+        {!scanMode && <button type="button" onClick={resetPw} className="w-full text-center text-boxing-muted text-sm tracking-wide hover:text-boxing-goldFight transition-colors">¿Olvidaste tu contraseña?</button>}
       </form>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
+import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
 import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
@@ -41,6 +41,11 @@ export default function App() {
   const [ticketsNew, setTicketsNew] = useState([]);
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
+  // MODO ESCÁNER (staff de la puerta): el enlace "?scan=1" abre la app SOLO en
+  // la pantalla de escanear, sin peleadores ni ventas. Se recuerda por
+  // dispositivo (localStorage) para que aguante recargas y el reabrir la PWA.
+  const scanParam = useMemo(() => new URLSearchParams(location.search).has("scan"), []);
+  const [scanMode] = useState(() => scanParam || localStorage.getItem("bm_scan_mode") === "1");
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
   const [editF, setEditF] = useState(null);
   // Protección contra borrado accidental: al eliminar un peleador se guarda por
@@ -83,6 +88,16 @@ export default function App() {
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
     location.reload();
+  }
+  // Recuerda el modo escáner en el dispositivo (sobrevive recargas / reabrir),
+  // para que el enlace "?scan=1" no haya que volver a pasarlo.
+  useEffect(() => { if (scanParam) { try { localStorage.setItem("bm_scan_mode", "1"); } catch (e) {} } }, [scanParam]);
+  // Salir del modo escáner: olvida el modo, quita el "?scan" de la URL y cierra
+  // sesión (logout ya limpia lo local y recarga limpio → vuelve al login normal).
+  function salirEscaner() {
+    try { localStorage.removeItem("bm_scan_mode"); } catch (e) {}
+    try { history.replaceState({}, "", location.pathname); } catch (e) {}
+    logout();
   }
   // "Recargar desde la nube": arreglo de un clic para el usuario. Borra los
   // datos locales de este dispositivo y recarga, así la app vuelve a bajar la
@@ -420,7 +435,35 @@ export default function App() {
   const syncLabel = <>{syncDot}{sync === "on" ? "Sincronizado" : sync === "connecting" ? "Conectando…" : sync === "error" ? "Error" : "Nube"}</>;
 
   if (authUser === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em" }}>Cargando…</div>;
-  if (authUser === null) return <LoginScreen />;
+  if (authUser === null) return <LoginScreen scanMode={scanMode} initialEmail={scanMode ? SCANNER_EMAIL : ""} />;
+
+  // Modo escáner: chrome mínimo (marca + Salir) y SOLO la pantalla de escanear.
+  // Nada de sidebar, navegación, KPIs ni otras vistas — el staff de la puerta
+  // solo puede escanear/validar entradas. La cuenta compartida por debajo puede
+  // más, pero aquí no hay forma de llegar a peleadores ni ventas.
+  if (scanMode) return (
+    <div className="app-root max-w-[512px] mx-auto flex flex-col" style={{ minHeight: "100vh" }}>
+      <header style={{ flexShrink: 0, borderBottom: "1px solid #2a1f2e", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-40px", left: "50%", transform: "translateX(-50%)", width: "320px", height: "160px", background: "radial-gradient(ellipse, rgba(155,26,42,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div className="flex justify-between items-center px-3 pt-2" style={{ position: "relative" }}>
+          <button onClick={toggleSync} className={syncBtnCls}>{syncLabel}</button>
+          <button onClick={salirEscaner} title="Salir del modo escáner y cerrar sesión" className="text-[14px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>
+        </div>
+        <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>
+          <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "52px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 8px 20px rgba(155,26,42,0.4))" }} />
+          <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "22px", letterSpacing: "0.12em", lineHeight: 1, marginTop: "4px" }}>SANGRE NUEVA</div>
+          <div className="text-[14px] font-semibold text-boxing-muted tracking-[0.3em] uppercase" style={{ marginTop: "3px" }}>Escáner de entradas</div>
+        </div>
+      </header>
+      <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="max-w-lg mx-auto">
+          <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
+            <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} scanOnly initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />
+          </Suspense>
+        </div>
+      </main>
+    </div>
+  );
 
   return (
     // Móvil (por defecto): columna centrada de 512px (max-w-lg), idéntica a

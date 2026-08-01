@@ -42,6 +42,14 @@ function parseFbConfigKeyValue(t) {
 
 export const OWNER_EMAIL = "josnier.azuaje@gmail.com";
 
+// Cuenta compartida de ESCÁNER para el staff de la puerta. El enlace "?scan=1"
+// abre la app directo en la pantalla de escanear y precarga este correo, para
+// que el staff solo teclee la clave compartida. Esta cuenta debe existir en
+// Firebase (Authentication) y su UID estar en la lista blanca /staff — así las
+// reglas le permiten leer boletas y marcar ingresos, pero el modo escáner le
+// oculta todo lo demás. La clave NO va en el código: la comparte el dueño.
+export const SCANNER_EMAIL = "escaner@sangrenueva.app";
+
 export function initFirebaseApp(cfg) {
   if (!cfg || !cfg.apiKey || !cfg.databaseURL) return false;
   FB.app = getApps().length ? getApp() : initializeApp(cfg);
