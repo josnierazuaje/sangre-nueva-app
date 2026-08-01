@@ -21,6 +21,10 @@ export function downloadBytes(bytes, filename, mime = "application/octet-stream"
 // Tipo MIME oficial de los libros de Excel. Sin esto macOS puede abrir el
 // archivo con la app equivocada.
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+// Tipo MIME de una planilla CSV. Es el formato que Google Sheets y Numbers
+// abren/importan sin problemas en una Mac sin Excel de pago (a diferencia del
+// .xlsx, que daba líos al editar y descargar).
+export const CSV_MIME = "text/csv;charset=utf-8";
 // Tipo MIME del PDF de llaves del Super 4. Con esto WhatsApp y el celular lo
 // reconocen como documento y lo abren en el visor en vez de ofrecer guardarlo
 // como archivo desconocido.
@@ -35,3 +39,4 @@ function safeFilename(base, fecha, ext) {
 }
 export function xlsxFilename(base, fecha) { return safeFilename(base, fecha, "xlsx"); }
 export function pdfFilename(base, fecha) { return safeFilename(base, fecha, "pdf"); }
+export function csvFilename(base, fecha) { return safeFilename(base, fecha, "csv"); }

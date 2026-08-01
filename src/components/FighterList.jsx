@@ -5,8 +5,8 @@ import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
 import { waChatUrl } from "../lib/whatsapp.js";
 import { printHtml } from "../lib/printHtml.js";
-import { buildFightersXlsx } from "../lib/xlsxPlanillas.js";
-import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
+import { buildFightersCsv } from "../lib/csvPlanillas.js";
+import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
 
 // Un filtro de la banda: la cifra en oro y la etiqueta en blanco, sin píldora.
@@ -88,15 +88,15 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
     return (filtros.length ? filtros.join(" · ") : "Todos los peleadores") + ` — ${filtered.length} peleador${filtered.length !== 1 ? "es" : ""}`;
   }
 
-  // La misma lista en Excel editable, con peso, edad y peleas como números de
-  // verdad (se puede ordenar y filtrar) y la columna "Rival propuesto" en
-  // blanco para anotar a mano.
-  function excelList() {
+  // La misma lista como CSV editable (Google Sheets / Numbers), con peso, edad
+  // y peleas como números de verdad (se puede ordenar y filtrar) y la columna
+  // "Rival propuesto" en blanco para anotar a mano.
+  function descargarPlanilla() {
     const fecha = new Date().toLocaleDateString("es-CL");
     downloadBytes(
-      buildFightersXlsx(filtered, subtituloFiltros()),
-      xlsxFilename("Peleadores Sangre Nueva", fecha.replace(/\//g, "-")),
-      XLSX_MIME,
+      buildFightersCsv(filtered, subtituloFiltros()),
+      csvFilename("Peleadores Sangre Nueva", fecha.replace(/\//g, "-")),
+      CSV_MIME,
     );
   }
 
@@ -186,7 +186,7 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-ink px-2 py-2 text-sm"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
         <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="btn-gold px-3 py-2 text-sm">🖨️</button>
-        <button onClick={excelList} title="Descargar la lista visible en Excel para editarla (Numbers, Excel o Google Sheets)" className="px-3 py-2 text-sm rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
+        <button onClick={descargarPlanilla} title="Descargar la lista visible para editarla en Google Sheets o Numbers (archivo CSV)" className="px-3 py-2 text-sm rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
       </div>
       </div>
       {/* Móvil: lista vertical de siempre. Escritorio: cuadrícula de 2
