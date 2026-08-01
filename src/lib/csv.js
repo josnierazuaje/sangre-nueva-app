@@ -13,9 +13,19 @@
 // compatible entre programas de planilla).
 
 // Convierte un valor de celda a su forma segura para CSV.
+//
+// Anti "inyección de fórmulas": Google Sheets/Excel/Numbers interpretan como
+// FÓRMULA cualquier celda que empiece con = + - @ (o tab/retorno). Un nombre de
+// asistente tecleado como "=1+1", o un teléfono "+569..." puesto en el campo del
+// nombre, saldría evaluado y corrompería la planilla (o, con =HYPERLINK/IMPORTXML,
+// filtraría datos). Se antepone un apóstrofo, que esos programas tratan como
+// "texto literal" y no muestran. Los NÚMEROS no se tocan (nunca son fórmula y así
+// se mantienen numéricos para sumar/ordenar en la hoja).
 export function csvCell(v) {
   if (v == null) return "";
-  const s = String(v);
+  if (typeof v === "number") return String(v);
+  let s = String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 

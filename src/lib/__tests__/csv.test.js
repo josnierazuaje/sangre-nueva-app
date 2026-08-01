@@ -15,6 +15,26 @@ describe("csvCell (escapado RFC 4180)", () => {
   it("con salto de línea → entrecomillado", () => expect(csvCell("linea1\nlinea2")).toBe('"linea1\nlinea2"'));
 });
 
+describe("csvCell — anti inyección de fórmulas", () => {
+  it("celda que empieza con = , + , - o @ → apóstrofo delante", () => {
+    expect(csvCell("=1+1")).toBe("'=1+1");
+    expect(csvCell("+56912345678")).toBe("'+56912345678");
+    expect(csvCell("-5")).toBe("'-5");
+    expect(csvCell("@sistema")).toBe("'@sistema");
+  });
+  it("fórmula con coma: primero el apóstrofo, luego el entrecomillado", () => {
+    expect(csvCell('=HYPERLINK("x","y")')).toBe('"\'=HYPERLINK(""x"",""y"")"');
+  });
+  it("un número NO se toca (sigue siendo numérico, aunque sea negativo)", () => {
+    expect(csvCell(-5)).toBe("-5");
+    expect(csvCell(7000)).toBe("7000");
+  });
+  it("un nombre normal no se altera", () => {
+    expect(csvCell("Pérez")).toBe("Pérez");
+    expect(csvCell("José Ramón")).toBe("José Ramón");
+  });
+});
+
 describe("toCsv", () => {
   it("filas separadas por CRLF y celdas por coma", () => {
     expect(toCsv([["a", "b"], ["c", "d"]])).toBe("a,b\r\nc,d");
