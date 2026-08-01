@@ -6,7 +6,7 @@ import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
 import PageHeader from "./PageHeader.jsx";
 
-export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken }) {
+export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken, scanOnly = false }) {
   const [subView, setSubView] = useState(initialTicketCode ? "checkin" : "sell");
   const kpis = useMemo(() => {
     // Dos conteos que ya NO son lo mismo: `total` cuenta BOLETAS (documentos),
@@ -63,6 +63,10 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     removeTicketNode(id);
   }
   const tabs = [{ k: "sell", label: "Vender" }, { k: "history", label: "Historial" }, { k: "checkin", label: "Check-in" }];
+  // Modo escáner (staff de la puerta): SOLO la pantalla de escanear/validar, sin
+  // KPIs de recaudación ni las pestañas de vender/historial. Reusa el mismo
+  // check-in transaccional (checkIn) del resto de la app.
+  if (scanOnly) return <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} />;
   return (
     // En escritorio se centra con un ancho controlado: los KPIs y las
     // sub-vistas (vender/historial/check-in) no se estiran de más.
