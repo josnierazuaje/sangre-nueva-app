@@ -90,8 +90,12 @@ export default function App() {
     location.reload();
   }
   // Recuerda el modo escáner en el dispositivo (sobrevive recargas / reabrir),
-  // para que el enlace "?scan=1" no haya que volver a pasarlo.
-  useEffect(() => { if (scanParam) { try { localStorage.setItem("bm_scan_mode", "1"); } catch (e) {} } }, [scanParam]);
+  // para que el enlace "?scan=1" no haya que volver a pasarlo. IMPORTANTE: solo
+  // se persiste cuando YA hay sesión iniciada. Si se guardara con solo abrir el
+  // enlace (sin loguearse), el dueño que abre "?scan=1" para probarlo quedaría
+  // atrapado en el login del escáner en ese dispositivo (el login de escáner no
+  // tiene forma de volver al normal salvo el enlace de escape de abajo).
+  useEffect(() => { if (scanParam && authUser) { try { localStorage.setItem("bm_scan_mode", "1"); } catch (e) {} } }, [scanParam, authUser]);
   // Salir del modo escáner: olvida el modo, quita el "?scan" de la URL y cierra
   // sesión (logout ya limpia lo local y recarga limpio → vuelve al login normal).
   function salirEscaner() {

@@ -48,6 +48,10 @@ export default function LoginScreen({ scanMode = false, initialEmail = "" }) {
           {loading ? "Entrando..." : (scanMode ? "Entrar a escanear" : "Iniciar Sesión")}
         </button>
         {!scanMode && <button type="button" onClick={resetPw} className="w-full text-center text-boxing-muted text-sm tracking-wide hover:text-boxing-goldFight transition-colors">¿Olvidaste tu contraseña?</button>}
+        {/* Salida del modo escáner desde el login: olvida el modo en este
+            dispositivo y vuelve al acceso normal. Es la vía para el dueño que
+            abrió "?scan=1" por error y no tiene la clave del escáner. */}
+        {scanMode && <button type="button" onClick={() => { try { localStorage.removeItem("bm_scan_mode"); } catch (e) {} location.href = location.pathname; }} className="w-full text-center text-boxing-muted text-sm tracking-wide hover:text-boxing-goldFight transition-colors">Acceso normal (no soy del staff)</button>}
       </form>
     </div>
   );
