@@ -2,8 +2,8 @@ import { getCategoryInfo, EVENT_LABELS } from "../constants.js";
 import { forcedPairingReasons } from "../lib/matchmaking.js";
 import { buildCarteleraHtml, carteleraGroups } from "../lib/printCartelera.js";
 import { printHtml } from "../lib/printHtml.js";
-import { buildCarteleraXlsx } from "../lib/xlsxPlanillas.js";
-import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
+import { buildCarteleraCsv } from "../lib/csvPlanillas.js";
+import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
 import PageHeader from "./PageHeader.jsx";
@@ -21,9 +21,10 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
   const conflicts = matchupConflicts(matchups, fighters, super4FighterIds(super4));
   const conflictLines = [...conflicts.huerfanas, ...conflicts.super4, ...conflicts.edadMixta, ...conflicts.mismaEscuela, ...conflicts.experiencia];
   // (Se quitó el botón de WhatsApp: mandaba la cartelera como texto plano, que
-  // se desarma en el chat y no se puede corregir. La descarga en Excel cumple
-  // mejor esa función —se adjunta al chat, se ve como planilla y el que la
-  // recibe puede editarla— así que la cabecera queda con Imprimir y Excel.)
+  // se desarma en el chat y no se puede corregir. La descarga como planilla
+  // cumple mejor esa función —se adjunta al chat, se ve como planilla y el que
+  // la recibe puede editarla— así que la cabecera queda con Imprimir y la
+  // planilla para Google Sheets.)
   // Abre una ventana con una tabla imprimible (N°/Escuela/Atleta/VS/Atleta/
   // Escuela/Peso/Nota) y dispara el diálogo de impresión del navegador —
   // desde ahí se puede imprimir directo o guardar como PDF. Las peleas se
@@ -34,19 +35,19 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
   function printSheet() {
     printHtml(buildCarteleraHtml(matchups, fighters));
   }
-  // Descarga la MISMA planilla como archivo de Excel editable. En la mesa de
-  // control siempre hay cambios de último minuto (un atleta que no llega, un
-  // peso que cambia en la balanza): así se corrige en Numbers/Excel/Google
-  // Sheets y se imprime desde ahí, sin volver a entrar a la app. El PDF no se
-  // puede editar sin programas de pago.
-  function downloadExcel() {
+  // Descarga la MISMA planilla como CSV editable (se abre/importa en Google
+  // Sheets o Numbers). En la mesa de control siempre hay cambios de último
+  // minuto (un atleta que no llega, un peso que cambia en la balanza): así se
+  // corrige en la hoja de cálculo y se imprime desde ahí, sin volver a entrar a
+  // la app. El PDF no se puede editar sin programas de pago.
+  function descargarPlanilla() {
     // Cuenta las peleas que REALMENTE salen en la planilla: las que tienen
     // rival eliminado se filtran, así que matchups.length mentiría.
     const n = carteleraGroups(matchups, fighters).reduce((s, g) => s + g.list.length, 0);
     downloadBytes(
-      buildCarteleraXlsx(matchups, fighters, `${eventDate} · ${n} pelea${n === 1 ? "" : "s"}`),
-      xlsxFilename("Cartelera Sangre Nueva", new Date().toLocaleDateString("es-CL").replace(/\//g, "-")),
-      XLSX_MIME,
+      buildCarteleraCsv(matchups, fighters, `${eventDate} · ${n} pelea${n === 1 ? "" : "s"}`),
+      csvFilename("Cartelera Sangre Nueva", new Date().toLocaleDateString("es-CL").replace(/\//g, "-")),
+      CSV_MIME,
     );
   }
   return (
@@ -67,7 +68,7 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
             planilla editable en Excel, que es la que se comparte por chat. */}
         <div className="flex gap-2 p-3 border-b border-white/5">
           <button onClick={printSheet} title="Imprimir o guardar como PDF" className="btn-gold flex-1 font-bold py-3 text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase">{"🖨️"} Imprimir</button>
-          <button onClick={downloadExcel} title="Descargar la cartelera en Excel para editarla (Numbers, Excel o Google Sheets)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">{"📊"} Excel</button>
+          <button onClick={descargarPlanilla} title="Descargar la cartelera para abrir y editar en Google Sheets o Numbers (archivo CSV)" className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">{"📊"} Google Sheets</button>
         </div>
         {/* Aviso de peleas con problemas, visible donde se imprime la planilla */}
         {conflictLines.length > 0 && <div className="bg-red-900/30 border-b border-red-500/40 p-3 space-y-1">

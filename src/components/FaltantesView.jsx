@@ -3,8 +3,8 @@ import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants
 import { save } from "../lib/storage.js";
 import { forcedMatchAll } from "../lib/matchmaking.js";
 import { committedFighterIds } from "../lib/super4.js";
-import { buildFaltantesXlsx } from "../lib/xlsxPlanillas.js";
-import { downloadBytes, xlsxFilename, XLSX_MIME } from "../lib/download.js";
+import { buildFaltantesCsv } from "../lib/csvPlanillas.js";
+import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import VSCard from "./VSCard.jsx";
 import PageHeader from "./PageHeader.jsx";
 
@@ -83,14 +83,14 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
   // mano (otro rival, kilos pactados, exhibición). Hoja "Forzadas" con lo que
   // le falta a cada una y una columna en blanco para la corrección, y hoja
   // "Sin rival" con los que quedaron sueltos.
-  function excel() {
+  function descargarPlanilla() {
     const fecha = new Date().toLocaleDateString("es-CL");
     const sub = `${forced.length} pelea${forced.length === 1 ? "" : "s"} forzada${forced.length === 1 ? "" : "s"}` +
       (faltantes.length ? ` · ${faltantes.length} sin rival` : "");
     downloadBytes(
-      buildFaltantesXlsx(forced, faltantes, fighters, sub),
-      xlsxFilename("Faltantes Sangre Nueva", fecha.replace(/\//g, "-")),
-      XLSX_MIME,
+      buildFaltantesCsv(forced, faltantes, fighters, sub),
+      csvFilename("Faltantes Sangre Nueva", fecha.replace(/\//g, "-")),
+      CSV_MIME,
     );
   }
 
@@ -131,9 +131,9 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
       </div>}
 
       {/* Descarga editable: lo mismo que se ve aquí, para corregirlo a mano en
-          Numbers / Excel / Google Sheets (igual que en la pestaña Cartelera). */}
-      {(forced.length > 0 || faltantes.length > 0) && !forcing && <button onClick={excel} title="Descargar en Excel para corregir los emparejamientos a mano (Numbers, Excel o Google Sheets)" className="block w-full lg:max-w-xl lg:mx-auto py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">
-        {"📊"} Excel editable
+          Google Sheets o Numbers (igual que en la pestaña Cartelera). */}
+      {(forced.length > 0 || faltantes.length > 0) && !forcing && <button onClick={descargarPlanilla} title="Descargar para corregir los emparejamientos a mano en Google Sheets o Numbers (archivo CSV)" className="block w-full lg:max-w-xl lg:mx-auto py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 tracking-[0.14em] uppercase transition-colors">
+        {"📊"} Google Sheets
       </button>}
 
       {/* Peleas forzadas ya creadas (también viven en el VS y la cartelera) */}
