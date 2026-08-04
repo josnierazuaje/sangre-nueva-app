@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty } from "../constants.js";
+import { fetchTicket } from "../lib/storage.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
-export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken }) {
+export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken, ticketsEstado = "listo" }) {
   const [input, setInput] = useState(initialCode ? initialCode.toUpperCase() : "");
   const [result, setResult] = useState(null);
   const [verify, setVerify] = useState("ok"); // "ok" | "warn" | "bad" (ver verifyTicketToken)
@@ -10,8 +11,14 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   const [actionErr, setActionErr] = useState("");
   const [already, setAlready] = useState(false); // otra puerta ya marcó este ingreso
   const [justCheckedIn, setJustCheckedIn] = useState(null);
+  // El ingreso se aplicó aquí pero el servidor aún no lo confirmó (sin señal).
+  // Se dice en la pantalla de bienvenida para que el portero no crea que ya
+  // está a salvo en la nube — el reintento es automático.
+  const [pendiente, setPendiente] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState("");
+  // Consultando esa boleta en la nube (no está en la copia de este aparato).
+  const [buscando, setBuscando] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -21,22 +28,36 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // evitamos activar una cámara que el usuario ya canceló (o que quedó
   // esperando en un componente ya desmontado).
   const scanRequestRef = useRef(null);
+  // ¿Se usó el escáner en esta sesión? Decide si tras marcar un ingreso la
+  // cámara se reabre sola (ver closeWelcome).
+  const usoEscanerRef = useRef(false);
   // jsQR (≈130 KB) se carga bajo demanda al escanear, no en el bundle inicial:
   // un organizador que solo registra peleadores nunca lo descarga.
   const jsQRRef = useRef(null);
 
   // manual=true cuando el operador tecleó el id (no escaneó): vía de confianza
   // del staff. En un escaneo (manual=false) el token del QR debe coincidir.
-  function lookup(code, token, manual) {
+  async function lookup(code, token, manual) {
     setActionErr(""); setAlready(false);
-    const f = tickets.find(t => t.id.toUpperCase() === String(code).trim().toUpperCase());
-    if (!f) { setResult("notfound"); setVerify("ok"); return; }
-    setResult(f); setVerify(verifyTicketToken(f, token, manual));
+    const buscado = String(code).trim().toUpperCase();
+    const f = tickets.find(t => t.id.toUpperCase() === buscado);
+    if (f) { setResult(f); setVerify(verifyTicketToken(f, token, manual)); return; }
+    // No está en la copia local. Antes se declaraba "no encontrada" aquí mismo,
+    // sin distinguir tres situaciones muy distintas para el portero:
+    if (ticketsEstado === "sin-permiso") { setResult("sin-permiso"); setVerify("ok"); return; }
+    // Puede que las boletas aún estén bajando (o que esta se vendiera en otro
+    // teléfono hace un segundo): se pregunta por ella directamente a la nube.
+    setBuscando(true);
+    const remota = await fetchTicket(buscado);
+    setBuscando(false);
+    if (remota) { setResult(remota); setVerify(verifyTicketToken(remota, token, manual)); return; }
+    setResult(ticketsEstado === "cargando" ? "cargando" : "notfound");
+    setVerify("ok");
   }
   function search(e) { e.preventDefault(); lookup(input, null, true); }
   async function doIn() {
     if (checking) return;
-    if (!(result && result !== "notfound" && result.status === "activo" && verify !== "bad")) return;
+    if (!(result && typeof result === "object" && result.status === "activo" && verify !== "bad")) return;
     setChecking(true); setActionErr("");
     const res = await onCheckIn(result.id);
     setChecking(false);
@@ -47,11 +68,22 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
       return;
     }
     if (!res || res.error) { setActionErr("No se pudo marcar el ingreso. Revisa la conexión y reintenta."); return; }
-    // res.ok (confirmado en el servidor) o res.offline (optimista, sin red)
+    // res.ok (confirmado en el servidor), res.pendiente (sin señal: quedó en
+    // cola y se reintenta solo) o res.offline (este aparato no usa la nube).
     const updated = { ...result, status: "ingresado", checkedInAt: res.ticket?.checkedInAt || new Date().toISOString() };
-    setResult(updated); setJustCheckedIn(updated);
+    setResult(updated); setJustCheckedIn(updated); setPendiente(!!(res.pendiente || res.offline));
   }
-  function closeWelcome() { setJustCheckedIn(null); setResult(null); setInput(""); setVerify("ok"); setAlready(false); setActionErr(""); }
+  // Al despachar a un asistente se vuelve a abrir la cámara sola: "Escanear
+  // siguiente" antes solo cerraba la pantalla y había que tocar de nuevo
+  // "📷 Escanear QR" y esperar a que arrancara la cámara — cuatro toques por
+  // persona y cientos de arranques a lo largo de la noche.
+  // Solo se reabre si en esta sesión ya se usó el escáner: a quien valida
+  // siempre a mano no se le debe saltar el permiso de cámara sin pedirlo.
+  function closeWelcome() {
+    setJustCheckedIn(null); setResult(null); setInput(""); setVerify("ok");
+    setAlready(false); setActionErr(""); setPendiente(false);
+    if (usoEscanerRef.current) startScan();
+  }
 
   function stopScan() {
     scanRequestRef.current = null;
@@ -80,6 +112,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   }
   function startScan() {
     setScanErr(""); setResult(null);
+    usoEscanerRef.current = true;
     // Carga el lector de QR bajo demanda, en paralelo mientras el usuario
     // concede el permiso de cámara. Si falla, queda "Validar manualmente".
     if (!jsQRRef.current) import("jsqr").then(m => { jsQRRef.current = m.default; }).catch(e => setScanErr("No se pudo cargar el lector de QR. Usa 'Validar manualmente'. " + e.message));
@@ -119,7 +152,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   const checkedInLog = useMemo(() => [...checked].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)), [checked]);
   if (justCheckedIn) {
     const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === justCheckedIn.ticketType) || TICKET_TYPES_V2[0];
-    return <CheckInWelcome ticket={justCheckedIn} ticketTypeInfo={ticketTypeInfo} onClose={closeWelcome} />;
+    return <CheckInWelcome ticket={justCheckedIn} ticketTypeInfo={ticketTypeInfo} onClose={closeWelcome} pendiente={pendiente} />;
   }
   return (
     <div className="space-y-4">
@@ -151,7 +184,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
           <button type="submit" className="btn-gold px-4 py-2.5 text-sm font-bold tracking-[0.14em] uppercase">Buscar</button>
         </div>
       </form>
-      {result && result !== "notfound" && (() => {
+      {/* `result` puede ser la boleta (objeto) o un estado ("notfound",
+          "cargando", "sin-permiso"): solo el objeto pinta la tarjeta. */}
+      {result && typeof result === "object" && (() => {
         const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === result.ticketType) || TICKET_TYPES_V2[0];
         const cantidad = ticketQty(result);
         const inAt = result.checkedInAt ? new Date(result.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : null;
@@ -186,6 +221,17 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
           </div>
         );
       })()}
+      {buscando && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(200,160,74,0.07)", border: "1px solid rgba(200,160,74,0.22)" }}><p className="text-boxing-cream font-bold">Consultando la boleta…</p></div>}
+      {/* Tres avisos distintos donde antes había uno solo. "No encontrada" ahora
+          significa de verdad que no existe: las otras dos causas (todavía
+          cargando, o esta cuenta sin permiso para leer las boletas) se dicen
+          aparte para que nadie rechace en la puerta una entrada legítima. */}
+      {result === "cargando" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
+        <p className="text-yellow-300 font-bold">⏳ Todavía cargando las entradas</p>
+        <p className="text-gray-400 text-sm mt-1">No la rechaces: espera unos segundos con señal y vuelve a escanear.</p></div>}
+      {result === "sin-permiso" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.45)" }}>
+        <p className="text-red-400 font-bold">⚠️ Esta cuenta no puede leer las entradas</p>
+        <p className="text-gray-300 text-sm mt-1">No es culpa de la boleta. Avísale al organizador para que dé permiso a esta cuenta.</p></div>}
       {result === "notfound" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-sm mt-1">Verifica el número ingresado</p></div>}
       {checkedInLog.length > 0 && <div><p className="text-[14px] text-boxing-muted uppercase tracking-[0.22em] mb-2">Registro de ingresos ({checkedInLog.length})</p>
         <div className="space-y-1.5">{checkedInLog.map(t => {

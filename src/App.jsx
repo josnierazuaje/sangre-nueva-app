@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
-import { reconcileData } from "./lib/dedup.js";
+import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -39,6 +39,10 @@ export default function App() {
   const [matchups, setMatchups] = useState([]);
   const [super4, setSuper4] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
+  // "cargando" | "listo" | "sin-permiso": lo usa la puerta para no decir
+  // "Boleta no encontrada" cuando en realidad las entradas aún están bajando o
+  // esta cuenta no tiene permiso para leerlas.
+  const [ticketsEstado, setTicketsEstado] = useState("cargando");
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   // MODO ESCÁNER (staff de la puerta): el enlace "?scan=1" abre la app SOLO en
@@ -74,6 +78,18 @@ export default function App() {
   const [cloudMode, setCloudMode] = useState(null);
   const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
   const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
+  // Todo lo que este dispositivo tiene SIN CONFIRMAR en la nube: altas de
+  // peleadores y ventas de entradas. Las dos colas viven en localStorage, así
+  // que las dos mueren si se borran los datos locales — por eso logout y
+  // "Recargar desde la nube" avisan antes, diciendo QUÉ se perdería.
+  function pendientesLocales() {
+    const peleadores = outboxList().length;
+    const ventas = ticketsOutboxList().length;
+    const partes = [];
+    if (peleadores) partes.push(peleadores + " registro(s) de peleador");
+    if (ventas) partes.push(ventas + " venta(s) de entrada");
+    return { total: peleadores + ventas, detalle: partes.join(" y ") };
+  }
   // Al cerrar sesión: borra los datos locales sensibles (un dispositivo perdido
   // no debe conservarlos legibles sin login) y recarga para partir de un estado
   // limpio en el próximo inicio (evita listeners de sync colgados tras re-login).
@@ -83,8 +99,8 @@ export default function App() {
     // hay altas aún sin subir a la nube (típico sin conexión), avisamos antes
     // de que se pierdan en silencio. Sin este guard, el "✓ guardado" inmediato
     // podría mentir: se dio por guardado algo que este borrado destruiría.
-    const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\nSi cierras sesión ahora, se PERDERÁN.\n\nEspera a que el chip de arriba diga "Sincronizado" antes de cerrar sesión. Si dice "Conectando…", revisa tu internet; si dice "Error", revisa tus permisos.\n\n¿Cerrar sesión de todos modos?`)) return;
+    const { total, detalle } = pendientesLocales();
+    if (total && !confirm(`Tienes ${detalle} que TODAVÍA no se guardaron en la nube.\n\nSi cierras sesión ahora, se PERDERÁN.\n\nEspera a que el chip de arriba diga "Sincronizado" antes de cerrar sesión. Si dice "Conectando…", revisa tu internet; si dice "Error", revisa tus permisos.\n\n¿Cerrar sesión de todos modos?`)) return;
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
     location.reload();
@@ -113,8 +129,8 @@ export default function App() {
     if (cloudMode !== true || !FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
     // Igual que en logout: recargar desde la nube BORRA lo local (incluido el
     // outbox), así que unas altas sin subir se perderían. Avisamos primero.
-    const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que esos ${pend} registro(s) se PERDERÍAN.\n\nEspera a que el chip de arriba diga "Sincronizado" (si dice "Error", revisa tus permisos) y luego recarga.\n\n¿Recargar de todos modos?`)) return;
+    const { total, detalle } = pendientesLocales();
+    if (total && !confirm(`Tienes ${detalle} que TODAVÍA no se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que se PERDERÍAN.\n\nEspera a que el chip de arriba diga "Sincronizado" (si dice "Error", revisa tus permisos) y luego recarga.\n\n¿Recargar de todos modos?`)) return;
     if (!confirm("¿Recargar los datos desde la nube?\n\nSe reemplazan los datos de ESTE dispositivo con la copia compartida en la nube. Útil si ves algo que no cuadra (por ejemplo, un peleador que aparece al registrar pero no en la lista).\n\nNo afecta la nube ni a otros dispositivos.")) return;
     clearLocalEventData();
     location.reload();
@@ -138,7 +154,15 @@ export default function App() {
   // en su lugar, migra (si hace falta) y escucha los nodos individuales de
   // boletas para que varios dispositivos vendiendo a la vez no se pisen.
   function startTicketsSync() {
-    migrateTicketsIfNeeded().then(() => watchTickets(setTicketsNew));
+    migrateTicketsIfNeeded().then(() => {
+      watchTickets(setTicketsNew, setTicketsEstado);
+      // Re-sube las ventas que quedaron sin confirmar (típico: se vendió sin
+      // señal y la app se recargó, o el sistema mató la PWA mientras el
+      // vendedor mandaba el voucher por WhatsApp). Crea solo lo que falta en la
+      // nube, así que es seguro repetirlo; watchTickets refresca la lista al
+      // confirmarse cada escritura.
+      replayTicketsOutbox().catch(e => console.error("No se pudieron recuperar las ventas pendientes:", e));
+    });
   }
 
   function toggleSync() {
@@ -188,6 +212,7 @@ export default function App() {
     } else {
       setCloudMode(false);
       setAuthUser(null);
+      setTicketsEstado("listo"); // modo solo-local: lo local es toda la verdad
     }
   }, []);
 
@@ -202,13 +227,33 @@ export default function App() {
   // garantizado — reconciliar sobre un estado parcial podría eliminar al
   // registro equivocado y propagar el error a todos los dispositivos); en
   // modo solo-local, corre de inmediato porque lo local es toda la verdad.
-  const reconcileEnabled = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups && hydrated.super4);
+  // En modo nube SOLO reconcilia el DUEÑO, y nunca en modo escáner: los 2-4
+  // teléfonos de la puerta no tienen por qué escribir jamás en el padrón ni en
+  // la cartelera (el modo escáner limitaba la pantalla, pero este efecto corría
+  // igual porque el early-return del escáner está en el render, no aquí).
+  // En modo solo-local sí corre siempre: ahí lo local es toda la verdad y no
+  // hay nadie a quien pisar.
+  const reconcileEnabled = !scanMode && (cloudMode === false || (cloudMode === true && isOwner && hydrated.fighters && hydrated.matchups && hydrated.super4));
   useEffect(() => {
     if (!reconcileEnabled || !fighters.length) return;
-    const { dedupedFighters, cleanedMatchups, cleanedSuper4, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
-    if (fightersChanged) { setFighters(dedupedFighters); save("bm_fighters_v4", dedupedFighters); console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es)."); }
-    if (matchupsChanged) { setMatchups(cleanedMatchups); save("bm_matchups_v3", cleanedMatchups); }
-    if (super4Changed) { setSuper4(cleanedSuper4); save("bm_super4_v1", cleanedSuper4); }
+    const { dedupedFighters, cleanedMatchups, cleanedSuper4, idMap, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
+    // Local primero (optimista) y a la nube por TRANSACCIÓN: la limpieza se
+    // vuelve a aplicar sobre el estado fresco del servidor, así no borra lo que
+    // otro dispositivo acaba de registrar (antes se reescribía el nodo entero
+    // con esta copia, que podía estar atrasada).
+    if (fightersChanged) {
+      setFighters(dedupedFighters); saveLocal("bm_fighters_v4", dedupedFighters);
+      reconcileNodeTx("bm_fighters_v4", arr => dedupeFighters(arr, matchups, super4).fighters, merged => setFighters(normalizeFighters(merged)));
+      console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es).");
+    }
+    if (matchupsChanged) {
+      setMatchups(cleanedMatchups); saveLocal("bm_matchups_v3", cleanedMatchups);
+      reconcileNodeTx("bm_matchups_v3", arr => cleanMatchups(arr, idMap), merged => setMatchups(merged));
+    }
+    if (super4Changed) {
+      setSuper4(cleanedSuper4); saveLocal("bm_super4_v1", cleanedSuper4);
+      reconcileNodeTx("bm_super4_v1", arr => remapSuper4(arr, idMap), merged => setSuper4(normalizeSuper4(merged)));
+    }
   }, [fighters, matchups, super4, reconcileEnabled]);
 
   // AUTO-REPARO de "fantasmas": una sola vez por sesión, al conectar y recibir
@@ -462,7 +507,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="max-w-lg mx-auto">
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
-            <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} scanOnly initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />
+            <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} ticketsEstado={ticketsEstado} scanOnly initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />
           </Suspense>
         </div>
       </main>
@@ -575,7 +620,7 @@ export default function App() {
             {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
             {view === "faltante" && <FaltantesView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
             {view === "card" && <FightCardView matchups={matchups} fighters={fighters} super4={super4} />}
-            {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
+            {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} ticketsEstado={ticketsEstado} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
           </Suspense>
         </div>
       </main>

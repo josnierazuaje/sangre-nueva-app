@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -38,6 +38,123 @@ describe("outbox de peleadores (escrituras que sobreviven a la recarga)", () => 
   it("SEGURIDAD: mergePending con listas nulas no explota", () => {
     expect(mergePending(null, null)).toEqual([]);
     expect(mergePending([A], null)).toEqual([A]);
+  });
+});
+
+describe("outbox de BOLETAS (ventas que sobreviven a la recarga)", () => {
+  const V1 = { id: "PRE-0001", attendeeName: "Ana", price: 7000, status: "activo", createdAt: "2026-08-04T10:00:00.000Z" };
+  const V2 = { id: "PRE-0002", attendeeName: "Beto", price: 7000, status: "activo", createdAt: "2026-08-04T11:00:00.000Z" };
+
+  describe("stripLocalFlags", () => {
+    it("quita las marcas internas y deja el resto intacto", () => {
+      expect(stripLocalFlags({ ...V1, _queuedAt: 123, _pending: true })).toEqual(V1);
+    });
+    it("no explota con valores raros", () => {
+      expect(stripLocalFlags(null)).toBe(null);
+      expect(stripLocalFlags("x")).toBe("x");
+    });
+  });
+
+  describe("mergePendingTickets", () => {
+    it("agrega la venta pendiente que la nube todavía no tiene, marcada", () => {
+      const out = mergePendingTickets([V1], [{ ...V2, _queuedAt: 1 }]);
+      expect(out).toHaveLength(2);
+      const pend = out.find(t => t.id === V2.id);
+      expect(pend._pending).toBe(true);
+      expect(pend._queuedAt).toBeUndefined();
+    });
+    it("CLAVE: nunca pisa la versión de la nube — un pendiente viejo NO revierte un check-in", () => {
+      const enLaNube = { ...V1, status: "ingresado", checkedInAt: "2026-08-04T20:00:00.000Z" };
+      const pendienteViejo = { ...V1, status: "activo", _queuedAt: 1 };
+      const out = mergePendingTickets([enLaNube], [pendienteViejo]);
+      expect(out).toHaveLength(1);
+      expect(out[0].status).toBe("ingresado");
+      expect(out[0]._pending).toBeUndefined();
+    });
+    it("sin pendientes devuelve la lista de la nube tal cual", () => {
+      expect(mergePendingTickets([V1, V2], [])).toEqual([V1, V2]);
+    });
+    it("SEGURIDAD: listas nulas no explotan", () => {
+      expect(mergePendingTickets(null, null)).toEqual([]);
+      expect(mergePendingTickets(null, [{ ...V1, _queuedAt: 1 }])).toHaveLength(1);
+    });
+    it("ignora pendientes sin id", () => {
+      expect(mergePendingTickets([], [{ attendeeName: "sin id" }])).toEqual([]);
+    });
+  });
+
+  it("sortTickets ordena por fecha de creación sin mutar la entrada", () => {
+    const entrada = [V2, V1];
+    expect(sortTickets(entrada).map(t => t.id)).toEqual([V1.id, V2.id]);
+    expect(entrada.map(t => t.id)).toEqual([V2.id, V1.id]);
+    expect(sortTickets(null)).toEqual([]);
+  });
+
+  it("las funciones del outbox de peleadores sirven igual para boletas (por id)", () => {
+    const now = 1_000_000;
+    let cola = applyOutboxPut([], V1, now);
+    cola = applyOutboxPut(cola, V2, now + 1);
+    expect(cola).toHaveLength(2);
+    // reemplaza por id en vez de duplicar (p.ej. reintento de la misma venta)
+    cola = applyOutboxPut(cola, { ...V1, attendeeName: "Ana corregida" }, now + 2);
+    expect(cola).toHaveLength(2);
+    expect(cola.find(t => t.id === V1.id).attendeeName).toBe("Ana corregida");
+    // confirmada en la nube → sale de la cola
+    expect(applyOutboxRemove(cola, V1.id).map(t => t.id)).toEqual([V2.id]);
+    // un pendiente vencido se descarta
+    expect(pruneOutbox([{ ...V1, _queuedAt: now - OUTBOX_TTL_MS - 1 }], now)).toEqual([]);
+  });
+
+  it("un respaldo exportado con ventas pendientes no sube `_pending` a la nube", () => {
+    const { ticketUpdates } = buildTicketRestore([{ ...V1, _pending: true, _queuedAt: 9 }]);
+    expect(ticketUpdates["tickets/" + V1.id]).toEqual(V1);
+  });
+});
+
+describe("check-in — LA regla que decide si una persona entra al recinto", () => {
+  const AHORA = "2026-08-04T20:15:00.000Z";
+  const activa = { id: "PRE-0001", status: "activo", checkedInAt: null, quantity: 2 };
+
+  describe("applyCheckIn", () => {
+    it("boleta activa → pasa a ingresada con la hora, sin tocar lo demás", () => {
+      const out = applyCheckIn(activa, AHORA);
+      expect(out).toEqual({ ...activa, status: "ingresado", checkedInAt: AHORA });
+    });
+    it("CLAVE: una boleta YA ingresada aborta (undefined) — no cuenta doble", () => {
+      expect(applyCheckIn({ ...activa, status: "ingresado" }, AHORA)).toBeUndefined();
+    });
+    it("boleta anulada aborta", () => {
+      expect(applyCheckIn({ ...activa, status: "anulado" }, AHORA)).toBeUndefined();
+    });
+    it("nodo inexistente aborta (no crea boletas de la nada)", () => {
+      expect(applyCheckIn(null, AHORA)).toBeUndefined();
+      expect(applyCheckIn(undefined, AHORA)).toBeUndefined();
+    });
+    it("no muta la boleta original", () => {
+      const orig = { ...activa };
+      applyCheckIn(orig, AHORA);
+      expect(orig).toEqual(activa);
+    });
+  });
+
+  describe("interpretCheckIn (veredicto que ve el portero)", () => {
+    const ingresada = { id: "PRE-0001", status: "ingresado", checkedInAt: AHORA };
+    it("transacción confirmada y quedó ingresada → ok", () => {
+      expect(interpretCheckIn(true, ingresada)).toEqual({ ok: true, ticket: ingresada });
+    });
+    it("abortada porque otra puerta la marcó antes → already", () => {
+      const r = interpretCheckIn(false, ingresada);
+      expect(r.already).toBe(true);
+      expect(r.ticket).toEqual(ingresada);
+    });
+    it("boleta inexistente → error", () => {
+      expect(interpretCheckIn(false, null).error).toBeInstanceOf(Error);
+    });
+    it("boleta anulada → error (no la deja entrar)", () => {
+      const r = interpretCheckIn(false, { id: "PRE-0001", status: "anulado" });
+      expect(r.error).toBeInstanceOf(Error);
+      expect(r.ok).toBeUndefined();
+    });
   });
 });
 

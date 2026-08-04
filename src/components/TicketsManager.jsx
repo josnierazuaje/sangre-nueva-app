@@ -6,7 +6,7 @@ import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
 import PageHeader from "./PageHeader.jsx";
 
-export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken, scanOnly = false }) {
+export default function TicketsManager({ tickets, setTickets, initialTicketCode, initialTicketToken, scanOnly = false, ticketsEstado = "listo" }) {
   const [subView, setSubView] = useState(initialTicketCode ? "checkin" : "sell");
   const kpis = useMemo(() => {
     // Dos conteos que ya NO son lo mismo: `total` cuenta BOLETAS (documentos),
@@ -52,7 +52,10 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
   // resultado y devuelve el veredicto a la vista para avisar dobles ingresos.
   async function checkIn(id) {
     const res = await checkInTicketTx(id);
-    if (res.ok || res.already || res.offline) {
+    // `pendiente`: sin señal, la transacción quedó en cola y ya se aplicó en
+    // local. La persona entra (parar la fila sería peor) pero la vista lo dice
+    // claramente en ámbar, y el outbox la reintenta hasta confirmarla.
+    if (res.ok || res.already || res.offline || res.pendiente) {
       const checkedInAt = res.ticket?.checkedInAt || new Date().toISOString();
       setTickets(tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t));
     }
@@ -66,7 +69,7 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
   // Modo escáner (staff de la puerta): SOLO la pantalla de escanear/validar, sin
   // KPIs de recaudación ni las pestañas de vender/historial. Reusa el mismo
   // check-in transaccional (checkIn) del resto de la app.
-  if (scanOnly) return <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} />;
+  if (scanOnly) return <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} ticketsEstado={ticketsEstado} />;
   return (
     // En escritorio se centra con un ancho controlado: los KPIs y las
     // sub-vistas (vender/historial/check-in) no se estiran de más.
@@ -135,7 +138,7 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
       </div>
       {subView === "sell" && <SellView onAdd={addTicket} />}
       {subView === "history" && <HistoryView tickets={tickets} onDelete={deleteTicket} />}
-      {subView === "checkin" && <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} />}
+      {subView === "checkin" && <CheckInView tickets={tickets} onCheckIn={checkIn} initialCode={initialTicketCode} initialToken={initialTicketToken} ticketsEstado={ticketsEstado} />}
     </div>
   );
 }

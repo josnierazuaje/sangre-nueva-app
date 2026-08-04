@@ -123,5 +123,9 @@ export function reconcileData(fighters, matchups, super4 = []) {
   const fightersChanged = removed > 0;
   const matchupsChanged = JSON.stringify(cleanedMatchups) !== JSON.stringify(matchups || []);
   const super4Changed = JSON.stringify(cleanedSuper4) !== JSON.stringify(super4 || []);
-  return { dedupedFighters, cleanedMatchups, cleanedSuper4, fightersChanged, matchupsChanged, super4Changed, removedFighters: removed };
+  // `idMap` sale hacia fuera para que la escritura a la nube pueda re-aplicar
+  // la misma limpieza sobre el estado FRESCO del servidor dentro de una
+  // transacción, en vez de sobrescribirlo con esta copia local (ver
+  // reconcileNodeTx en storage.js).
+  return { dedupedFighters, cleanedMatchups, cleanedSuper4, idMap, fightersChanged, matchupsChanged, super4Changed, removedFighters: removed };
 }
