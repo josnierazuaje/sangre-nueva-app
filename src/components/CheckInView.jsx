@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty } from "../constants.js";
+import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty, findTicketByCode } from "../constants.js";
 import { fetchTicket } from "../lib/storage.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
@@ -19,6 +19,9 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   const [scanErr, setScanErr] = useState("");
   // Consultando esa boleta en la nube (no está en la copia de este aparato).
   const [buscando, setBuscando] = useState(false);
+  // Varias boletas comparten el número tecleado (p. ej. PRE-0001 y PUE-0001):
+  // se listan para que el staff elija, en vez de que la app adivine.
+  const [ambiguas, setAmbiguas] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -31,6 +34,10 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // ¿Se usó el escáner en esta sesión? Decide si tras marcar un ingreso la
   // cámara se reabre sola (ver closeWelcome).
   const usoEscanerRef = useRef(false);
+  // Contexto del canvas y marca de la última decodificación: evitan pedir el
+  // contexto y decodificar en cada cuadro (ver tick).
+  const ctxRef = useRef(null);
+  const ultimaLecturaRef = useRef(0);
   // jsQR (≈130 KB) se carga bajo demanda al escanear, no en el bundle inicial:
   // un organizador que solo registra peleadores nunca lo descarga.
   const jsQRRef = useRef(null);
@@ -38,9 +45,10 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // manual=true cuando el operador tecleó el id (no escaneó): vía de confianza
   // del staff. En un escaneo (manual=false) el token del QR debe coincidir.
   async function lookup(code, token, manual) {
-    setActionErr(""); setAlready(false);
-    const buscado = String(code).trim().toUpperCase();
-    const f = tickets.find(t => t.id.toUpperCase() === buscado);
+    setActionErr(""); setAlready(false); setAmbiguas(null);
+    const buscado = String(code == null ? "" : code).trim().toUpperCase();
+    const { ticket: f, ambiguas } = findTicketByCode(tickets, buscado);
+    if (ambiguas) { setAmbiguas(ambiguas); setResult(null); return; }
     if (f) { setResult(f); setVerify(verifyTicketToken(f, token, manual)); return; }
     // No está en la copia local. Antes se declaraba "no encontrada" aquí mismo,
     // sin distinguir tres situaciones muy distintas para el portero:
@@ -81,7 +89,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // siempre a mano no se le debe saltar el permiso de cámara sin pedirlo.
   function closeWelcome() {
     setJustCheckedIn(null); setResult(null); setInput(""); setVerify("ok");
-    setAlready(false); setActionErr(""); setPendiente(false);
+    setAlready(false); setActionErr(""); setPendiente(false); setAmbiguas(null);
     if (usoEscanerRef.current) startScan();
   }
 
@@ -91,24 +99,46 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach(tr => tr.stop()); streamRef.current = null; }
   }
-  function tick() {
+  // Ancho máximo al que se decodifica. Un QR de pantalla de celular se lee de
+  // sobra a 640 px; procesar el cuadro completo solo gasta batería y calienta el
+  // teléfono, que pasa la noche entera en la puerta.
+  const ANCHO_LECTURA = 640;
+  // Intentos de decodificación por segundo. Sin tope, jsQR corría en CADA
+  // cuadro (hasta 60/s) bloqueando el hilo principal, así que la interfaz —y el
+  // propio escaneo— iban a tirones. A 10/s la lectura se siente igual de
+  // inmediata y cuesta una fracción.
+  const MS_ENTRE_LECTURAS = 100;
+  function tick(ahora) {
+    rafRef.current = requestAnimationFrame(tick);
     const v = videoRef.current;
-    if (!v || v.readyState !== v.HAVE_ENOUGH_DATA) { rafRef.current = requestAnimationFrame(tick); return; }
+    if (!v || v.readyState !== v.HAVE_ENOUGH_DATA) return;
+    if (ahora && ultimaLecturaRef.current && ahora - ultimaLecturaRef.current < MS_ENTRE_LECTURAS) return;
+    ultimaLecturaRef.current = ahora || 0;
     const canvas = canvasRef.current;
-    canvas.width = v.videoWidth; canvas.height = v.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (!canvas) return;
+    // Se dibuja reducido conservando la proporción.
+    const escala = Math.min(1, ANCHO_LECTURA / (v.videoWidth || ANCHO_LECTURA));
+    const w = Math.round(v.videoWidth * escala), h = Math.round(v.videoHeight * escala);
+    if (!w || !h) return;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; ctxRef.current = null; }
+    // El contexto se pide UNA vez y con willReadFrequently: sin esa pista, cada
+    // getImageData fuerza una lectura lenta de la GPU a la CPU.
+    if (!ctxRef.current) ctxRef.current = canvas.getContext("2d", { willReadFrequently: true });
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
     const jsQR = jsQRRef.current;
     const code = jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
     if (code && code.data) {
+      // Vibración corta al leer: a pleno sol y con ruido de cola, el portero no
+      // debería tener que mirar la pantalla para saber que el QR entró.
+      try { navigator.vibrate?.(60); } catch (e) {}
       const { id, token } = extractTicketData(code.data);
       setInput(id.toUpperCase());
       lookup(id, token, false);
       stopScan();
-      return;
     }
-    rafRef.current = requestAnimationFrame(tick);
   }
   function startScan() {
     setScanErr(""); setResult(null);
@@ -143,13 +173,26 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   // teléfono. Trae token, así que se valida como un escaneo (manual=false).
   useEffect(() => { if (initialCode) lookup(initialCode, initialToken, false); }, []);
 
-  const checked = tickets.filter(t => t.status === "ingresado");
-  const pending = tickets.filter(t => t.status === "activo");
-  // Personas (no boletas): una boleta de grupo mete/deja pendientes a varias.
-  // El conteo de boletas se conserva como dato secundario abajo.
-  const peopleIn = checked.reduce((s, t) => s + ticketQty(t), 0);
-  const peoplePending = pending.reduce((s, t) => s + ticketQty(t), 0);
-  const checkedInLog = useMemo(() => [...checked].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)), [checked]);
+  // TODO en un solo useMemo sobre `tickets`. Antes `checked` se recalculaba en
+  // cada dibujado, así que el useMemo del registro dependía de una referencia
+  // siempre nueva y re-ordenaba en TODOS los renders: con 200-500 ingresados,
+  // cada tecla del campo manual reordenaba y repintaba cientos de filas.
+  const { checked, peopleIn, peoplePending, pendingCount, checkedInLog } = useMemo(() => {
+    const dentro = tickets.filter(t => t.status === "ingresado");
+    const porEntrar = tickets.filter(t => t.status === "activo");
+    return {
+      checked: dentro,
+      // Personas (no boletas): una boleta de grupo mete/deja pendientes a varias.
+      peopleIn: dentro.reduce((s, t) => s + ticketQty(t), 0),
+      peoplePending: porEntrar.reduce((s, t) => s + ticketQty(t), 0),
+      pendingCount: porEntrar.length,
+      checkedInLog: [...dentro].sort((a, b) => new Date(b.checkedInAt || 0) - new Date(a.checkedInAt || 0)),
+    };
+  }, [tickets]);
+  // El registro completo se pinta en Historial; aquí basta lo reciente. Sin
+  // tope, la puerta repintaba cientos de filas en cada cambio.
+  const MAX_REGISTRO = 25;
+  const registroVisible = checkedInLog.slice(0, MAX_REGISTRO);
   if (justCheckedIn) {
     const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === justCheckedIn.ticketType) || TICKET_TYPES_V2[0];
     return <CheckInWelcome ticket={justCheckedIn} ticketTypeInfo={ticketTypeInfo} onClose={closeWelcome} pendiente={pendiente} />;
@@ -165,7 +208,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         <div className="rounded-2xl p-3 text-center border" style={{ background: "linear-gradient(158deg, rgba(245,158,11,0.08), transparent 48%), linear-gradient(168deg, #14101a, #0b090c)", borderColor: "rgba(245,158,11,0.25)" }}>
           <p className="text-2xl font-black text-yellow-400" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif" }}>{peoplePending}</p>
           <p className="text-[14px] text-boxing-muted uppercase tracking-[0.18em]">Por entrar</p>
-          <p className="text-[12px] text-boxing-muted mt-0.5" style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{pending.length} boleta{pending.length !== 1 ? "s" : ""}</p>
+          <p className="text-[12px] text-boxing-muted mt-0.5" style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{pendingCount} boleta{pendingCount !== 1 ? "s" : ""}</p>
         </div>
       </div>
       {scanning && <div className="rounded-2xl overflow-hidden relative scale-in" style={{ border: "1px solid rgba(220,38,38,0.4)" }}>
@@ -226,6 +269,16 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
           significa de verdad que no existe: las otras dos causas (todavía
           cargando, o esta cuenta sin permiso para leer las boletas) se dicen
           aparte para que nadie rechace en la puerta una entrada legítima. */}
+      {ambiguas && <div className="rounded-2xl p-3 space-y-2 scale-in" style={{ background: "rgba(200,160,74,0.07)", border: "1px solid rgba(200,160,74,0.28)" }}>
+        <p className="text-boxing-cream text-sm text-center">Ese número lo tienen {ambiguas.length} entradas de distinto tipo. ¿Cuál es?</p>
+        <div className="flex flex-col gap-1.5">{ambiguas.map(t => {
+          const tt = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
+          return <button key={t.id} type="button" onClick={() => { setInput(t.id.toUpperCase()); lookup(t.id, null, true); }} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left transition-colors" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <span className="text-white text-sm truncate">{t.attendeeName}</span>
+            <span className="text-[14px] flex-shrink-0" style={{ color: tt.color }}>#{t.id}</span>
+          </button>;
+        })}</div>
+      </div>}
       {result === "cargando" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
         <p className="text-yellow-300 font-bold">⏳ Todavía cargando las entradas</p>
         <p className="text-gray-400 text-sm mt-1">No la rechaces: espera unos segundos con señal y vuelve a escanear.</p></div>}
@@ -234,7 +287,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         <p className="text-gray-300 text-sm mt-1">No es culpa de la boleta. Avísale al organizador para que dé permiso a esta cuenta.</p></div>}
       {result === "notfound" && <div className="text-center py-4 rounded-2xl scale-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}><p className="text-red-400 font-bold">❌ Boleta no encontrada</p><p className="text-gray-500 text-sm mt-1">Verifica el número ingresado</p></div>}
       {checkedInLog.length > 0 && <div><p className="text-[14px] text-boxing-muted uppercase tracking-[0.22em] mb-2">Registro de ingresos ({checkedInLog.length})</p>
-        <div className="space-y-1.5">{checkedInLog.map(t => {
+        <div className="space-y-1.5">{registroVisible.map(t => {
           const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
           const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "--:--";
           return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span>{ticketQty(t) > 1 && <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: "#e3c07a" }}>×{ticketQty(t)}</span>}</div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[14px] text-gray-500">{time}</span><span className="text-[14px] text-green-400">#{t.id}</span></div></div>;

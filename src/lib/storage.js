@@ -363,6 +363,17 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
 // ============================================
 export function loadTicketsV4() { return load("bm_tickets_v4", []); }
 
+// Guarda el espejo local de boletas cuando NO hay nube. Con la sincronización
+// desconectada, watchTickets no corre y era el único que escribía ese espejo:
+// las ventas y los check-ins vivían solo en la memoria de la página, así que
+// recargar la app —el gesto habitual para "actualizarla"— dejaba el registro de
+// ventas en cero, sin error ni aviso. Y el propio diálogo de desconectar
+// prometía justo lo contrario ("los datos locales se conservan").
+export function cacheTicketsSiSinNube(list) {
+  if (FB.ready) return; // con nube, watchTickets ya mantiene el espejo al día
+  cacheTicketsV4(list);
+}
+
 // Lee UNA boleta directo de la nube. La puerta valida contra el espejo local
 // (rápido, y funciona sin señal), pero ese espejo puede no tenerla todavía: un
 // teléfono recién abierto con "?scan=1" empieza vacío y tarda en bajar las
@@ -711,21 +722,32 @@ export function watchTickets(onChange, onEstado) {
 // tipo. Ignora ids vacíos y los de emergencia (prefijo-XNNN, sin dígitos tras
 // el guion), que no cuentan para el correlativo. La usan la migración en
 // caliente y la restauración de un respaldo.
-export function buildTicketRestore(tickets) {
+export function buildTicketRestore(tickets, idsExistentes = []) {
+  const yaEstan = new Set(idsExistentes);
   const ticketUpdates = {};
   const maxByType = {};
+  const omitidos = [];
   (tickets || []).forEach(t => {
     if (!t || !t.id) return;
-    // stripLocalFlags: un respaldo exportado mientras había ventas pendientes
-    // arrastra la marca `_pending`, que no debe llegar a la nube.
-    ticketUpdates["tickets/" + t.id] = stripLocalFlags(t);
+    // El correlativo cuenta SIEMPRE, exista o no la boleta: el contador nunca
+    // debe bajar, o se reasignarían números ya usados.
     const m = /^[A-Za-z]+-(\d+)$/.exec(t.id);
     if (m) {
       const n = parseInt(m[1], 10);
       if (n > (maxByType[t.ticketType] || 0)) maxByType[t.ticketType] = n;
     }
+    // Las que YA están en la nube no se tocan. Antes se sobrescribían enteras,
+    // así que restaurar el respaldo de la mañana a mitad del evento devolvía a
+    // "activo" todas las boletas que ya habían entrado (con checkedInAt en
+    // null) y cada QR usado volvía a admitir a su grupo completo. El diálogo
+    // siempre prometió lo contrario: "se agregan (por número) a las que ya
+    // existan" — ahora eso es literalmente lo que hace.
+    if (yaEstan.has(t.id)) { omitidos.push(t.id); return; }
+    // stripLocalFlags: un respaldo exportado mientras había ventas pendientes
+    // arrastra la marca `_pending`, que no debe llegar a la nube.
+    ticketUpdates["tickets/" + t.id] = stripLocalFlags(t);
   });
-  return { ticketUpdates, maxByType };
+  return { ticketUpdates, maxByType, omitidos };
 }
 
 // Migración en caliente, una sola vez: si sangre_nueva/tickets todavía no
@@ -765,15 +787,21 @@ export async function migrateTicketsIfNeeded() {
 // cuántas boletas escribió. Requiere conexión (los nodos de boletas viven solo
 // en la nube); si no hay FB, no hace nada y devuelve 0.
 export async function restoreTicketsFromBackup(tickets) {
-  if (!FB.ready || !Array.isArray(tickets) || !tickets.length) return 0;
-  const { ticketUpdates, maxByType } = buildTicketRestore(tickets);
+  if (!FB.ready || !Array.isArray(tickets) || !tickets.length) return { agregadas: 0, omitidas: 0 };
+  // Se mira PRIMERO qué boletas existen ya en la nube: las del respaldo que ya
+  // están se dejan intactas (ver buildTicketRestore). Es la diferencia entre
+  // "agregar lo que falta" y "devolver el evento a como estaba en la mañana".
+  const snap = await get(ref(FB.db, fbPath("tickets")));
+  const existentes = Object.keys(snap.val() || {});
+  const { ticketUpdates, maxByType, omitidos } = buildTicketRestore(tickets, existentes);
   const n = Object.keys(ticketUpdates).length;
-  if (!n) return 0;
-  await dbUpdate(ref(FB.db, fbPath("")), ticketUpdates);
+  if (n) await dbUpdate(ref(FB.db, fbPath("")), ticketUpdates);
+  // Los contadores suben al máximo restaurado aunque no se agregara ninguna
+  // boleta: nunca se baja un correlativo.
   await Promise.all(Object.entries(maxByType).map(([tipo, max]) =>
     runTransaction(ref(FB.db, fbPath("counters/" + tipo)), cur => Math.max(cur || 0, max))
   ));
-  return n;
+  return { agregadas: n, omitidas: omitidos.length };
 }
 
 export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); }

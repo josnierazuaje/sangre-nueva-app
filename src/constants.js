@@ -226,6 +226,37 @@ export function extractTicketData(text) {
 // Compat: versión que solo devuelve el id (usada por el arranque desde la URL).
 export function extractTicketCode(text) { return extractTicketData(text).id; }
 
+// Normaliza un número de boleta para compararlo: sin guiones, sin espacios y en
+// mayúsculas. La validación manual es el plan B cuando el QR no se puede
+// escanear (pantalla rota, brillo, captura borrosa), o sea el momento de más
+// presión — y exigía el id exacto: "PRE 0001" o "pre0001" daban "Boleta no
+// encontrada" con la persona delante insistiendo. La app ya normalizaba así en
+// la búsqueda del Historial (normName); esto lleva el mismo criterio a la puerta.
+export function normTicketId(s) { return String(s == null ? "" : s).toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+
+// Busca una boleta por lo que el portero tecleó. Acepta el id completo en
+// cualquier formato y también SOLO los dígitos ("0001" encuentra PRE-0001).
+// Devuelve { ticket } si hay una sola; { ambiguas } si el número suelto coincide
+// con varios tipos (p. ej. PRE-0001 y PUE-0001), para que el staff elija en vez
+// de que la app adivine; o {} si no hay ninguna.
+export function findTicketByCode(tickets, code) {
+  const lista = Array.isArray(tickets) ? tickets : [];
+  const buscado = normTicketId(code);
+  if (!buscado) return {};
+  const exactas = lista.filter(t => t && normTicketId(t.id) === buscado);
+  if (exactas.length) return { ticket: exactas[0] };
+  // Solo dígitos: se compara contra el número correlativo de cada boleta.
+  if (!/^\d+$/.test(buscado)) return {};
+  const n = parseInt(buscado, 10);
+  const porNumero = lista.filter(t => {
+    const m = /^[A-Za-z]+-(\d+)$/.exec((t && t.id) || "");
+    return m && parseInt(m[1], 10) === n;
+  });
+  if (porNumero.length === 1) return { ticket: porNumero[0] };
+  if (porNumero.length > 1) return { ambiguas: porNumero };
+  return {};
+}
+
 // Veredicto de verificación de una boleta escaneada/tecleada frente al token
 // que traía el QR. "manual" = el operador tecleó el id a mano (no escaneó):
 // es una vía de confianza para el staff, se permite pero se pide cotejar

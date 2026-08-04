@@ -279,8 +279,33 @@ describe("buildTicketRestore", () => {
     expect(maxByType).toEqual({ preventa: 1 });
   });
   it("lista vacía o nula → objetos vacíos", () => {
-    expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {} });
-    expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {} });
+    expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {}, omitidos: [] });
+    expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {}, omitidos: [] });
+  });
+
+  describe("restaurar NO debe revertir los check-ins ya marcados", () => {
+    it("CLAVE: omite las boletas que ya existen en la nube, en vez de pisarlas", () => {
+      // El respaldo de la mañana las trae en "activo": si se escribieran encima,
+      // cada QR ya usado volvería a admitir a su grupo completo.
+      const delRespaldo = [t("PRE-0001", "preventa"), t("PRE-0002", "preventa")];
+      const { ticketUpdates, omitidos } = buildTicketRestore(delRespaldo, ["PRE-0001"]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0002"]);
+      expect(omitidos).toEqual(["PRE-0001"]);
+    });
+    it("sí agrega las que faltan (que es lo que el diálogo promete)", () => {
+      const { ticketUpdates, omitidos } = buildTicketRestore([t("PRE-0009", "preventa")], ["PRE-0001"]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0009"]);
+      expect(omitidos).toEqual([]);
+    });
+    it("el correlativo cuenta AUNQUE la boleta ya exista (nunca se reasigna un número)", () => {
+      const { ticketUpdates, maxByType } = buildTicketRestore([t("PRE-0042", "preventa")], ["PRE-0042"]);
+      expect(ticketUpdates).toEqual({});
+      expect(maxByType).toEqual({ preventa: 42 });
+    });
+    it("sin lista de existentes se comporta como antes (lo usa la migración)", () => {
+      const { ticketUpdates } = buildTicketRestore([t("PRE-0001", "preventa")]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0001"]);
+    });
   });
 });
 

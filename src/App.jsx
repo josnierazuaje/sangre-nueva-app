@@ -419,9 +419,12 @@ export default function App() {
   function restoreTicketsFromImport(ticketsNew) {
     if (!Array.isArray(ticketsNew) || !ticketsNew.length) return;
     if (!FB.ready) { alert("El respaldo trae " + ticketsNew.length + " boleta(s), pero restaurarlas requiere conexión a internet. Vuelve a importar el archivo con conexión."); return; }
-    if (!confirm("¿Restaurar también " + ticketsNew.length + " boleta(s) del respaldo? Se agregan (por número) a las que ya existan.")) return;
+    if (!confirm("¿Restaurar también " + ticketsNew.length + " boleta(s) del respaldo?\n\nSe agregan SOLO las que falten. Las que ya existen no se tocan, así que no se pierde ningún ingreso ya marcado.")) return;
     restoreTicketsFromBackup(ticketsNew)
-      .then(n => alert("Se restauraron " + n + " boleta(s) del respaldo."))
+      .then(({ agregadas, omitidas }) => alert(
+        agregadas
+          ? "Se agregaron " + agregadas + " boleta(s) del respaldo." + (omitidas ? "\n\nOtras " + omitidas + " ya existían y se dejaron como estaban (no se revirtió ningún ingreso)." : "")
+          : "No hizo falta agregar nada: las " + omitidas + " boleta(s) del respaldo ya estaban en la nube."))
       .catch(err => { console.error("No se pudieron restaurar las boletas:", err); alert("No se pudieron restaurar las boletas del respaldo.\n\nError: " + err.message); });
   }
 
@@ -497,7 +500,13 @@ export default function App() {
       <header style={{ flexShrink: 0, borderBottom: "1px solid #2a1f2e", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-40px", left: "50%", transform: "translateX(-50%)", width: "320px", height: "160px", background: "radial-gradient(ellipse, rgba(155,26,42,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div className="flex justify-between items-center px-3 pt-2" style={{ position: "relative" }}>
-          <button onClick={toggleSync} className={syncBtnCls}>{syncLabel}</button>
+          {/* En modo escáner el chip es SOLO un indicador, no un botón. Era uno
+              de los dos únicos controles de la pantalla y su diálogo suena
+              inofensivo ("los datos locales se conservan"), pero al aceptarlo el
+              aparato queda sin nube y ni siquiera puede volver a iniciar sesión:
+              había que borrar los datos del sitio o reinstalar la PWA, algo que
+              el staff de la puerta no va a hacer con la fila esperando. */}
+          <span className={syncBtnCls} title="Estado de la conexión">{syncLabel}</span>
           <button onClick={salirEscaner} title="Salir del modo escáner y cerrar sesión" className="text-[14px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>
         </div>
         <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>
