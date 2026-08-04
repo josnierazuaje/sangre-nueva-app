@@ -27,6 +27,13 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,json}"],
+        // Los íconos de 512 px (213 KB entre los dos) los usa SOLO el sistema
+        // operativo al instalar la PWA — no los pinta ninguna vista. Guardarlos
+        // en la caché sin conexión no aporta nada y son el bulto más grande de
+        // la primera carga, justo cuando el staff abre el enlace del escáner
+        // con la señal mala del recinto. El navegador los baja por su cuenta si
+        // el usuario instala la app.
+        globIgnores: ["**/icons/icon-512*.png"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === "navigate",

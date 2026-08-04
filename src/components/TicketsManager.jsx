@@ -53,8 +53,8 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
   // Ingreso atómico: la transacción en el servidor decide si esta boleta cuenta
   // como ingreso (only activo→ingresado). Actualiza el estado local con el
   // resultado y devuelve el veredicto a la vista para avisar dobles ingresos.
-  async function checkIn(id) {
-    const res = await checkInTicketTx(id);
+  async function checkIn(id, opciones) {
+    const res = await checkInTicketTx(id, opciones);
     // `pendiente`: sin señal, la transacción quedó en cola y ya se aplicó en
     // local. La persona entra (parar la fila sería peor) pero la vista lo dice
     // claramente en ámbar, y el outbox la reintenta hasta confirmarla.

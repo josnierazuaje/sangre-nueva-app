@@ -135,6 +135,13 @@ describe("check-in — LA regla que decide si una persona entra al recinto", () 
       applyCheckIn(orig, AHORA);
       expect(orig).toEqual(activa);
     });
+    it("un ingreso SIN verificación por QR queda marcado en el registro", () => {
+      expect(applyCheckIn(activa, AHORA, true).checkedInManual).toBe(true);
+    });
+    it("un ingreso verificado por QR NO lleva esa marca", () => {
+      expect(applyCheckIn(activa, AHORA, false).checkedInManual).toBeUndefined();
+      expect(applyCheckIn(activa, AHORA).checkedInManual).toBeUndefined();
+    });
   });
 
   describe("interpretCheckIn (veredicto que ve el portero)", () => {
