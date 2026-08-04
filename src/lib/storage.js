@@ -156,6 +156,26 @@ export function loadFighters() {
   return load("bm_fighters_v4", []);
 }
 
+// Escribe la CARTELERA fusionando contra el estado más fresco del servidor.
+//
+// Era el último nodo que se reescribía entero desde la copia local (save()).
+// La ventana no es de milisegundos: la cola sin conexión del SDK guarda la
+// escritura TAL CUAL y la manda al reconectar, así que una tablet que editó una
+// nota el viernes con la señal caída y quedó abierta en segundo plano podía, al
+// recuperar red el sábado, sobrescribir el nodo con su arreglo viejo y borrar
+// toda la cartelera armada después (y resucitar peleas ya eliminadas).
+//
+// `aplicar(arr)` recibe el arreglo del SERVIDOR y devuelve el nuevo; los
+// llamadores renumeran ahí dentro (renumerarPeleas) para que los números de
+// pelea salgan del estado fusionado, no del local.
+export function matchupsTx(aplicar, optimista, onMerged) {
+  saveLocal("bm_matchups_v3", optimista);
+  if (!FB.ready) return;
+  runTransaction(ref(FB.db, fbPath("bm_matchups_v3")), cur => fighterNodeValue(aplicar(nodeToArray(cur))))
+    .then(res => { if (res.committed) onMerged?.(nodeToArray(res.snapshot.val())); })
+    .catch(e => reportSyncError("No se pudo sincronizar la cartelera (el cambio sí quedó guardado localmente):", e));
+}
+
 // Guarda SOLO en este dispositivo, sin tocar la nube. Lo usa la reconciliación
 // automática, que a la nube escribe por transacción (reconcileNodeTx).
 export function saveLocal(k, v) {
@@ -410,7 +430,13 @@ function withTimeout(promise, ms) {
 
 // Correlativo local (sin sincronización): se deriva del máximo id ya usado
 // en las boletas que ya tenemos, sin depender de un contador aparte.
-function maxCounterFromTickets(tickets, tipo) {
+// Sufijo único para los ids de emergencia: reloj + aleatorio, el mismo patrón
+// que genId() ya usa para los peleadores.
+export function emergencySuffix() {
+  return (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+}
+
+export function maxCounterFromTickets(tickets, tipo) {
   let max = 0;
   (tickets || []).forEach(t => {
     if (t.ticketType !== tipo) return;
@@ -433,7 +459,12 @@ export async function nextTicketId(tipo, prefix, localTickets) {
     } catch (e) {
       console.error("No se pudo generar un correlativo en la nube (¿sin conexión?); se usa un id de emergencia:", e);
     }
-    return prefix + "-X" + Date.now().toString(36).toUpperCase();
+    // Id de emergencia. Lleva una parte ALEATORIA además del reloj: sin ella,
+    // dos teléfonos vendiendo el mismo tipo de entrada en el mismo milisegundo
+    // generaban el MISMO id, la segunda venta pisaba a la primera (mismo nodo,
+    // last-write-wins) y en la puerta el QR del primer comprador cotejaba
+    // contra el token del segundo: "entrada falsificada" a alguien que pagó.
+    return prefix + "-X" + emergencySuffix();
   }
   const next = maxCounterFromTickets(localTickets, tipo) + 1;
   return prefix + "-" + padN(next);
@@ -833,6 +864,43 @@ export function clearLocalEventData() {
 // Guarda una copia completa del evento en sangre_nueva_backups/{fecha}.
 // Ese nodo está protegido en database.rules.json para que solo el dueño
 // (por email) pueda leerlo o escribirlo — la Fase 2 ya deja esa regla lista.
+// Lista los respaldos guardados en la nube, del más nuevo al más viejo, con la
+// fecha ya legible y un resumen de lo que contienen. Hasta ahora "Reiniciar
+// evento" guardaba una copia que la app NO sabía volver a leer: la única forma
+// de recuperarla era entrar a la consola de Firebase, algo fuera del alcance
+// del organizador. Solo el dueño puede leer ese nodo (ver database.rules.json).
+export async function listCloudBackups() {
+  if (!FB.ready) return [];
+  const snap = await get(ref(FB.db, "sangre_nueva_backups"));
+  const val = snap.val() || {};
+  return Object.entries(val).map(([clave, d]) => ({
+    clave,
+    // La clave es un ISO con "." y ":" cambiados por "-" (ver backupEventToCloud).
+    fecha: descifrarFechaRespaldo(clave),
+    peleadores: nodeToArray(d && d.fighters).length,
+    peleas: nodeToArray(d && d.matchups).length,
+    boletas: nodeToArray(d && d.ticketsNew).length,
+    eventLabel: (d && d.eventLabel) || "",
+  })).sort((a, b) => b.clave.localeCompare(a.clave));
+}
+
+// Pura y testeable: de la clave del respaldo saca una fecha legible en español.
+// Devuelve la clave tal cual si no se puede interpretar (nunca falla).
+export function descifrarFechaRespaldo(clave) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/.exec(String(clave || ""));
+  if (!m) return String(clave || "");
+  const [, a, mes, d, h, min] = m;
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  return `${Number(d)} de ${MESES[Number(mes) - 1] || mes} de ${a}, ${h}:${min}`;
+}
+
+// Trae un respaldo completo de la nube para restaurarlo.
+export async function fetchCloudBackup(clave) {
+  if (!FB.ready) return null;
+  const snap = await get(ref(FB.db, "sangre_nueva_backups/" + clave));
+  return snap.exists() ? snap.val() : null;
+}
+
 export async function backupEventToCloud(data) {
   if (!FB.ready) return null;
   const key = new Date().toISOString().replace(/[.:]/g, "-");

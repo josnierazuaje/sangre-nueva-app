@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
@@ -428,6 +428,37 @@ export default function App() {
       .catch(err => { console.error("No se pudieron restaurar las boletas:", err); alert("No se pudieron restaurar las boletas del respaldo.\n\nError: " + err.message); });
   }
 
+  // Restaurar un respaldo GUARDADO EN LA NUBE. "Reiniciar evento" ya guardaba
+  // una copia allí, pero la app no sabía leerla: recuperarla exigía entrar a la
+  // consola de Firebase. Reusa el mismo camino que la importación de un archivo
+  // (restoreTicketsFromImport ya agrega solo las boletas que faltan, sin
+  // revertir ingresos).
+  async function restaurarDesdeLaNube() {
+    if (!FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
+    let copias;
+    try { copias = await listCloudBackups(); }
+    catch (e) { console.error("No se pudieron listar los respaldos:", e); alert("No se pudieron leer los respaldos de la nube.\n\nError: " + e.message); return; }
+    if (!copias.length) { alert("Todavía no hay respaldos en la nube.\n\nSe guarda uno automáticamente cada vez que usas \"Reiniciar evento\"."); return; }
+    const lista = copias.map((c, i) => `${i + 1}) ${c.fecha} — ${c.peleadores} peleador(es), ${c.peleas} pelea(s), ${c.boletas} boleta(s)`).join("\n");
+    const elegido = prompt(`Respaldos guardados en la nube (el 1 es el más reciente):\n\n${lista}\n\nEscribe el número del que quieres restaurar:`);
+    if (elegido === null) return;
+    const idx = parseInt(elegido, 10) - 1;
+    if (!(idx >= 0 && idx < copias.length)) { alert("Ese número no está en la lista. No se restauró nada."); return; }
+    const c = copias[idx];
+    if (!confirm(`¿Restaurar el respaldo del ${c.fecha}?\n\nSe REEMPLAZAN los peleadores, las peleas y el Super 4 que hay ahora por los del respaldo.\n\nLas boletas se AGREGAN: las que ya existen no se tocan, así que no se pierde ningún ingreso ya marcado.\n\nAntes de reemplazar se descarga una copia de lo que tienes ahora.`)) return;
+    handleExport(); // red de seguridad: lo actual queda en un archivo
+    let d;
+    try { d = await fetchCloudBackup(c.clave); }
+    catch (e) { console.error("No se pudo leer el respaldo:", e); alert("No se pudo leer ese respaldo.\n\nError: " + e.message); return; }
+    if (!d) { alert("Ese respaldo ya no está en la nube."); return; }
+    if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); }
+    if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); }
+    if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); }
+    if (d.eventLabel) { setEventLabel(d.eventLabel); save("bm_event_label", d.eventLabel); }
+    restoreTicketsFromImport(d.ticketsNew);
+    alert(`Respaldo del ${c.fecha} restaurado.`);
+  }
+
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
   // vacío para cargar peleadores reales desde cero. Antes de borrar nada:
@@ -475,6 +506,7 @@ export default function App() {
   // pie del sidebar de escritorio.
   const menuActions = [
     { label: "Recargar desde la nube", danger: false, run: reloadFromCloud },
+    { label: "Restaurar respaldo de la nube", danger: false, run: restaurarDesdeLaNube },
     { label: "Importar", danger: false, run: handleImport },
     { label: "Exportar", danger: false, run: handleExport },
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },

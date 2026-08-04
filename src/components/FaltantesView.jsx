@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { getCategoryInfo, getExperienceInfo, getAgeCategory } from "../constants.js";
-import { save } from "../lib/storage.js";
-import { forcedMatchAll } from "../lib/matchmaking.js";
+import { save, matchupsTx } from "../lib/storage.js";
+import { forcedMatchAll, renumerarPeleas } from "../lib/matchmaking.js";
 import { committedFighterIds } from "../lib/super4.js";
 import { buildFaltantesCsv } from "../lib/csvPlanillas.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
@@ -54,8 +54,9 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
     // Pequeña pausa para que el botón dé feedback (el cálculo es instantáneo).
     setTimeout(() => {
       const { matchups: nuevas, leftover } = forcedMatchAll(faltantes, matchups.length + 1);
-      const u = [...matchups, ...nuevas];
-      setMatchups(u); save("bm_matchups_v3", u);
+      const u = renumerarPeleas([...matchups, ...nuevas]);
+      setMatchups(u);
+      matchupsTx(arr => renumerarPeleas([...arr, ...nuevas]), u, setMatchups);
       setForcing(false);
       if (leftover.length) alert(`Quedó 1 atleta sin rival porque el número de faltantes era impar:\n\n• ${leftover[0].fullName}\n\nRegístrale un rival, agrégalo a mano en el VS, o inclúyelo en el Super 4.`);
     }, 500);
@@ -63,19 +64,23 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
 
   function rmM(id) {
     if (!checkReady()) return;
-    const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 }));
-    setMatchups(u); save("bm_matchups_v3", u);
+    const u = renumerarPeleas(matchups.filter(m => m.id !== id));
+    setMatchups(u);
+    matchupsTx(arr => renumerarPeleas(arr.filter(m => m.id !== id)), u, setMatchups);
   }
   function quitarForzadas() {
     if (!checkReady()) return;
     if (!confirm(`Se quitarán las ${forced.length} pelea${forced.length === 1 ? "" : "s"} forzada${forced.length === 1 ? "" : "s"} de la cartelera y se renumerará el resto.\n\nLos atletas volverán a aparecer como faltantes. ¿Continuar?`)) return;
-    const u = matchups.filter(m => !m.forced).map((m, i) => ({ ...m, roundNumber: i + 1 }));
-    setMatchups(u); save("bm_matchups_v3", u);
+    const u = renumerarPeleas(matchups.filter(m => !m.forced));
+    setMatchups(u);
+    matchupsTx(arr => renumerarPeleas(arr.filter(m => !m.forced)), u, setMatchups);
   }
   function notaChange(id, nota) {
     if (!checkReady()) return;
-    const u = matchups.map(m => m.id === id ? { ...m, nota } : m);
-    setMatchups(u); save("bm_matchups_v3", u);
+    const cambiar = arr => arr.map(m => m.id === id ? { ...m, nota } : m);
+    const u = cambiar(matchups);
+    setMatchups(u);
+    matchupsTx(cambiar, u, setMatchups);
   }
 
   // La MISMA planilla que se ve aquí, en Excel editable: en la mesa de control

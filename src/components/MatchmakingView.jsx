@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { getCategoryInfo, getExperienceInfo, getAgeCategory, genId } from "../constants.js";
-import { save } from "../lib/storage.js";
-import { bestMatchAll, experienceOk, analyzeMatch } from "../lib/matchmaking.js";
+import { save, matchupsTx } from "../lib/storage.js";
+import { bestMatchAll, experienceOk, analyzeMatch, renumerarPeleas } from "../lib/matchmaking.js";
 import { super4FighterIds } from "../lib/super4.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import Badge from "./Badge.jsx";
@@ -45,12 +45,28 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     const ids = new Set(conflicts.removibles);
     const nums = matchups.filter(m => ids.has(m.id)).map(m => m.roundNumber);
     if (!confirm(`Se quitará${ids.size === 1 ? "" : "n"} ${ids.size} pelea${ids.size === 1 ? "" : "s"} de la cartelera (pelea${ids.size === 1 ? "" : "s"} ${nums.join(", ")}) y se renumerará el resto.\n\n¿Continuar?`)) return;
-    const u = matchups.filter(m => !ids.has(m.id)).map((m, i) => ({ ...m, roundNumber: i + 1 }));
-    setMatchups(u); save("bm_matchups_v3", u);
+    const u = renumerarPeleas(matchups.filter(m => !ids.has(m.id)));
+    setMatchups(u);
+    matchupsTx(arr => renumerarPeleas(arr.filter(m => !ids.has(m.id))), u, setMatchups);
   }
-  function rmM(id) { if (!checkReady()) return; const u = matchups.filter(m => m.id !== id).map((m, i) => ({ ...m, roundNumber: i + 1 })); setMatchups(u); save("bm_matchups_v3", u); }
+  function rmM(id) {
+    if (!checkReady()) return;
+    const u = renumerarPeleas(matchups.filter(m => m.id !== id));
+    setMatchups(u);
+    matchupsTx(arr => renumerarPeleas(arr.filter(m => m.id !== id)), u, setMatchups);
+  }
+  // Los dos REEMPLAZOS a propósito (vaciar y volver a armar toda la cartelera)
+  // siguen usando save(): ahí sobrescribir el nodo entero ES lo que el operador
+  // pidió, así que fusionar con lo del servidor sería justo lo contrario. Las
+  // ediciones puntuales (agregar, quitar, nota) van por matchupsTx.
   function clearAll() { if (!checkReady()) return; setMatchups([]); save("bm_matchups_v3", []); }
-  function notaChange(id, nota) { if (!checkReady()) return; const u = matchups.map(m => m.id === id ? { ...m, nota } : m); setMatchups(u); save("bm_matchups_v3", u); }
+  function notaChange(id, nota) {
+    if (!checkReady()) return;
+    const cambiar = arr => arr.map(m => m.id === id ? { ...m, nota } : m);
+    const u = cambiar(matchups);
+    setMatchups(u);
+    matchupsTx(cambiar, u, setMatchups);
+  }
   // Emparejamiento MANUAL desde "Sin pelea": el operador elige dos atletas. Si
   // el cruce rompe una regla dura, se avisa exactamente cuál y se pide
   // confirmación (el criterio humano puede aceptar, p.ej., un par de kg de más).
@@ -72,9 +88,12 @@ export default function MatchmakingView({ fighters, matchups, setMatchups, super
     const issues = hardRuleIssues(a, b);
     if (issues.length && !confirm(`⚠️ Esta pelea rompe: ${issues.join("; ")}.\n\n${a.fullName} (esquina roja) vs ${b.fullName} (esquina azul)\n\n¿Crear la pelea igual?`)) return;
     const nueva = { id: genId(), fighterRedId: pairPick, fighterBlueId: id, roundNumber: matchups.length + 1, warnings: analyzeMatch(a, b), createdAt: new Date().toISOString() };
-    const u = [...matchups, nueva];
+    const u = renumerarPeleas([...matchups, nueva]);
     setPairPick(null);
-    setMatchups(u); save("bm_matchups_v3", u);
+    setMatchups(u);
+    // Agrega SOBRE lo que haya en el servidor y renumera ahí: si otro
+    // dispositivo creó una pelea a la vez, ninguna de las dos se pierde.
+    matchupsTx(arr => renumerarPeleas([...arr, nueva]), u, setMatchups);
   }
   // La planilla imprimible vive ahora en la pestaña Cartelera (FightCardView).
   // Único botón de armado: busca el reparto MÁS JUSTO posible (fusión de Auto VS
