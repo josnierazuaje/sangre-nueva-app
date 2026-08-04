@@ -83,7 +83,14 @@ export function reportSyncError(context, e) {
   if (notifyStatus) notifyStatus("error");
 }
 
-export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
+// `opts.soloConexion` (modo escáner): deja lista la conexión y el chip de
+// estado, pero NO se suscribe a los datos del evento. El teléfono de la puerta
+// solo valida entradas: bajarse el padrón completo —con nombre, edad y escuela
+// de los menores— y volver a bajarlo entero cada vez que el organizador corrige
+// la cartelera era gasto de datos y, sobre todo, dejaba esa información
+// guardada en un aparato prestado o personal. También es lo que permite que las
+// reglas le nieguen la lectura a la cuenta de puerta sin romper la app.
+export function startFirebaseSync(onStatus, onRemote, onKeyReady, opts = {}) {
   if (FB.ready) return;
   notifyStatus = onStatus;
   onStatus("connecting");
@@ -97,6 +104,7 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
     FB.connected = !!s.val();
     onStatus(FB.connected ? "on" : "connecting");
   });
+  if (opts.soloConexion) return;
   Object.keys(SYNC_KEYS).forEach(k => {
     const nodeRef = ref(FB.db, fbPath(k));
     get(nodeRef).then(snap => {
@@ -123,7 +131,17 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
           onRemote(k, remote);
         }
         if (first) { first = false; onKeyReady?.(k); }
+      }, err => {
+        // onValue acepta un callback de error y no se le pasaba ninguno: un
+        // permiso denegado se perdía en silencio, la clave nunca hidrataba y
+        // todo lo que espera esa hidratación (limpieza de duplicados, replay
+        // del outbox) se quedaba esperando para siempre, con el chip en verde.
+        onKeyReady?.(k); // desbloquea a los que esperan, aunque sea sin datos
+        reportSyncError("No se pudo leer " + k + " de Firebase (¿esta cuenta tiene permiso?):", err);
       });
+    }).catch(e => {
+      onKeyReady?.(k);
+      reportSyncError("No se pudo leer " + k + " de Firebase (¿esta cuenta tiene permiso?):", e);
     });
   });
 }
