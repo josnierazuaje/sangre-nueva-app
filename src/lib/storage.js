@@ -370,14 +370,111 @@ export async function nextTicketId(tipo, prefix, localTickets) {
   return prefix + "-" + padN(next);
 }
 
+// ============================================
+// OUTBOX de boletas — ventas que SOBREVIVEN a la recarga
+// ============================================
+// Misma garantía que el outbox de peleadores, pero para lo que representa
+// DINERO. Antes, addTicketNode era dispara-y-olvida: sin señal la escritura
+// quedaba encolada SOLO en la memoria del SDK, y el flujo de venta obliga a
+// salir a WhatsApp para mandar el voucher — con la PWA en segundo plano el
+// sistema puede matarla y la cola muere con ella. La boleta nunca llegaba a la
+// nube y, al reconectar, watchTickets sobrescribía la copia local con la del
+// servidor: la venta desaparecía TAMBIÉN del teléfono del vendedor, sin aviso.
+// El comprador quedaba pagado y sin entrada ("Boleta no encontrada" en la
+// puerta) y la caja no cuadraba. Es el mismo fallo que ya ocurrió con los
+// peleadores (los "fantasmas"), que fue lo que motivó el primer outbox.
+const TICKETS_OUTBOX_KEY = "bm_tickets_outbox";
+
+// Marcas internas que viven SOLO en este dispositivo y jamás deben viajar a la
+// nube: `_queuedAt` (antigüedad del pendiente) y `_pending` (bandera de la UI).
+export function stripLocalFlags(t) {
+  if (!t || typeof t !== "object") return t;
+  const o = {};
+  Object.keys(t).forEach(k => { if (k[0] !== "_") o[k] = t[k]; });
+  return o;
+}
+
+// Pura y testeable: fusiona los pendientes sobre la copia de la NUBE. Solo
+// agrega los que FALTAN en el servidor — nunca pisa la versión remota de una
+// boleta que ya existe. Es deliberado: un pendiente viejo podría decir
+// "activo" mientras el servidor ya la tiene "ingresado", y dejarlo ganar
+// revertiría un check-in en pantalla. Los agregados se marcan con `_pending`
+// para que el Historial los muestre como aún no sincronizados.
+export function mergePendingTickets(cloudList, pending) {
+  const base = Array.isArray(cloudList) ? cloudList : [];
+  const yaEstan = new Set(base.map(t => t && t.id));
+  const faltantes = (pending || [])
+    .filter(p => p && p.id && !yaEstan.has(p.id))
+    .map(p => ({ ...stripLocalFlags(p), _pending: true }));
+  return [...base, ...faltantes];
+}
+
+// Ordena por fecha de creación (el orden que espera la UI del Historial).
+export function sortTickets(list) {
+  return [...(list || [])].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
+// Reutiliza las funciones puras del outbox de peleadores: son genéricas sobre
+// objetos con `id` (agregar/quitar por id y podar por TTL), así que no hay
+// motivo para duplicar esa lógica —ni sus pruebas— para las boletas.
+export function ticketsOutboxList() { return pruneOutbox(load(TICKETS_OUTBOX_KEY, []), Date.now()); }
+function ticketsOutboxPut(t) {
+  // Igual que en peleadores: anotar el pendiente es lo que SOSTIENE la promesa
+  // de entrega, así que si falla (cuota llena) se avisa en el chip.
+  try { localStorage.setItem(TICKETS_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(TICKETS_OUTBOX_KEY, []), t, Date.now()))); }
+  catch (e) { reportSyncError("No se pudo anotar la venta pendiente en este dispositivo:", e); }
+}
+function ticketsOutboxRemove(id) {
+  // Solo descuenta algo ya confirmado y escribe una cadena más corta (por cuota
+  // no puede fallar): basta la consola, nunca debe pintar de rojo una venta que
+  // la nube SÍ confirmó.
+  try { localStorage.setItem(TICKETS_OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(TICKETS_OUTBOX_KEY, []), id))); }
+  catch (e) { console.error("No se pudo descontar la venta pendiente en este dispositivo:", e); }
+}
+
 // Devuelve la promesa de la escritura (con su propio .catch), por si el
 // llamador quiere reaccionar; NO debe esperarse con await en el flujo de venta:
 // sin conexión RTDB deja la promesa pendiente hasta reconectar y colgaría el
 // voucher. El fallo real (rechazo) se avisa por el chip vía reportSyncError.
+// La boleta se anota como PENDIENTE antes de salir y solo se descuenta cuando
+// la nube confirma el commit; si la app se recarga o muere en el intermedio,
+// replayTicketsOutbox la re-sube al arrancar.
 export function addTicketNode(ticket) {
+  const limpia = stripLocalFlags(ticket);
+  if (cloudIntended()) ticketsOutboxPut(limpia);
   if (!FB.ready) return Promise.resolve();
-  return dbSet(ref(FB.db, fbPath("tickets/" + ticket.id)), ticket)
+  return dbSet(ref(FB.db, fbPath("tickets/" + limpia.id)), limpia)
+    .then(() => ticketsOutboxRemove(limpia.id))
     .catch(e => reportSyncError("No se pudo guardar la boleta en Firebase (sigue guardada localmente):", e));
+}
+
+// Re-sube las ventas que quedaron PENDIENTES de confirmación. Se llama al
+// arrancar la sincronización de boletas. Crea el nodo SOLO si no existe: si la
+// boleta ya está en la nube (la escritura sí llegó, o alguien ya la marcó como
+// ingresada) no se pisa nada — un dbSet a ciegas devolvería una boleta ya
+// usada al estado "activo" y su QR volvería a admitir gente. Devuelve cuántos
+// pendientes quedaron resueltos.
+export async function replayTicketsOutbox() {
+  if (!FB.ready) return 0;
+  const pendientes = ticketsOutboxList();
+  if (!pendientes.length) return 0;
+  console.info("Recuperando " + pendientes.length + " venta(s) pendiente(s) de guardar en la nube…");
+  let resueltas = 0;
+  for (const p of pendientes) {
+    const boleta = stripLocalFlags(p);
+    try {
+      const res = await runTransaction(ref(FB.db, fbPath("tickets/" + boleta.id)), cur => {
+        if (cur) return; // ya existe en la nube: abortar sin escribir
+        return boleta;
+      });
+      // El nodo existe (lo creamos ahora o ya estaba): la venta está a salvo.
+      if (res.snapshot.exists()) { ticketsOutboxRemove(boleta.id); resueltas++; }
+    } catch (e) {
+      // Sigue en el outbox: se reintenta al reconectar o al reabrir la app.
+      reportSyncError("No se pudo recuperar la venta pendiente " + boleta.id + ":", e);
+    }
+  }
+  return resueltas;
 }
 export function updateTicketNode(id, patch) {
   if (!FB.ready) return Promise.resolve();
@@ -413,6 +510,10 @@ export async function checkInTicketTx(id) {
   }
 }
 export function removeTicketNode(id) {
+  // Un borrado explícito cancela el pendiente de esa misma boleta: si no, el
+  // replay la resucitaría después de eliminarla (mismo criterio que
+  // removeFighterTx).
+  ticketsOutboxRemove(id);
   if (!FB.ready) return Promise.resolve();
   return dbRemove(ref(FB.db, fbPath("tickets/" + id)))
     .catch(e => reportSyncError("No se pudo eliminar la boleta en Firebase (sigue eliminada localmente):", e));
@@ -429,7 +530,11 @@ export function watchTickets(onChange) {
   const nodeRef = ref(FB.db, fbPath("tickets"));
   onValue(nodeRef, snap => {
     const val = snap.val() || {};
-    const list = Object.values(val).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    // Las ventas PENDIENTES (emitidas aquí y aún sin confirmar en la nube) se
+    // fusionan sobre la copia del servidor. Sin esto, esta misma lista las
+    // borraba del dispositivo del vendedor: la boleta desaparecía de la app
+    // aunque el comprador ya tuviera su voucher con el QR.
+    const list = sortTickets(mergePendingTickets(Object.values(val), ticketsOutboxList()));
     cacheTicketsV4(list);
     onChange(list);
   });
@@ -445,7 +550,9 @@ export function buildTicketRestore(tickets) {
   const maxByType = {};
   (tickets || []).forEach(t => {
     if (!t || !t.id) return;
-    ticketUpdates["tickets/" + t.id] = t;
+    // stripLocalFlags: un respaldo exportado mientras había ventas pendientes
+    // arrastra la marca `_pending`, que no debe llegar a la nube.
+    ticketUpdates["tickets/" + t.id] = stripLocalFlags(t);
     const m = /^[A-Za-z]+-(\d+)$/.exec(t.id);
     if (m) {
       const n = parseInt(m[1], 10);
@@ -519,6 +626,10 @@ export function clearLocalEventData() {
   // purgar, y un pendiente encolado por una cuenta podría terminar re-subido
   // por la cuenta que inicie sesión después.
   localStorage.removeItem(OUTBOX_KEY);
+  // También los pendientes de VENTA: traen datos del comprador y, igual que los
+  // de peleadores, no deben quedar legibles sin login ni sobrevivir a un
+  // "Recargar desde la nube" (los guards de App.jsx avisan antes de borrarlos).
+  localStorage.removeItem(TICKETS_OUTBOX_KEY);
 }
 
 // ============================================

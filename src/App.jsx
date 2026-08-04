@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
@@ -74,6 +74,18 @@ export default function App() {
   const [cloudMode, setCloudMode] = useState(null);
   const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
   const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
+  // Todo lo que este dispositivo tiene SIN CONFIRMAR en la nube: altas de
+  // peleadores y ventas de entradas. Las dos colas viven en localStorage, así
+  // que las dos mueren si se borran los datos locales — por eso logout y
+  // "Recargar desde la nube" avisan antes, diciendo QUÉ se perdería.
+  function pendientesLocales() {
+    const peleadores = outboxList().length;
+    const ventas = ticketsOutboxList().length;
+    const partes = [];
+    if (peleadores) partes.push(peleadores + " registro(s) de peleador");
+    if (ventas) partes.push(ventas + " venta(s) de entrada");
+    return { total: peleadores + ventas, detalle: partes.join(" y ") };
+  }
   // Al cerrar sesión: borra los datos locales sensibles (un dispositivo perdido
   // no debe conservarlos legibles sin login) y recarga para partir de un estado
   // limpio en el próximo inicio (evita listeners de sync colgados tras re-login).
@@ -83,8 +95,8 @@ export default function App() {
     // hay altas aún sin subir a la nube (típico sin conexión), avisamos antes
     // de que se pierdan en silencio. Sin este guard, el "✓ guardado" inmediato
     // podría mentir: se dio por guardado algo que este borrado destruiría.
-    const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\nSi cierras sesión ahora, se PERDERÁN.\n\nEspera a que el chip de arriba diga "Sincronizado" antes de cerrar sesión. Si dice "Conectando…", revisa tu internet; si dice "Error", revisa tus permisos.\n\n¿Cerrar sesión de todos modos?`)) return;
+    const { total, detalle } = pendientesLocales();
+    if (total && !confirm(`Tienes ${detalle} que TODAVÍA no se guardaron en la nube.\n\nSi cierras sesión ahora, se PERDERÁN.\n\nEspera a que el chip de arriba diga "Sincronizado" antes de cerrar sesión. Si dice "Conectando…", revisa tu internet; si dice "Error", revisa tus permisos.\n\n¿Cerrar sesión de todos modos?`)) return;
     clearLocalEventData();
     try { await signOut(FB.auth); } catch (e) { console.error("Error al cerrar sesión:", e); }
     location.reload();
@@ -113,8 +125,8 @@ export default function App() {
     if (cloudMode !== true || !FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
     // Igual que en logout: recargar desde la nube BORRA lo local (incluido el
     // outbox), así que unas altas sin subir se perderían. Avisamos primero.
-    const pend = outboxList().length;
-    if (pend && !confirm(`Tienes ${pend} registro(s) que TODAVÍA no se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que esos ${pend} registro(s) se PERDERÍAN.\n\nEspera a que el chip de arriba diga "Sincronizado" (si dice "Error", revisa tus permisos) y luego recarga.\n\n¿Recargar de todos modos?`)) return;
+    const { total, detalle } = pendientesLocales();
+    if (total && !confirm(`Tienes ${detalle} que TODAVÍA no se guardaron en la nube.\n\n"Recargar desde la nube" reemplaza lo de este dispositivo con la copia de la nube, así que se PERDERÍAN.\n\nEspera a que el chip de arriba diga "Sincronizado" (si dice "Error", revisa tus permisos) y luego recarga.\n\n¿Recargar de todos modos?`)) return;
     if (!confirm("¿Recargar los datos desde la nube?\n\nSe reemplazan los datos de ESTE dispositivo con la copia compartida en la nube. Útil si ves algo que no cuadra (por ejemplo, un peleador que aparece al registrar pero no en la lista).\n\nNo afecta la nube ni a otros dispositivos.")) return;
     clearLocalEventData();
     location.reload();
@@ -138,7 +150,15 @@ export default function App() {
   // en su lugar, migra (si hace falta) y escucha los nodos individuales de
   // boletas para que varios dispositivos vendiendo a la vez no se pisen.
   function startTicketsSync() {
-    migrateTicketsIfNeeded().then(() => watchTickets(setTicketsNew));
+    migrateTicketsIfNeeded().then(() => {
+      watchTickets(setTicketsNew);
+      // Re-sube las ventas que quedaron sin confirmar (típico: se vendió sin
+      // señal y la app se recargó, o el sistema mató la PWA mientras el
+      // vendedor mandaba el voucher por WhatsApp). Crea solo lo que falta en la
+      // nube, así que es seguro repetirlo; watchTickets refresca la lista al
+      // confirmarse cada escritura.
+      replayTicketsOutbox().catch(e => console.error("No se pudieron recuperar las ventas pendientes:", e));
+    });
   }
 
   function toggleSync() {

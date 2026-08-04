@@ -74,7 +74,13 @@ export default function HistoryView({ tickets, onDelete }) {
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold" style={{ color: ticketTypeInfo.color }}>{fmt$(t.price)}</p>
-                <Badge variant="filled" size="xs" color={t.status === "ingresado" ? "#4ADE80" : "#FCD34D"}>{t.status === "ingresado" ? "✓ In" : "● Act"}</Badge>
+                {/* `_pending`: la venta está guardada en este dispositivo y en
+                    cola, pero la nube todavía no la confirmó (se re-sube sola).
+                    Se avisa para que nadie borre los datos locales creyendo que
+                    ya está a salvo. */}
+                {t._pending
+                  ? <Badge variant="filled" size="xs" color="#FB923C">⏳ Subiendo</Badge>
+                  : <Badge variant="filled" size="xs" color={t.status === "ingresado" ? "#4ADE80" : "#FCD34D"}>{t.status === "ingresado" ? "✓ In" : "● Act"}</Badge>}
               </div>
               <button onClick={() => del(t.id)} className={"p-1.5 rounded-[10px] flex-shrink-0 transition-colors " + (confirmDeleteId === t.id ? "text-red-400 bg-red-500/10" : "text-gray-500 hover:text-red-400")} title="Eliminar entrada">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
