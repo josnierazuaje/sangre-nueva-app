@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
-import { reconcileData } from "./lib/dedup.js";
+import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./lib/dedup.js";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -227,13 +227,33 @@ export default function App() {
   // garantizado — reconciliar sobre un estado parcial podría eliminar al
   // registro equivocado y propagar el error a todos los dispositivos); en
   // modo solo-local, corre de inmediato porque lo local es toda la verdad.
-  const reconcileEnabled = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups && hydrated.super4);
+  // En modo nube SOLO reconcilia el DUEÑO, y nunca en modo escáner: los 2-4
+  // teléfonos de la puerta no tienen por qué escribir jamás en el padrón ni en
+  // la cartelera (el modo escáner limitaba la pantalla, pero este efecto corría
+  // igual porque el early-return del escáner está en el render, no aquí).
+  // En modo solo-local sí corre siempre: ahí lo local es toda la verdad y no
+  // hay nadie a quien pisar.
+  const reconcileEnabled = !scanMode && (cloudMode === false || (cloudMode === true && isOwner && hydrated.fighters && hydrated.matchups && hydrated.super4));
   useEffect(() => {
     if (!reconcileEnabled || !fighters.length) return;
-    const { dedupedFighters, cleanedMatchups, cleanedSuper4, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
-    if (fightersChanged) { setFighters(dedupedFighters); save("bm_fighters_v4", dedupedFighters); console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es)."); }
-    if (matchupsChanged) { setMatchups(cleanedMatchups); save("bm_matchups_v3", cleanedMatchups); }
-    if (super4Changed) { setSuper4(cleanedSuper4); save("bm_super4_v1", cleanedSuper4); }
+    const { dedupedFighters, cleanedMatchups, cleanedSuper4, idMap, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
+    // Local primero (optimista) y a la nube por TRANSACCIÓN: la limpieza se
+    // vuelve a aplicar sobre el estado fresco del servidor, así no borra lo que
+    // otro dispositivo acaba de registrar (antes se reescribía el nodo entero
+    // con esta copia, que podía estar atrasada).
+    if (fightersChanged) {
+      setFighters(dedupedFighters); saveLocal("bm_fighters_v4", dedupedFighters);
+      reconcileNodeTx("bm_fighters_v4", arr => dedupeFighters(arr, matchups, super4).fighters, merged => setFighters(normalizeFighters(merged)));
+      console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es).");
+    }
+    if (matchupsChanged) {
+      setMatchups(cleanedMatchups); saveLocal("bm_matchups_v3", cleanedMatchups);
+      reconcileNodeTx("bm_matchups_v3", arr => cleanMatchups(arr, idMap), merged => setMatchups(merged));
+    }
+    if (super4Changed) {
+      setSuper4(cleanedSuper4); saveLocal("bm_super4_v1", cleanedSuper4);
+      reconcileNodeTx("bm_super4_v1", arr => remapSuper4(arr, idMap), merged => setSuper4(normalizeSuper4(merged)));
+    }
   }, [fighters, matchups, super4, reconcileEnabled]);
 
   // AUTO-REPARO de "fantasmas": una sola vez por sesión, al conectar y recibir

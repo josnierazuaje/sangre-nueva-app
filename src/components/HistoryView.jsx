@@ -5,12 +5,20 @@ import { normName } from "../lib/dedup.js";
 import { buildEntradasCsv, buildEntradasHtml } from "../lib/entradasReporte.js";
 import { printHtml } from "../lib/printHtml.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
+import TicketPreview from "./TicketPreview.jsx";
 
 export default function HistoryView({ tickets, onDelete }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  // Boleta cuyo voucher se está reenviando. Hasta ahora el voucher solo existía
+  // mientras la venta recién hecha siguiera en pantalla, y la siguiente venta lo
+  // reemplazaba: si el navegador bloqueaba la ventana de WhatsApp, el vendedor
+  // olvidaba pegar la imagen o atendía al siguiente cliente, el comprador
+  // quedaba pagado y SIN entrada, sin ninguna vía para mandársela después (la
+  // única salida era anular y re-vender, duplicando correlativo y recaudación).
+  const [compartir, setCompartir] = useState(null);
   function del(id) { if (confirmDeleteId === id) { onDelete(id); setConfirmDeleteId(null); } else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); } }
   const filtered = useMemo(() => {
     let r = [...tickets].reverse();
@@ -82,6 +90,9 @@ export default function HistoryView({ tickets, onDelete }) {
                   ? <Badge variant="filled" size="xs" color="#FB923C">⏳ Subiendo</Badge>
                   : <Badge variant="filled" size="xs" color={t.status === "ingresado" ? "#4ADE80" : "#FCD34D"}>{t.status === "ingresado" ? "✓ In" : "● Act"}</Badge>}
               </div>
+              <button onClick={() => setCompartir(compartir && compartir.id === t.id ? null : t)} className={"p-1.5 rounded-[10px] flex-shrink-0 transition-colors " + (compartir && compartir.id === t.id ? "text-boxing-goldFight bg-boxing-goldFight/10" : "text-gray-500 hover:text-boxing-goldFight")} title="Volver a mostrar el voucher para enviarlo">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342a3 3 0 100-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684zm0-12.632a3 3 0 105.368-2.684 3 3 0 00-5.368 2.684z" /></svg>
+              </button>
               <button onClick={() => del(t.id)} className={"p-1.5 rounded-[10px] flex-shrink-0 transition-colors " + (confirmDeleteId === t.id ? "text-red-400 bg-red-500/10" : "text-gray-500 hover:text-red-400")} title="Eliminar entrada">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </button>
@@ -89,6 +100,19 @@ export default function HistoryView({ tickets, onDelete }) {
           );
         })}
       </div>
+      {/* Reenvío del voucher: se muestra en una capa encima para no romper la
+          rejilla de dos columnas del escritorio. Reusa TicketPreview tal cual
+          —ya recibe la boleta como dato—, así que el botón de WhatsApp, el QR y
+          el aviso de pegar la imagen funcionan igual que al vender. */}
+      {compartir && <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.72)" }} onClick={() => setCompartir(null)}>
+        <div className="w-full max-w-md max-h-full overflow-y-auto space-y-2 scale-in" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[14px] text-boxing-goldFight font-bold uppercase tracking-widest">Reenviar entrada #{compartir.id}</p>
+            <button onClick={() => setCompartir(null)} title="Cerrar" className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full text-boxing-muted hover:text-boxing-cream transition-colors" style={{ background: "rgba(255,255,255,0.06)" }}>✕</button>
+          </div>
+          <TicketPreview key={compartir.id} ticket={compartir} />
+        </div>
+      </div>}
     </div>
   );
 }

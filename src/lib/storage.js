@@ -156,6 +156,39 @@ export function loadFighters() {
   return load("bm_fighters_v4", []);
 }
 
+// Guarda SOLO en este dispositivo, sin tocar la nube. Lo usa la reconciliación
+// automática, que a la nube escribe por transacción (reconcileNodeTx).
+export function saveLocal(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); }
+  catch (e) { console.error("No se pudo guardar " + k + " en este dispositivo:", e); }
+}
+
+// Aplica una limpieza (dedup de peleadores, saneo de la cartelera…) SOBRE el
+// estado más fresco del servidor, dentro de una transacción.
+//
+// Antes, la reconciliación automática llamaba a save(), que hace un dbSet del
+// nodo COMPLETO desde la copia local — justo el patrón last-write-wins que las
+// altas de peleadores habían dejado atrás. La carrera era real: un dispositivo
+// registraba a alguien (transacción confirmada, fuera del outbox) y, casi a la
+// vez, otro detectaba un duplicado cualquiera y reescribía el nodo entero con
+// su arreglo atrasado; el peleador nuevo desaparecía de la nube y, vía onValue,
+// de todos los dispositivos. Y como TODOS los que reciben el duplicado disparan
+// su limpieza a la vez, la ventana se multiplicaba.
+//
+// `aplicar(arr)` debe ser pura y recibir el arreglo del servidor. Si no cambia
+// nada, la transacción se ABORTA (no escribe) para no generar un bucle.
+export function reconcileNodeTx(key, aplicar, onMerged) {
+  if (!FB.ready) return;
+  runTransaction(ref(FB.db, fbPath(key)), cur => {
+    const arr = nodeToArray(cur);
+    if (!arr.length) return cur; // nodo vacío o aún sin llegar: no pisar a ciegas
+    const next = aplicar(arr);
+    if (!Array.isArray(next) || JSON.stringify(next) === JSON.stringify(arr)) return; // sin cambios: abortar
+    return fighterNodeValue(next); // saneo + centinela "__EMPTY__"
+  }).then(res => { if (res.committed) onMerged?.(nodeToArray(res.snapshot.val())); })
+    .catch(e => reportSyncError("No se pudo sincronizar la limpieza automática de " + key + ":", e));
+}
+
 // Lee el valor AUTORITATIVO de un nodo-arreglo directo desde la nube (una sola
 // lectura, no un listener). Lo usa el auto-reparo: si un guardado falló y quedó
 // un registro "fantasma" solo en este dispositivo (existe local pero no en la
