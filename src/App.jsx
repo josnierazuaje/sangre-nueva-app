@@ -205,7 +205,9 @@ export default function App() {
       try {
         onAuthStateChanged(FB.auth, user => {
           setAuthUser(user);
-          if (user) { startFirebaseSync(setSync, applyRemote, keyReady); startTicketsSync(); }
+          // En modo escáner solo se abre la conexión (para el chip y el
+          // check-in) y las boletas: nada de peleadores, cartelera ni Super 4.
+          if (user) { startFirebaseSync(setSync, applyRemote, keyReady, { soloConexion: scanMode }); startTicketsSync(); }
           else setSync("off");
         });
       } catch (e) { setAuthUser(null); setSync("error"); }
