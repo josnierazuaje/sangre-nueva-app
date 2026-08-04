@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx } from "./lib/storage.js";
+import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
@@ -419,10 +419,44 @@ export default function App() {
   function restoreTicketsFromImport(ticketsNew) {
     if (!Array.isArray(ticketsNew) || !ticketsNew.length) return;
     if (!FB.ready) { alert("El respaldo trae " + ticketsNew.length + " boleta(s), pero restaurarlas requiere conexión a internet. Vuelve a importar el archivo con conexión."); return; }
-    if (!confirm("¿Restaurar también " + ticketsNew.length + " boleta(s) del respaldo? Se agregan (por número) a las que ya existan.")) return;
+    if (!confirm("¿Restaurar también " + ticketsNew.length + " boleta(s) del respaldo?\n\nSe agregan SOLO las que falten. Las que ya existen no se tocan, así que no se pierde ningún ingreso ya marcado.")) return;
     restoreTicketsFromBackup(ticketsNew)
-      .then(n => alert("Se restauraron " + n + " boleta(s) del respaldo."))
+      .then(({ agregadas, omitidas }) => alert(
+        agregadas
+          ? "Se agregaron " + agregadas + " boleta(s) del respaldo." + (omitidas ? "\n\nOtras " + omitidas + " ya existían y se dejaron como estaban (no se revirtió ningún ingreso)." : "")
+          : "No hizo falta agregar nada: las " + omitidas + " boleta(s) del respaldo ya estaban en la nube."))
       .catch(err => { console.error("No se pudieron restaurar las boletas:", err); alert("No se pudieron restaurar las boletas del respaldo.\n\nError: " + err.message); });
+  }
+
+  // Restaurar un respaldo GUARDADO EN LA NUBE. "Reiniciar evento" ya guardaba
+  // una copia allí, pero la app no sabía leerla: recuperarla exigía entrar a la
+  // consola de Firebase. Reusa el mismo camino que la importación de un archivo
+  // (restoreTicketsFromImport ya agrega solo las boletas que faltan, sin
+  // revertir ingresos).
+  async function restaurarDesdeLaNube() {
+    if (!FB.ready) { alert("No hay conexión con la nube en este momento.\n\nRevisa tu internet e intenta de nuevo."); return; }
+    let copias;
+    try { copias = await listCloudBackups(); }
+    catch (e) { console.error("No se pudieron listar los respaldos:", e); alert("No se pudieron leer los respaldos de la nube.\n\nError: " + e.message); return; }
+    if (!copias.length) { alert("Todavía no hay respaldos en la nube.\n\nSe guarda uno automáticamente cada vez que usas \"Reiniciar evento\"."); return; }
+    const lista = copias.map((c, i) => `${i + 1}) ${c.fecha} — ${c.peleadores} peleador(es), ${c.peleas} pelea(s), ${c.boletas} boleta(s)`).join("\n");
+    const elegido = prompt(`Respaldos guardados en la nube (el 1 es el más reciente):\n\n${lista}\n\nEscribe el número del que quieres restaurar:`);
+    if (elegido === null) return;
+    const idx = parseInt(elegido, 10) - 1;
+    if (!(idx >= 0 && idx < copias.length)) { alert("Ese número no está en la lista. No se restauró nada."); return; }
+    const c = copias[idx];
+    if (!confirm(`¿Restaurar el respaldo del ${c.fecha}?\n\nSe REEMPLAZAN los peleadores, las peleas y el Super 4 que hay ahora por los del respaldo.\n\nLas boletas se AGREGAN: las que ya existen no se tocan, así que no se pierde ningún ingreso ya marcado.\n\nAntes de reemplazar se descarga una copia de lo que tienes ahora.`)) return;
+    handleExport(); // red de seguridad: lo actual queda en un archivo
+    let d;
+    try { d = await fetchCloudBackup(c.clave); }
+    catch (e) { console.error("No se pudo leer el respaldo:", e); alert("No se pudo leer ese respaldo.\n\nError: " + e.message); return; }
+    if (!d) { alert("Ese respaldo ya no está en la nube."); return; }
+    if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); }
+    if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); }
+    if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); }
+    if (d.eventLabel) { setEventLabel(d.eventLabel); save("bm_event_label", d.eventLabel); }
+    restoreTicketsFromImport(d.ticketsNew);
+    alert(`Respaldo del ${c.fecha} restaurado.`);
   }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
@@ -472,6 +506,7 @@ export default function App() {
   // pie del sidebar de escritorio.
   const menuActions = [
     { label: "Recargar desde la nube", danger: false, run: reloadFromCloud },
+    { label: "Restaurar respaldo de la nube", danger: false, run: restaurarDesdeLaNube },
     { label: "Importar", danger: false, run: handleImport },
     { label: "Exportar", danger: false, run: handleExport },
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },
@@ -497,7 +532,13 @@ export default function App() {
       <header style={{ flexShrink: 0, borderBottom: "1px solid #2a1f2e", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-40px", left: "50%", transform: "translateX(-50%)", width: "320px", height: "160px", background: "radial-gradient(ellipse, rgba(155,26,42,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div className="flex justify-between items-center px-3 pt-2" style={{ position: "relative" }}>
-          <button onClick={toggleSync} className={syncBtnCls}>{syncLabel}</button>
+          {/* En modo escáner el chip es SOLO un indicador, no un botón. Era uno
+              de los dos únicos controles de la pantalla y su diálogo suena
+              inofensivo ("los datos locales se conservan"), pero al aceptarlo el
+              aparato queda sin nube y ni siquiera puede volver a iniciar sesión:
+              había que borrar los datos del sitio o reinstalar la PWA, algo que
+              el staff de la puerta no va a hacer con la fila esperando. */}
+          <span className={syncBtnCls} title="Estado de la conexión">{syncLabel}</span>
           <button onClick={salirEscaner} title="Salir del modo escáner y cerrar sesión" className="text-[14px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 tracking-widest uppercase transition-colors">Salir</button>
         </div>
         <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>

@@ -14,6 +14,14 @@ function sameGym(a, b) {
 // nunca se empareja con un peleador de 15.
 const MAX_FIGHT_DIFF = 3;
 const PRO_FIGHTS = 15;
+// Renumera las peleas de 1 a N respetando el orden de la lista. Se aplica
+// DESPUÉS de fusionar contra el estado del servidor (ver matchupsTx), porque un
+// número calculado sobre la copia local puede chocar con una pelea que otro
+// dispositivo agregó mientras tanto.
+export function renumerarPeleas(list) {
+  return (Array.isArray(list) ? list : []).filter(Boolean).map((m, i) => ({ ...m, roundNumber: i + 1 }));
+}
+
 export function experienceOk(a, b) {
   const fa = a.fightCount || 0, fb = b.fightCount || 0;
   if (Math.abs(fa - fb) <= MAX_FIGHT_DIFF) return true;

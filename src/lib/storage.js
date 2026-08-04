@@ -156,6 +156,26 @@ export function loadFighters() {
   return load("bm_fighters_v4", []);
 }
 
+// Escribe la CARTELERA fusionando contra el estado más fresco del servidor.
+//
+// Era el último nodo que se reescribía entero desde la copia local (save()).
+// La ventana no es de milisegundos: la cola sin conexión del SDK guarda la
+// escritura TAL CUAL y la manda al reconectar, así que una tablet que editó una
+// nota el viernes con la señal caída y quedó abierta en segundo plano podía, al
+// recuperar red el sábado, sobrescribir el nodo con su arreglo viejo y borrar
+// toda la cartelera armada después (y resucitar peleas ya eliminadas).
+//
+// `aplicar(arr)` recibe el arreglo del SERVIDOR y devuelve el nuevo; los
+// llamadores renumeran ahí dentro (renumerarPeleas) para que los números de
+// pelea salgan del estado fusionado, no del local.
+export function matchupsTx(aplicar, optimista, onMerged) {
+  saveLocal("bm_matchups_v3", optimista);
+  if (!FB.ready) return;
+  runTransaction(ref(FB.db, fbPath("bm_matchups_v3")), cur => fighterNodeValue(aplicar(nodeToArray(cur))))
+    .then(res => { if (res.committed) onMerged?.(nodeToArray(res.snapshot.val())); })
+    .catch(e => reportSyncError("No se pudo sincronizar la cartelera (el cambio sí quedó guardado localmente):", e));
+}
+
 // Guarda SOLO en este dispositivo, sin tocar la nube. Lo usa la reconciliación
 // automática, que a la nube escribe por transacción (reconcileNodeTx).
 export function saveLocal(k, v) {
@@ -363,6 +383,17 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
 // ============================================
 export function loadTicketsV4() { return load("bm_tickets_v4", []); }
 
+// Guarda el espejo local de boletas cuando NO hay nube. Con la sincronización
+// desconectada, watchTickets no corre y era el único que escribía ese espejo:
+// las ventas y los check-ins vivían solo en la memoria de la página, así que
+// recargar la app —el gesto habitual para "actualizarla"— dejaba el registro de
+// ventas en cero, sin error ni aviso. Y el propio diálogo de desconectar
+// prometía justo lo contrario ("los datos locales se conservan").
+export function cacheTicketsSiSinNube(list) {
+  if (FB.ready) return; // con nube, watchTickets ya mantiene el espejo al día
+  cacheTicketsV4(list);
+}
+
 // Lee UNA boleta directo de la nube. La puerta valida contra el espejo local
 // (rápido, y funciona sin señal), pero ese espejo puede no tenerla todavía: un
 // teléfono recién abierto con "?scan=1" empieza vacío y tarda en bajar las
@@ -399,7 +430,13 @@ function withTimeout(promise, ms) {
 
 // Correlativo local (sin sincronización): se deriva del máximo id ya usado
 // en las boletas que ya tenemos, sin depender de un contador aparte.
-function maxCounterFromTickets(tickets, tipo) {
+// Sufijo único para los ids de emergencia: reloj + aleatorio, el mismo patrón
+// que genId() ya usa para los peleadores.
+export function emergencySuffix() {
+  return (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+}
+
+export function maxCounterFromTickets(tickets, tipo) {
   let max = 0;
   (tickets || []).forEach(t => {
     if (t.ticketType !== tipo) return;
@@ -422,7 +459,12 @@ export async function nextTicketId(tipo, prefix, localTickets) {
     } catch (e) {
       console.error("No se pudo generar un correlativo en la nube (¿sin conexión?); se usa un id de emergencia:", e);
     }
-    return prefix + "-X" + Date.now().toString(36).toUpperCase();
+    // Id de emergencia. Lleva una parte ALEATORIA además del reloj: sin ella,
+    // dos teléfonos vendiendo el mismo tipo de entrada en el mismo milisegundo
+    // generaban el MISMO id, la segunda venta pisaba a la primera (mismo nodo,
+    // last-write-wins) y en la puerta el QR del primer comprador cotejaba
+    // contra el token del segundo: "entrada falsificada" a alguien que pagó.
+    return prefix + "-X" + emergencySuffix();
   }
   const next = maxCounterFromTickets(localTickets, tipo) + 1;
   return prefix + "-" + padN(next);
@@ -711,21 +753,32 @@ export function watchTickets(onChange, onEstado) {
 // tipo. Ignora ids vacíos y los de emergencia (prefijo-XNNN, sin dígitos tras
 // el guion), que no cuentan para el correlativo. La usan la migración en
 // caliente y la restauración de un respaldo.
-export function buildTicketRestore(tickets) {
+export function buildTicketRestore(tickets, idsExistentes = []) {
+  const yaEstan = new Set(idsExistentes);
   const ticketUpdates = {};
   const maxByType = {};
+  const omitidos = [];
   (tickets || []).forEach(t => {
     if (!t || !t.id) return;
-    // stripLocalFlags: un respaldo exportado mientras había ventas pendientes
-    // arrastra la marca `_pending`, que no debe llegar a la nube.
-    ticketUpdates["tickets/" + t.id] = stripLocalFlags(t);
+    // El correlativo cuenta SIEMPRE, exista o no la boleta: el contador nunca
+    // debe bajar, o se reasignarían números ya usados.
     const m = /^[A-Za-z]+-(\d+)$/.exec(t.id);
     if (m) {
       const n = parseInt(m[1], 10);
       if (n > (maxByType[t.ticketType] || 0)) maxByType[t.ticketType] = n;
     }
+    // Las que YA están en la nube no se tocan. Antes se sobrescribían enteras,
+    // así que restaurar el respaldo de la mañana a mitad del evento devolvía a
+    // "activo" todas las boletas que ya habían entrado (con checkedInAt en
+    // null) y cada QR usado volvía a admitir a su grupo completo. El diálogo
+    // siempre prometió lo contrario: "se agregan (por número) a las que ya
+    // existan" — ahora eso es literalmente lo que hace.
+    if (yaEstan.has(t.id)) { omitidos.push(t.id); return; }
+    // stripLocalFlags: un respaldo exportado mientras había ventas pendientes
+    // arrastra la marca `_pending`, que no debe llegar a la nube.
+    ticketUpdates["tickets/" + t.id] = stripLocalFlags(t);
   });
-  return { ticketUpdates, maxByType };
+  return { ticketUpdates, maxByType, omitidos };
 }
 
 // Migración en caliente, una sola vez: si sangre_nueva/tickets todavía no
@@ -765,15 +818,21 @@ export async function migrateTicketsIfNeeded() {
 // cuántas boletas escribió. Requiere conexión (los nodos de boletas viven solo
 // en la nube); si no hay FB, no hace nada y devuelve 0.
 export async function restoreTicketsFromBackup(tickets) {
-  if (!FB.ready || !Array.isArray(tickets) || !tickets.length) return 0;
-  const { ticketUpdates, maxByType } = buildTicketRestore(tickets);
+  if (!FB.ready || !Array.isArray(tickets) || !tickets.length) return { agregadas: 0, omitidas: 0 };
+  // Se mira PRIMERO qué boletas existen ya en la nube: las del respaldo que ya
+  // están se dejan intactas (ver buildTicketRestore). Es la diferencia entre
+  // "agregar lo que falta" y "devolver el evento a como estaba en la mañana".
+  const snap = await get(ref(FB.db, fbPath("tickets")));
+  const existentes = Object.keys(snap.val() || {});
+  const { ticketUpdates, maxByType, omitidos } = buildTicketRestore(tickets, existentes);
   const n = Object.keys(ticketUpdates).length;
-  if (!n) return 0;
-  await dbUpdate(ref(FB.db, fbPath("")), ticketUpdates);
+  if (n) await dbUpdate(ref(FB.db, fbPath("")), ticketUpdates);
+  // Los contadores suben al máximo restaurado aunque no se agregara ninguna
+  // boleta: nunca se baja un correlativo.
   await Promise.all(Object.entries(maxByType).map(([tipo, max]) =>
     runTransaction(ref(FB.db, fbPath("counters/" + tipo)), cur => Math.max(cur || 0, max))
   ));
-  return n;
+  return { agregadas: n, omitidas: omitidos.length };
 }
 
 export function clearTicketsCache() { localStorage.removeItem("bm_tickets_v4"); }
@@ -805,6 +864,43 @@ export function clearLocalEventData() {
 // Guarda una copia completa del evento en sangre_nueva_backups/{fecha}.
 // Ese nodo está protegido en database.rules.json para que solo el dueño
 // (por email) pueda leerlo o escribirlo — la Fase 2 ya deja esa regla lista.
+// Lista los respaldos guardados en la nube, del más nuevo al más viejo, con la
+// fecha ya legible y un resumen de lo que contienen. Hasta ahora "Reiniciar
+// evento" guardaba una copia que la app NO sabía volver a leer: la única forma
+// de recuperarla era entrar a la consola de Firebase, algo fuera del alcance
+// del organizador. Solo el dueño puede leer ese nodo (ver database.rules.json).
+export async function listCloudBackups() {
+  if (!FB.ready) return [];
+  const snap = await get(ref(FB.db, "sangre_nueva_backups"));
+  const val = snap.val() || {};
+  return Object.entries(val).map(([clave, d]) => ({
+    clave,
+    // La clave es un ISO con "." y ":" cambiados por "-" (ver backupEventToCloud).
+    fecha: descifrarFechaRespaldo(clave),
+    peleadores: nodeToArray(d && d.fighters).length,
+    peleas: nodeToArray(d && d.matchups).length,
+    boletas: nodeToArray(d && d.ticketsNew).length,
+    eventLabel: (d && d.eventLabel) || "",
+  })).sort((a, b) => b.clave.localeCompare(a.clave));
+}
+
+// Pura y testeable: de la clave del respaldo saca una fecha legible en español.
+// Devuelve la clave tal cual si no se puede interpretar (nunca falla).
+export function descifrarFechaRespaldo(clave) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/.exec(String(clave || ""));
+  if (!m) return String(clave || "");
+  const [, a, mes, d, h, min] = m;
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  return `${Number(d)} de ${MESES[Number(mes) - 1] || mes} de ${a}, ${h}:${min}`;
+}
+
+// Trae un respaldo completo de la nube para restaurarlo.
+export async function fetchCloudBackup(clave) {
+  if (!FB.ready) return null;
+  const snap = await get(ref(FB.db, "sangre_nueva_backups/" + clave));
+  return snap.exists() ? snap.val() : null;
+}
+
 export async function backupEventToCloud(data) {
   if (!FB.ready) return null;
   const key = new Date().toISOString().replace(/[.:]/g, "-");

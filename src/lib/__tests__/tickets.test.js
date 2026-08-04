@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractTicketData, extractTicketCode, verifyTicketToken, genTicketToken, clampTicketQty, ticketUnitPrice, ticketQty, MAX_TICKET_QTY } from "../../constants.js";
+import { extractTicketData, extractTicketCode, verifyTicketToken, genTicketToken, clampTicketQty, ticketUnitPrice, ticketQty, MAX_TICKET_QTY, normTicketId, findTicketByCode } from "../../constants.js";
 
 const ORIGIN = "https://sangre-nueva-la-velada.pages.dev/";
 
@@ -101,6 +101,56 @@ describe("ticketQty / ticketUnitPrice (compat con boletas viejas)", () => {
     const t = { price: 5000, quantity: 0 };
     expect(ticketQty(t)).toBe(1);        // 0 → compat, cuenta como 1
     expect(ticketUnitPrice(t)).toBe(5000);
+  });
+});
+
+describe("búsqueda manual en la puerta (el plan B cuando el QR no se puede escanear)", () => {
+  const PRE = { id: "PRE-0001", attendeeName: "Ana", ticketType: "preventa" };
+  const PUE = { id: "PUE-0001", attendeeName: "Beto", ticketType: "puerta" };
+  const PRE42 = { id: "PRE-0042", attendeeName: "Caro", ticketType: "preventa" };
+  const EMERG = { id: "PRE-XK3J9", attendeeName: "Dani", ticketType: "preventa" };
+
+  describe("normTicketId", () => {
+    it("ignora guiones, espacios y mayúsculas", () => {
+      ["PRE-0001", "pre0001", "PRE 0001", " pre - 0001 ", "Pre_0001"].forEach(s =>
+        expect(normTicketId(s)).toBe("PRE0001"));
+    });
+    it("no explota con valores vacíos", () => {
+      expect(normTicketId(null)).toBe("");
+      expect(normTicketId(undefined)).toBe("");
+    });
+  });
+
+  describe("findTicketByCode", () => {
+    const lista = [PRE, PUE, PRE42, EMERG];
+    it("encuentra escrito de cualquier forma (antes daba 'no encontrada')", () => {
+      ["PRE-0042", "pre0042", "PRE 0042", "  pre-0042  "].forEach(s =>
+        expect(findTicketByCode(lista, s).ticket).toBe(PRE42));
+    });
+    it("encuentra tecleando solo el número, si no hay duda", () => {
+      expect(findTicketByCode(lista, "0042").ticket).toBe(PRE42);
+      expect(findTicketByCode(lista, "42").ticket).toBe(PRE42);
+    });
+    it("si el número lo comparten varios tipos, NO adivina: los devuelve para elegir", () => {
+      const r = findTicketByCode(lista, "0001");
+      expect(r.ticket).toBeUndefined();
+      expect(r.ambiguas.map(t => t.id).sort()).toEqual(["PRE-0001", "PUE-0001"]);
+    });
+    it("el id completo manda aunque el número se repita", () => {
+      expect(findTicketByCode(lista, "PUE-0001").ticket).toBe(PUE);
+    });
+    it("encuentra un id de emergencia", () => {
+      expect(findTicketByCode(lista, "prexk3j9").ticket).toBe(EMERG);
+    });
+    it("devuelve vacío si no existe, si está vacío o si la lista no sirve", () => {
+      expect(findTicketByCode(lista, "PRE-9999")).toEqual({});
+      expect(findTicketByCode(lista, "")).toEqual({});
+      expect(findTicketByCode(lista, null)).toEqual({});
+      expect(findTicketByCode(null, "PRE-0001")).toEqual({});
+    });
+    it("no confunde el número con un id de emergencia parecido", () => {
+      expect(findTicketByCode([EMERG], "3").ticket).toBeUndefined();
+    });
   });
 });
 

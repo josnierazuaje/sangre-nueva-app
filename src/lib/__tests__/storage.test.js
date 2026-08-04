@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn, maxCounterFromTickets, emergencySuffix, descifrarFechaRespaldo } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -279,8 +279,33 @@ describe("buildTicketRestore", () => {
     expect(maxByType).toEqual({ preventa: 1 });
   });
   it("lista vacía o nula → objetos vacíos", () => {
-    expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {} });
-    expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {} });
+    expect(buildTicketRestore([])).toEqual({ ticketUpdates: {}, maxByType: {}, omitidos: [] });
+    expect(buildTicketRestore(null)).toEqual({ ticketUpdates: {}, maxByType: {}, omitidos: [] });
+  });
+
+  describe("restaurar NO debe revertir los check-ins ya marcados", () => {
+    it("CLAVE: omite las boletas que ya existen en la nube, en vez de pisarlas", () => {
+      // El respaldo de la mañana las trae en "activo": si se escribieran encima,
+      // cada QR ya usado volvería a admitir a su grupo completo.
+      const delRespaldo = [t("PRE-0001", "preventa"), t("PRE-0002", "preventa")];
+      const { ticketUpdates, omitidos } = buildTicketRestore(delRespaldo, ["PRE-0001"]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0002"]);
+      expect(omitidos).toEqual(["PRE-0001"]);
+    });
+    it("sí agrega las que faltan (que es lo que el diálogo promete)", () => {
+      const { ticketUpdates, omitidos } = buildTicketRestore([t("PRE-0009", "preventa")], ["PRE-0001"]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0009"]);
+      expect(omitidos).toEqual([]);
+    });
+    it("el correlativo cuenta AUNQUE la boleta ya exista (nunca se reasigna un número)", () => {
+      const { ticketUpdates, maxByType } = buildTicketRestore([t("PRE-0042", "preventa")], ["PRE-0042"]);
+      expect(ticketUpdates).toEqual({});
+      expect(maxByType).toEqual({ preventa: 42 });
+    });
+    it("sin lista de existentes se comporta como antes (lo usa la migración)", () => {
+      const { ticketUpdates } = buildTicketRestore([t("PRE-0001", "preventa")]);
+      expect(Object.keys(ticketUpdates)).toEqual(["tickets/PRE-0001"]);
+    });
   });
 });
 
@@ -372,5 +397,45 @@ describe("fighterNodeValue (lo que la transacción manda a RTDB)", () => {
 
   it("una lista normal pasa intacta", () => {
     expect(fighterNodeValue([A, B])).toEqual([A, B]);
+  });
+});
+
+describe("correlativos de boleta", () => {
+  const t = (id, ticketType) => ({ id, ticketType });
+  it("maxCounterFromTickets toma el mayor de ESE tipo", () => {
+    const lista = [t("PRE-0003", "preventa"), t("PRE-0010", "preventa"), t("PUE-0099", "puerta")];
+    expect(maxCounterFromTickets(lista, "preventa")).toBe(10);
+    expect(maxCounterFromTickets(lista, "puerta")).toBe(99);
+  });
+  it("ignora los ids de emergencia (no tienen correlativo)", () => {
+    expect(maxCounterFromTickets([t("PRE-0005", "preventa"), t("PRE-XK3J9", "preventa")], "preventa")).toBe(5);
+  });
+  it("sin boletas de ese tipo → 0 (la primera será la 1)", () => {
+    expect(maxCounterFromTickets([t("PRE-0005", "preventa")], "puerta")).toBe(0);
+    expect(maxCounterFromTickets(null, "preventa")).toBe(0);
+  });
+
+  describe("emergencySuffix (sin señal)", () => {
+    it("CLAVE: dos ventas en el mismo milisegundo NO chocan", () => {
+      // Antes dependía solo del reloj: el mismo milisegundo daba el mismo id,
+      // la segunda venta pisaba a la primera y en la puerta el QR del primer
+      // comprador salía como falsificado.
+      const s = new Set();
+      for (let i = 0; i < 2000; i++) s.add(emergencySuffix());
+      expect(s.size).toBeGreaterThan(1995);
+    });
+    it("solo letras y números en mayúscula (cabe en el id)", () => {
+      for (let i = 0; i < 50; i++) expect(emergencySuffix()).toMatch(/^[0-9A-Z]+$/);
+    });
+  });
+});
+
+describe("descifrarFechaRespaldo (para que el dueño reconozca su respaldo)", () => {
+  it("convierte la clave técnica en una fecha legible", () => {
+    expect(descifrarFechaRespaldo("2026-08-04T13-45-10-123Z")).toBe("4 de agosto de 2026, 13:45");
+  });
+  it("devuelve la clave tal cual si no la entiende (nunca falla)", () => {
+    expect(descifrarFechaRespaldo("cualquier-cosa")).toBe("cualquier-cosa");
+    expect(descifrarFechaRespaldo(null)).toBe("");
   });
 });

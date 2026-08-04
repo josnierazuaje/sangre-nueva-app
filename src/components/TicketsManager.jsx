@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken, clampTicketQty, ticketQty } from "../constants.js";
-import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode } from "../lib/storage.js";
+import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode, cacheTicketsSiSinNube } from "../lib/storage.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";
@@ -43,7 +43,10 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     // token: acompaña al id en el QR para que el check-in pueda distinguir una
     // boleta legítima de un correlativo adivinado (ver verifyTicketToken).
     const newT = { ...data, id, token: genTicketToken(), quantity, price: ticketTypeInfo.price * quantity, status: "activo", createdAt: new Date().toISOString(), checkedInAt: null };
-    setTickets([...tickets, newT]);
+    const conNueva = [...tickets, newT];
+    setTickets(conNueva);
+    // Sin nube, este espejo local es lo ÚNICO que sobrevive a una recarga.
+    cacheTicketsSiSinNube(conNueva);
     addTicketNode(newT);
     return newT;
   }
@@ -57,12 +60,16 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
     // claramente en ámbar, y el outbox la reintenta hasta confirmarla.
     if (res.ok || res.already || res.offline || res.pendiente) {
       const checkedInAt = res.ticket?.checkedInAt || new Date().toISOString();
-      setTickets(tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t));
+      const actualizadas = tickets.map(t => t.id === id ? { ...t, status: "ingresado", checkedInAt } : t);
+      setTickets(actualizadas);
+      cacheTicketsSiSinNube(actualizadas);
     }
     return res;
   }
   function deleteTicket(id) {
-    setTickets(tickets.filter(t => t.id !== id));
+    const restantes = tickets.filter(t => t.id !== id);
+    setTickets(restantes);
+    cacheTicketsSiSinNube(restantes);
     removeTicketNode(id);
   }
   const tabs = [{ k: "sell", label: "Vender" }, { k: "history", label: "Historial" }, { k: "checkin", label: "Check-in" }];

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, bestMatchAll, experienceOk, forcedMatchAll, forcedPairingReasons } from "../matchmaking.js";
+import { analyzeMatch, getScore, autoMatchAll, sorteoMatch, bestMatchAll, experienceOk, forcedMatchAll, forcedPairingReasons , renumerarPeleas } from "../matchmaking.js";
 import { getWeightCategory, getCategoryInfo, getAgeCategory } from "../../constants.js";
 
 function makeFighter(overrides) {
@@ -573,5 +573,25 @@ describe("forcedPairingReasons — correcciones de la revisión", () => {
     const { matchups, leftover } = forcedMatchAll([a, b], 1);
     expect(matchups.length).toBe(1); // se empareja igual
     expect(leftover).toEqual([]);
+  });
+});
+
+describe("renumerarPeleas (los números salen del estado fusionado, no del local)", () => {
+  it("numera de 1 a N respetando el orden", () => {
+    const out = renumerarPeleas([{ id: "a" }, { id: "b" }, { id: "c" }]);
+    expect(out.map(m => m.roundNumber)).toEqual([1, 2, 3]);
+  });
+  it("re-numera después de quitar una del medio (sin huecos)", () => {
+    const conHueco = [{ id: "a", roundNumber: 1 }, { id: "c", roundNumber: 3 }];
+    expect(renumerarPeleas(conHueco).map(m => m.roundNumber)).toEqual([1, 2]);
+  });
+  it("no muta la lista original", () => {
+    const orig = [{ id: "a", roundNumber: 9 }];
+    renumerarPeleas(orig);
+    expect(orig[0].roundNumber).toBe(9);
+  });
+  it("aguanta nulos y listas raras", () => {
+    expect(renumerarPeleas(null)).toEqual([]);
+    expect(renumerarPeleas([null, { id: "a" }]).length).toBe(1);
   });
 });
