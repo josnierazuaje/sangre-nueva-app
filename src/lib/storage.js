@@ -597,9 +597,16 @@ export function updateTicketNode(id, patch) {
 // no existe o ya no está activa). Vivía como callback anónimo dentro de
 // runTransaction, o sea que la lógica más crítica del evento no tenía una sola
 // prueba y podía romperse en un refactor sin que nada fallara.
-export function applyCheckIn(t, nowISO) {
+// `manual` = el operador tecleó el número y el QR no verificó la boleta. Se
+// GUARDA en el registro para que el cierre distinga los ingresos verificados de
+// los aceptados por criterio del staff: quien vio el voucher de otra persona
+// (una foto reenviada en un grupo) podía llegar a la puerta, decir un
+// correlativo cercano y entrar gratis a costa de una entrada pagada.
+export function applyCheckIn(t, nowISO, manual) {
   if (!t || t.status !== "activo") return undefined;
-  return { ...t, status: "ingresado", checkedInAt: nowISO };
+  const next = { ...t, status: "ingresado", checkedInAt: nowISO };
+  if (manual) next.checkedInManual = true;
+  return next;
 }
 
 // Pura y testeable: traduce el resultado de la transacción al veredicto que ve
@@ -620,8 +627,8 @@ export function interpretCheckIn(committed, val) {
 // reintentarlo al reabrir la app.
 const CHECKIN_OUTBOX_KEY = "bm_checkin_outbox";
 export function checkinOutboxList() { return pruneOutbox(load(CHECKIN_OUTBOX_KEY, []), Date.now()); }
-function checkinOutboxPut(id) {
-  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(CHECKIN_OUTBOX_KEY, []), { id }, Date.now()))); }
+function checkinOutboxPut(id, manual) {
+  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(CHECKIN_OUTBOX_KEY, []), { id, manual: !!manual }, Date.now()))); }
   catch (e) { console.error("No se pudo anotar el ingreso pendiente en este dispositivo:", e); }
 }
 function checkinOutboxRemove(id) {
@@ -648,13 +655,13 @@ function checkinOutboxRemove(id) {
 // ingresada / otra puerta la marcó), { pendiente } (sin confirmar en el
 // servidor: quedó en cola), { offline } (este dispositivo no usa la nube), o
 // { error }.
-export async function checkInTicketTx(id) {
+export async function checkInTicketTx(id, { manual = false } = {}) {
   if (!FB.ready) return { offline: true };
   const nodeRef = ref(FB.db, fbPath("tickets/" + id));
   // Se anota ANTES de lanzar: si la página muere con la escritura en vuelo, el
   // replay al reabrir es lo único que puede salvar el ingreso.
-  if (cloudIntended()) checkinOutboxPut(id);
-  const tx = runTransaction(nodeRef, t => applyCheckIn(t, new Date().toISOString()));
+  if (cloudIntended()) checkinOutboxPut(id, manual);
+  const tx = runTransaction(nodeRef, t => applyCheckIn(t, new Date().toISOString(), manual));
   // Sin socket, RTDB no resuelve la transacción hasta reconectar: esperarla
   // sería parar la fila. Se deja en vuelo y se informa como pendiente.
   if (!FB.connected) {
@@ -690,7 +697,7 @@ export async function replayCheckinOutbox() {
   let resueltos = 0;
   for (const p of pendientes) {
     try {
-      const res = await runTransaction(ref(FB.db, fbPath("tickets/" + p.id)), t => applyCheckIn(t, new Date().toISOString()));
+      const res = await runTransaction(ref(FB.db, fbPath("tickets/" + p.id)), t => applyCheckIn(t, new Date().toISOString(), p.manual));
       const val = res.snapshot.val();
       // Resuelto si la boleta quedó ingresada (por nosotros o por otra puerta),
       // y también si ya no existe o fue anulada: en esos casos no hay nada que

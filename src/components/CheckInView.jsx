@@ -66,8 +66,15 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
   async function doIn() {
     if (checking) return;
     if (!(result && typeof result === "object" && result.status === "activo" && verify !== "bad")) return;
+    // Sin verificación por QR (id tecleado a mano, o boleta vieja sin token) el
+    // ingreso se acepta por CRITERIO del staff, no por el sistema: quien vio el
+    // voucher de otra persona podía decir un correlativo cercano y entrar gratis
+    // a costa de una entrada pagada. Se pide una confirmación aparte que nombra
+    // al titular, y el ingreso queda marcado como manual en el registro.
+    const sinQR = verify === "warn";
+    if (sinQR && !confirm(`Esta entrada NO se verificó con el QR.\n\nA nombre de: ${result.attendeeName}\nBoleta: #${result.id}\n\nCotéjalo con la persona antes de dejarla pasar (pídele su boleta o un documento).\n\n¿Confirmar el ingreso igual?`)) return;
     setChecking(true); setActionErr("");
-    const res = await onCheckIn(result.id);
+    const res = await onCheckIn(result.id, { manual: sinQR });
     setChecking(false);
     if (res && res.already) {
       // Otra puerta marcó el ingreso mientras tanto: no cuenta como nuevo.
@@ -145,7 +152,11 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
     usoEscanerRef.current = true;
     // Carga el lector de QR bajo demanda, en paralelo mientras el usuario
     // concede el permiso de cámara. Si falla, queda "Validar manualmente".
-    if (!jsQRRef.current) import("jsqr").then(m => { jsQRRef.current = m.default; }).catch(e => setScanErr("No se pudo cargar el lector de QR. Usa 'Validar manualmente'. " + e.message));
+    // Si se publicó una versión nueva mientras esta pestaña estaba abierta, el
+    // service worker borra los archivos viejos y este trozo ya no existe en el
+    // servidor: la carga falla. Se ofrece recargar de un toque, porque el staff
+    // de la puerta no tiene por qué saber que "recargar" es la solución.
+    if (!jsQRRef.current) import("jsqr").then(m => { jsQRRef.current = m.default; }).catch(() => setScanErr("actualizar"));
     const requestId = {};
     scanRequestRef.current = requestId;
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
@@ -219,7 +230,13 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
         <p className="absolute bottom-2 left-0 right-0 text-center text-[14px] text-white/80">Apunta al código QR de la entrada</p>
       </div>}
       {!scanning && <button onClick={startScan} type="button" className="btn-primary w-full py-3.5 font-black flex items-center justify-center gap-2" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "2px" }}>📷 Escanear QR</button>}
-      {scanErr && <p className="text-red-400 text-sm text-center">{scanErr}</p>}
+      {scanErr === "actualizar"
+        ? <div className="text-center py-3 rounded-2xl space-y-2" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
+            <p className="text-yellow-300 text-sm">Hay una versión nueva de la app. Actualízala para volver a escanear.</p>
+            <button type="button" onClick={() => location.reload()} className="btn-gold px-4 py-2 text-sm font-bold tracking-[0.14em] uppercase">Actualizar la app</button>
+            <p className="text-gray-500 text-[14px]">Mientras tanto puedes usar "Validar manualmente".</p>
+          </div>
+        : scanErr && <p className="text-red-400 text-sm text-center">{scanErr}</p>}
       <form onSubmit={search} className="rounded-3xl p-4 space-y-3 border border-white/5" style={{ background: "linear-gradient(170deg, #131016, #0c0a0e)" }}>
         <h3 className="text-boxing-cream" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: "17px" }}>Validar manualmente</h3>
         <div className="flex gap-2">
@@ -258,7 +275,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
               ? (already
                   ? <p className="text-yellow-300 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(245,158,11,0.12)" }}>⚠️ Otra puerta ya marcó este ingreso{inAt ? " (" + inAt + ")" : ""}</p>
                   : <p className="text-green-400 text-sm font-bold text-center py-2 rounded-lg" style={{ background: "rgba(34,197,94,0.1)" }}>✓ Ya registrado como ingresado{inAt ? " (" + inAt + ")" : ""}</p>)
-              : <button onClick={doIn} disabled={checking} className="w-full py-3 rounded-2xl font-black text-white transition-all active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>{checking ? "MARCANDO..." : "✅ MARCAR INGRESO"}</button>
+              : <button onClick={doIn} disabled={checking} className="w-full py-3 rounded-2xl font-black text-white transition-all active:scale-95 disabled:opacity-60" style={{ background: verify === "warn" ? "linear-gradient(135deg,#B45309,#92400E)" : "linear-gradient(135deg,#16A34A,#15803D)", fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "18px", letterSpacing: "3px" }}>{checking ? "MARCANDO..." : verify === "warn" ? "⚠️ INGRESO SIN QR" : "✅ MARCAR INGRESO"}</button>
             }
             {actionErr && <p className="text-red-400 text-sm text-center">{actionErr}</p>}
           </div>

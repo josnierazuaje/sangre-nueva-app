@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { FB, OWNER_EMAIL, SCANNER_EMAIL, DEFAULT_FB_CONFIG, parseFbConfig, initFirebaseApp, initFirebase, startFirebaseSync } from "./lib/firebase.js";
-import { load, save, loadFighters, upsertFighterTx, removeFighterTx, loadTicketsV4, migrateTicketsIfNeeded, watchTickets, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, fetchCloudArray, stripLocalGhosts, outboxList, mergePending, ticketsOutboxList, replayTicketsOutbox, saveLocal, reconcileNodeTx, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
+import { signOut } from "firebase/auth";
+import { FB, SCANNER_EMAIL, parseFbConfig } from "./lib/firebase.js";
+import { load, save, upsertFighterTx, removeFighterTx, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, outboxList, ticketsOutboxList, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
-import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./lib/dedup.js";
+import { useEventSync } from "./lib/useEventSync.js";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -35,14 +35,6 @@ const NAV_ITEMS = [
 // APP PRINCIPAL
 // ============================================
 export default function App() {
-  const [fighters, setFighters] = useState([]);
-  const [matchups, setMatchups] = useState([]);
-  const [super4, setSuper4] = useState([]);
-  const [ticketsNew, setTicketsNew] = useState([]);
-  // "cargando" | "listo" | "sin-permiso": lo usa la puerta para no decir
-  // "Boleta no encontrada" cuando en realidad las entradas aún están bajando o
-  // esta cuenta no tiene permiso para leerlas.
-  const [ticketsEstado, setTicketsEstado] = useState("cargando");
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   // MODO ESCÁNER (staff de la puerta): el enlace "?scan=1" abre la app SOLO en
@@ -50,6 +42,23 @@ export default function App() {
   // dispositivo (localStorage) para que aguante recargas y el reabrir la PWA.
   const scanParam = useMemo(() => new URLSearchParams(location.search).has("scan"), []);
   const [scanMode] = useState(() => scanParam || localStorage.getItem("bm_scan_mode") === "1");
+  // Todo el ciclo de vida de la sincronización vive en este hook: arranque,
+  // hidratación por clave, cambios remotos, limpieza de duplicados, auto-reparo
+  // de fantasmas y recuperación de pendientes. App.jsx se queda con la interfaz
+  // y las acciones del usuario.
+  const {
+    fighters, setFighters, matchups, setMatchups, super4, setSuper4,
+    tickets: ticketsNew, setTickets: setTicketsNew, ticketsEstado,
+    eventLabel, setEventLabel, sync, authUser, cloudMode, isOwner,
+    super4Ready, matchupsReady, conectarConConfig,
+  } = useEventSync({
+    scanMode,
+    // El último recuperado queda como dueño del aviso: al confirmarse se ve su
+    // "✓ guardado" (los demás confirman en silencio).
+    alRecuperar: f => { addedToastOwnerRef.current = f.id; },
+    alConfirmar: confirmSaved,
+    alFallar: reportAddError,
+  });
   const [view, setView] = useState(() => urlTicketCode ? "finance" : "list");
   const [editF, setEditF] = useState(null);
   // Protección contra borrado accidental: al eliminar un peleador se guarda por
@@ -68,16 +77,7 @@ export default function App() {
   // ANTERIOR pisaría el aviso del alta más reciente (registrando de corrido,
   // el último registro debe mandar sobre el aviso).
   const addedToastOwnerRef = useRef(null);
-  const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
-  const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [authUser, setAuthUser] = useState(undefined);
-  // Hidratación de la sincronización: null = aún no se decide el modo;
-  // false = modo solo-local (sin nube); en modo nube, un objeto con qué
-  // claves ya recibieron su primer valor desde Firebase en esta sesión.
-  const [cloudMode, setCloudMode] = useState(null);
-  const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
-  const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
   // Todo lo que este dispositivo tiene SIN CONFIRMAR en la nube: altas de
   // peleadores y ventas de entradas. Las dos colas viven en localStorage, así
   // que las dos mueren si se borran los datos locales — por eso logout y
@@ -135,36 +135,6 @@ export default function App() {
     clearLocalEventData();
     location.reload();
   }
-  function keyReady(k) {
-    if (k === "bm_fighters_v4") setHydrated(h => (h.fighters ? h : { ...h, fighters: true }));
-    else if (k === "bm_matchups_v3") setHydrated(h => (h.matchups ? h : { ...h, matchups: true }));
-    else if (k === "bm_super4_v1") setHydrated(h => (h.super4 ? h : { ...h, super4: true }));
-  }
-
-  function applyRemote(k, val) {
-    if (k === "bm_fighters_v4") setFighters(normalizeFighters(val));
-    else if (k === "bm_matchups_v3") setMatchups(val);
-    else if (k === "bm_super4_v1") setSuper4(normalizeSuper4(val));
-    else if (k === "bm_event_label") setEventLabel(val);
-    // Las boletas (v4) ya no vienen por acá: se sincronizan aparte por nodo
-    // individual, ver migrateTicketsIfNeeded/watchTickets más abajo.
-  }
-
-  // Deja de escuchar el nodo viejo de bm_tickets_v4 vía el sync genérico y,
-  // en su lugar, migra (si hace falta) y escucha los nodos individuales de
-  // boletas para que varios dispositivos vendiendo a la vez no se pisen.
-  function startTicketsSync() {
-    migrateTicketsIfNeeded().then(() => {
-      watchTickets(setTicketsNew, setTicketsEstado);
-      // Re-sube las ventas que quedaron sin confirmar (típico: se vendió sin
-      // señal y la app se recargó, o el sistema mató la PWA mientras el
-      // vendedor mandaba el voucher por WhatsApp). Crea solo lo que falta en la
-      // nube, así que es seguro repetirlo; watchTickets refresca la lista al
-      // confirmarse cada escritura.
-      replayTicketsOutbox().catch(e => console.error("No se pudieron recuperar las ventas pendientes:", e));
-    });
-  }
-
   function toggleSync() {
     const raw = localStorage.getItem("bm_fb_config");
     const disabled = localStorage.getItem("bm_fb_disabled");
@@ -185,144 +155,11 @@ export default function App() {
     if (!t) return;
     const cfg = parseFbConfig(t);
     if (!cfg) { alert("No pude leer la configuración. Copia el bloque completo entre llaves { }."); return; }
-    if (initFirebase(cfg, setSync, applyRemote, keyReady)) {
+    if (conectarConConfig(cfg)) {
       localStorage.setItem("bm_fb_config", JSON.stringify(cfg));
       localStorage.removeItem("bm_fb_disabled");
-      startTicketsSync();
     }
   }
-
-  useEffect(() => {
-    setFighters(normalizeFighters(loadFighters()));
-    setMatchups(load("bm_matchups_v3", []));
-    setSuper4(normalizeSuper4(load("bm_super4_v1", [])));
-    setTicketsNew(loadTicketsV4());
-    const raw = localStorage.getItem("bm_fb_config");
-    const disabled = localStorage.getItem("bm_fb_disabled");
-    const cfgToUse = raw ? JSON.parse(raw) : (disabled ? null : DEFAULT_FB_CONFIG);
-    if (cfgToUse && initFirebaseApp(cfgToUse)) {
-      setCloudMode(true);
-      try {
-        onAuthStateChanged(FB.auth, user => {
-          setAuthUser(user);
-          // En modo escáner solo se abre la conexión (para el chip y el
-          // check-in) y las boletas: nada de peleadores, cartelera ni Super 4.
-          if (user) { startFirebaseSync(setSync, applyRemote, keyReady, { soloConexion: scanMode }); startTicketsSync(); }
-          else setSync("off");
-        });
-      } catch (e) { setAuthUser(null); setSync("error"); }
-    } else {
-      setCloudMode(false);
-      setAuthUser(null);
-      setTicketsEstado("listo"); // modo solo-local: lo local es toda la verdad
-    }
-  }, []);
-
-  // Reconciliación automática: detecta y elimina peleadores duplicados
-  // (mismo nombre + sexo + peso, registrados dos veces) y peleas inválidas
-  // o repetidas (la misma persona a ambos lados, parejas duplicadas). Es
-  // idempotente: si ya está todo limpio no escribe nada (no genera bucle).
-  //
-  // SOLO corre cuando el estado ya refleja la nube: en modo nube, después
-  // de que peleadores Y peleas recibieron su primer valor de Firebase en
-  // esta sesión (las claves sincronizan por canales separados sin orden
-  // garantizado — reconciliar sobre un estado parcial podría eliminar al
-  // registro equivocado y propagar el error a todos los dispositivos); en
-  // modo solo-local, corre de inmediato porque lo local es toda la verdad.
-  // En modo nube SOLO reconcilia el DUEÑO, y nunca en modo escáner: los 2-4
-  // teléfonos de la puerta no tienen por qué escribir jamás en el padrón ni en
-  // la cartelera (el modo escáner limitaba la pantalla, pero este efecto corría
-  // igual porque el early-return del escáner está en el render, no aquí).
-  // En modo solo-local sí corre siempre: ahí lo local es toda la verdad y no
-  // hay nadie a quien pisar.
-  const reconcileEnabled = !scanMode && (cloudMode === false || (cloudMode === true && isOwner && hydrated.fighters && hydrated.matchups && hydrated.super4));
-  useEffect(() => {
-    if (!reconcileEnabled || !fighters.length) return;
-    const { dedupedFighters, cleanedMatchups, cleanedSuper4, idMap, fightersChanged, matchupsChanged, super4Changed, removedFighters } = reconcileData(fighters, matchups, super4);
-    // Local primero (optimista) y a la nube por TRANSACCIÓN: la limpieza se
-    // vuelve a aplicar sobre el estado fresco del servidor, así no borra lo que
-    // otro dispositivo acaba de registrar (antes se reescribía el nodo entero
-    // con esta copia, que podía estar atrasada).
-    if (fightersChanged) {
-      setFighters(dedupedFighters); saveLocal("bm_fighters_v4", dedupedFighters);
-      reconcileNodeTx("bm_fighters_v4", arr => dedupeFighters(arr, matchups, super4).fighters, merged => setFighters(normalizeFighters(merged)));
-      console.info("Duplicados eliminados automáticamente: " + removedFighters + " peleador(es).");
-    }
-    if (matchupsChanged) {
-      setMatchups(cleanedMatchups); saveLocal("bm_matchups_v3", cleanedMatchups);
-      reconcileNodeTx("bm_matchups_v3", arr => cleanMatchups(arr, idMap), merged => setMatchups(merged));
-    }
-    if (super4Changed) {
-      setSuper4(cleanedSuper4); saveLocal("bm_super4_v1", cleanedSuper4);
-      reconcileNodeTx("bm_super4_v1", arr => remapSuper4(arr, idMap), merged => setSuper4(normalizeSuper4(merged)));
-    }
-  }, [fighters, matchups, super4, reconcileEnabled]);
-
-  // AUTO-REPARO de "fantasmas": una sola vez por sesión, al conectar y recibir
-  // el primer valor de peleadores desde la nube, se lee la copia AUTORITATIVA
-  // de la nube y se quitan de este dispositivo los peleadores que existen SOLO
-  // aquí (un guardado que falló y nunca llegó a la nube). Ese fantasma no sale
-  // en la lista sincronizada pero sí hace saltar el aviso de "ya registrado" al
-  // intentar agregarlo — justo el síntoma reportado.
-  //
-  // Seguridad: (a) corre UNA vez, tras la hidratación y ANTES de que el usuario
-  // agregue nada, y solo quita los ids detectados en ese instante (un alta
-  // posterior que aún se sincroniza NO se toca); (b) NO hace nada si la nube
-  // devuelve nulo o vacío (podría ser un estado transitorio — nunca se vacía la
-  // lista local por una lectura dudosa).
-  const autoRepairDoneRef = useRef(false);
-  useEffect(() => {
-    if (autoRepairDoneRef.current) return;
-    if (cloudMode !== true || !hydrated.fighters) return;
-    autoRepairDoneRef.current = true;
-    fetchCloudArray("bm_fighters_v4").then(cloud => {
-      // stripLocalGhosts NO quita nada si la nube es nula o vacía (seguridad).
-      const { removedIds } = stripLocalGhosts(fighters, cloud);
-      // Los PENDIENTES del outbox no son fantasmas: son escrituras aún no
-      // confirmadas que el replay va a re-subir — jamás se eliminan aquí.
-      const pendingIds = new Set(outboxList().map(x => x.id));
-      const ghostIds = new Set(removedIds.filter(id => !pendingIds.has(id)));
-      if (!ghostIds.size) return;
-      setFighters(prev => normalizeFighters(prev.filter(f => !ghostIds.has(f.id))));
-      const cur = load("bm_fighters_v4", []);
-      localStorage.setItem("bm_fighters_v4", JSON.stringify(cur.filter(f => f && !ghostIds.has(f.id))));
-      console.info("Auto-reparo: se quitaron " + ghostIds.size + " registro(s) local(es) que no estaban en la nube.");
-    });
-  }, [cloudMode, hydrated.fighters]);
-
-  // REPLAY del outbox: al conectar (tras recibir el primer valor de la nube),
-  // re-sube los registros que quedaron PENDIENTES de confirmación — el caso
-  // típico: se registró un peleador y la app se recargó con la escritura en
-  // vuelo (la transacción muere con la página y la nube nunca lo recibió).
-  // upsertFighterTx fusiona por id contra el servidor, así el replay es
-  // idempotente: si el registro sí alcanzó a llegar, solo lo re-confirma.
-  const outboxReplayDoneRef = useRef(false);
-  useEffect(() => {
-    if (outboxReplayDoneRef.current) return;
-    if (cloudMode !== true || !hydrated.fighters) return;
-    outboxReplayDoneRef.current = true;
-    const pending = outboxList();
-    if (!pending.length) return;
-    console.info("Recuperando " + pending.length + " registro(s) pendiente(s) de guardar en la nube…");
-    const u = normalizeFighters(mergePending(load("bm_fighters_v4", []), pending));
-    setFighters(u);
-    localStorage.setItem("bm_fighters_v4", JSON.stringify(u));
-    pending.forEach(p => {
-      const { _queuedAt, ...f } = p;
-      // El último pendiente queda como dueño del toast: al confirmarse se ve
-      // el "✓ guardado" de la recuperación (los demás confirman en silencio).
-      addedToastOwnerRef.current = f.id;
-      upsertFighterTx(f, u, merged => setFighters(normalizeFighters(merged)), confirmSaved, reportAddError);
-    });
-  }, [cloudMode, hydrated.fighters]);
-
-  // Escribir en las llaves del Super 4 antes de recibir su primer valor de
-  // la nube podría pisar llaves ya armadas en otro dispositivo (misma
-  // carrera de sincronización que la reconciliación de arriba).
-  const super4Ready = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.super4);
-  // Mismo guard para la cartelera (VS): escribir bm_matchups_v3 antes de recibir
-  // su primer valor de la nube pisaría peleas armadas en otro dispositivo.
-  const matchupsReady = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.matchups);
 
   // Al agregar un peleador nuevo la vista se queda en "Agregar" para seguir
   // registrando atletas de corrido (la confirmación la muestra el propio

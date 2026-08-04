@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { TICKET_TYPES_V2, fmt$, ticketQty, ticketUnitPrice } from "../constants.js";
 import { waChatUrl } from "../lib/whatsapp.js";
 import { buildVoucherFile, voucherFileName } from "../lib/voucher.js";
@@ -21,6 +21,9 @@ export default function TicketPreview({ ticket }) {
   const listoRef = useRef(null);   // voucher ya dibujado, listo para compartir al instante
   const [sharing, setSharing] = useState(false);
   const [aviso, setAviso] = useState(null);
+  // Puntero fino = computador. En el teléfono el envío va por la hoja de
+  // compartir del sistema y no hace falta explicar nada.
+  const esEscritorio = useMemo(() => typeof matchMedia === "function" && !matchMedia("(pointer: coarse)").matches, []);
   const archivo = voucherFileName(ticket);
   // Pie de foto que acompaña a la imagen en la hoja de compartir del celular.
   // Viaja PEGADO al archivo, no en el enlace: o llegan los dos o no llega nada.
@@ -175,6 +178,15 @@ export default function TicketPreview({ ticket }) {
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true"><path d={WA_PATH} /></svg>
         {sharing ? "Preparando voucher..." : "Compartir al WhatsApp"}
       </button>
+      {/* En COMPUTADOR el aviso se adelanta al botón. El voucher se copia y se
+          abre WhatsApp Web en el mismo gesto (ese orden es obligatorio: al
+          perder el foco, el navegador rechaza escribir en el portapapeles), así
+          que la instrucción de pegar terminaba dibujándose en la pestaña que el
+          vendedor acababa de abandonar. Un vendedor primerizo se quedaba
+          mirando un chat vacío sin saber que la imagen ya estaba copiada. */}
+      {esEscritorio && !aviso && <p className="text-[14px] text-boxing-muted leading-snug px-1">
+        Al tocar el botón se copia el voucher y se abre WhatsApp Web: <b className="text-boxing-cream">pégalo en el chat con ⌘V</b> (Ctrl+V) y envía.
+      </p>}
       {aviso && (
         <div className={"fade-in rounded-lg px-3 py-2 text-[14px] leading-snug flex items-start gap-2 " + (aviso.ok ? "text-green-300" : "text-yellow-300")}
              style={{ background: (aviso.ok ? "#25D366" : "#FCD34D") + "12", border: "1px solid " + (aviso.ok ? "#25D366" : "#FCD34D") + "40" }}>
