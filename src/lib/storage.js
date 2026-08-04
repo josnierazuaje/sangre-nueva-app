@@ -329,13 +329,38 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
 // (antes era un solo arreglo en bm_tickets_v4; ver migrateTicketsIfNeeded)
 // ============================================
 export function loadTicketsV4() { return load("bm_tickets_v4", []); }
+
+// Lee UNA boleta directo de la nube. La puerta valida contra el espejo local
+// (rápido, y funciona sin señal), pero ese espejo puede no tenerla todavía: un
+// teléfono recién abierto con "?scan=1" empieza vacío y tarda en bajar las
+// 300-800 boletas. Sin esta consulta puntual, un QR legítimo salía como
+// "Boleta no encontrada" y el portero podía rechazar a alguien que sí pagó.
+// Devuelve la boleta, o null si no existe / no se pudo leer.
+export async function fetchTicket(id) {
+  if (!FB.ready || !FB.db) return null;
+  try {
+    const snap = await withTimeout(get(ref(FB.db, fbPath("tickets/" + id))), 5000);
+    return snap.exists() ? snap.val() : null;
+  } catch (e) {
+    console.error("No se pudo consultar la boleta " + id + " en la nube:", e);
+    return null;
+  }
+}
 function cacheTicketsV4(list) { localStorage.setItem("bm_tickets_v4", JSON.stringify(list)); }
 export function padN(n) { return String(n).padStart(4, "0"); }
 
 function withTimeout(promise, ms) {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout esperando a Firebase")), ms)),
+    // `esTimeout` distingue "no contestó a tiempo" (la escritura SIGUE en vuelo
+    // y probablemente se confirme sola) de un rechazo real (permiso, dato
+    // inválido). El check-in los trata muy distinto: uno es "pendiente", el
+    // otro es un error de verdad.
+    new Promise((_, reject) => setTimeout(() => {
+      const e = new Error("timeout esperando a Firebase");
+      e.esTimeout = true;
+      reject(e);
+    }, ms)),
   ]);
 }
 
@@ -492,22 +517,115 @@ export function updateTicketNode(id, patch) {
 // Devuelve: { ok } (recién ingresada), { already, ticket } (ya estaba
 // ingresada / otra puerta la marcó), { offline } (sin conexión: no se pudo
 // confirmar en el servidor), o { error }.
+// Pura y testeable: LA regla que decide si una persona entra al recinto.
+// Devuelve el nodo nuevo, o `undefined` para ABORTAR la transacción (la boleta
+// no existe o ya no está activa). Vivía como callback anónimo dentro de
+// runTransaction, o sea que la lógica más crítica del evento no tenía una sola
+// prueba y podía romperse en un refactor sin que nada fallara.
+export function applyCheckIn(t, nowISO) {
+  if (!t || t.status !== "activo") return undefined;
+  return { ...t, status: "ingresado", checkedInAt: nowISO };
+}
+
+// Pura y testeable: traduce el resultado de la transacción al veredicto que ve
+// el staff de la puerta.
+export function interpretCheckIn(committed, val) {
+  if (committed && val && val.status === "ingresado") return { ok: true, ticket: val };
+  if (val && val.status === "ingresado") return { already: true, ticket: val };
+  return { error: new Error("boleta no encontrada o no activa"), ticket: val };
+}
+
+// ============================================
+// OUTBOX de INGRESOS — check-ins que sobreviven a la recarga
+// ============================================
+// Sin señal, RTDB aplica la transacción en local y la encola en MEMORIA: si la
+// página muere antes de reconectar, el servidor nunca se entera y esa boleta
+// sigue "activo" en la nube — su QR (o una captura reenviada) vuelve a admitir
+// al grupo entero en otra puerta. Se anota el ingreso como pendiente para
+// reintentarlo al reabrir la app.
+const CHECKIN_OUTBOX_KEY = "bm_checkin_outbox";
+export function checkinOutboxList() { return pruneOutbox(load(CHECKIN_OUTBOX_KEY, []), Date.now()); }
+function checkinOutboxPut(id) {
+  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(CHECKIN_OUTBOX_KEY, []), { id }, Date.now()))); }
+  catch (e) { console.error("No se pudo anotar el ingreso pendiente en este dispositivo:", e); }
+}
+function checkinOutboxRemove(id) {
+  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(CHECKIN_OUTBOX_KEY, []), id))); }
+  catch (e) { console.error("No se pudo descontar el ingreso pendiente en este dispositivo:", e); }
+}
+
+// Marca el ingreso de una boleta de forma ATÓMICA en el servidor: la
+// transacción solo pasa la boleta de "activo" a "ingresado" si en ese momento
+// SIGUE activa. Así, si dos puertas escanean el mismo QR (o el original y una
+// captura reenviada) casi a la vez, solo una gana: la otra recibe already=true
+// y no cuenta un segundo ingreso.
+//
+// Ante MALA SEÑAL ya no se espera a ciegas. Antes se esperaban 8 s y luego se
+// devolvía { error }, con lo cual el portero veía "No se pudo marcar el
+// ingreso" mientras la app ya lo contaba como adentro (la transacción se aplica
+// en local) — y al re-buscar la boleta le decía "✓ Ya registrado". Un mensaje
+// se contradecía con el otro y la fila se paraba 8 segundos por persona.
+// Ahora: si no hay socket, se devuelve { pendiente } al instante; si hay socket
+// pero no contesta en 5 s, también { pendiente } — la escritura sigue en vuelo
+// y el outbox la reintenta. Solo un rechazo REAL devuelve { error }.
+//
+// Devuelve: { ok } (recién ingresada), { already, ticket } (ya estaba
+// ingresada / otra puerta la marcó), { pendiente } (sin confirmar en el
+// servidor: quedó en cola), { offline } (este dispositivo no usa la nube), o
+// { error }.
 export async function checkInTicketTx(id) {
   if (!FB.ready) return { offline: true };
   const nodeRef = ref(FB.db, fbPath("tickets/" + id));
+  // Se anota ANTES de lanzar: si la página muere con la escritura en vuelo, el
+  // replay al reabrir es lo único que puede salvar el ingreso.
+  if (cloudIntended()) checkinOutboxPut(id);
+  const tx = runTransaction(nodeRef, t => applyCheckIn(t, new Date().toISOString()));
+  // Sin socket, RTDB no resuelve la transacción hasta reconectar: esperarla
+  // sería parar la fila. Se deja en vuelo y se informa como pendiente.
+  if (!FB.connected) {
+    tx.then(res => { if (res.committed) checkinOutboxRemove(id); })
+      .catch(e => reportSyncError("No se pudo marcar el ingreso de la boleta en Firebase:", e));
+    return { pendiente: true };
+  }
   try {
-    const res = await withTimeout(runTransaction(nodeRef, t => {
-      if (!t || t.status !== "activo") return; // no existe o ya no está activa: aborta
-      return { ...t, status: "ingresado", checkedInAt: new Date().toISOString() };
-    }), 8000);
-    const val = res.snapshot.val();
-    if (res.committed && val && val.status === "ingresado") return { ok: true, ticket: val };
-    if (val && val.status === "ingresado") return { already: true, ticket: val };
-    return { error: new Error("boleta no encontrada o no activa"), ticket: val };
+    const res = await withTimeout(tx, 5000);
+    checkinOutboxRemove(id); // el servidor contestó: ya no hay nada pendiente
+    return interpretCheckIn(res.committed, res.snapshot.val());
   } catch (e) {
+    if (e && e.esTimeout) {
+      // La transacción NO se canceló: sigue en vuelo y se confirmará sola.
+      tx.then(res => { if (res.committed) checkinOutboxRemove(id); }).catch(() => {});
+      return { pendiente: true };
+    }
+    checkinOutboxRemove(id); // rechazo real: reintentarlo no arreglaría nada
     console.error("No se pudo marcar el ingreso de la boleta en Firebase:", e);
     return { error: e };
   }
+}
+
+// Reintenta los ingresos que quedaron sin confirmar (se escaneó sin señal y la
+// app se recargó o el sistema mató la PWA). Reusa la misma transacción, que es
+// idempotente: si otra puerta ya la marcó, applyCheckIn aborta y no cuenta un
+// segundo ingreso. Devuelve cuántos quedaron resueltos.
+export async function replayCheckinOutbox() {
+  if (!FB.ready) return 0;
+  const pendientes = checkinOutboxList();
+  if (!pendientes.length) return 0;
+  console.info("Recuperando " + pendientes.length + " ingreso(s) sin confirmar…");
+  let resueltos = 0;
+  for (const p of pendientes) {
+    try {
+      const res = await runTransaction(ref(FB.db, fbPath("tickets/" + p.id)), t => applyCheckIn(t, new Date().toISOString()));
+      const val = res.snapshot.val();
+      // Resuelto si la boleta quedó ingresada (por nosotros o por otra puerta),
+      // y también si ya no existe o fue anulada: en esos casos no hay nada que
+      // reintentar y dejarlo en la cola solo lo repetiría cada arranque.
+      if (!val || val.status !== "activo") { checkinOutboxRemove(p.id); resueltos++; }
+    } catch (e) {
+      reportSyncError("No se pudo recuperar el ingreso pendiente " + p.id + ":", e);
+    }
+  }
+  return resueltos;
 }
 export function removeTicketNode(id) {
   // Un borrado explícito cancela el pendiente de esa misma boleta: si no, el
@@ -524,11 +642,19 @@ export function removeTicketNode(id) {
 // del servidor cada vez que cualquier boleta cambia (la propia o la de otro
 // dispositivo), así que no hace falta diffear child-by-child.
 let ticketsWatching = false;
-export function watchTickets(onChange) {
+// `onEstado(estado)` avisa a la app en qué punto está la lista de boletas:
+// "cargando" (aún no llegó el primer valor), "listo" (ya hay datos del
+// servidor) o "sin-permiso" (esta cuenta no puede leerlas). Sin esto, la puerta
+// mostraba "❌ Boleta no encontrada" en los tres casos: mientras bajaban las
+// boletas y —lo peor— cuando el UID no estaba en la lista blanca /staff, con el
+// chip en verde diciendo "Sincronizado". El portero rechazaba entradas
+// legítimas una tras otra creyendo que eran falsas.
+export function watchTickets(onChange, onEstado) {
   if (!FB.ready || ticketsWatching) return;
   ticketsWatching = true;
   const nodeRef = ref(FB.db, fbPath("tickets"));
   onValue(nodeRef, snap => {
+    onEstado?.("listo");
     const val = snap.val() || {};
     // Las ventas PENDIENTES (emitidas aquí y aún sin confirmar en la nube) se
     // fusionan sobre la copia del servidor. Sin esto, esta misma lista las
@@ -537,6 +663,13 @@ export function watchTickets(onChange) {
     const list = sortTickets(mergePendingTickets(Object.values(val), ticketsOutboxList()));
     cacheTicketsV4(list);
     onChange(list);
+  }, err => {
+    // onValue SÍ acepta un callback de error, pero no se le pasaba ninguno: un
+    // permission-denied se perdía en silencio y la lista se quedaba vacía para
+    // siempre, indistinguible de "no hay boletas vendidas".
+    ticketsWatching = false; // permite reintentar tras arreglar los permisos
+    onEstado?.("sin-permiso");
+    reportSyncError("No se pudieron leer las boletas de Firebase (¿esta cuenta está en la lista de staff?):", err);
   });
 }
 
@@ -630,6 +763,7 @@ export function clearLocalEventData() {
   // de peleadores, no deben quedar legibles sin login ni sobrevivir a un
   // "Recargar desde la nube" (los guards de App.jsx avisan antes de borrarlos).
   localStorage.removeItem(TICKETS_OUTBOX_KEY);
+  localStorage.removeItem(CHECKIN_OUTBOX_KEY);
 }
 
 // ============================================

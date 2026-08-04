@@ -3,7 +3,12 @@ import { getDatabase, ref, get, set, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { SYNC_KEYS } from "../constants.js";
 
-export const FB = { app: null, db: null, auth: null, ready: false };
+// `connected` refleja el estado REAL del socket con RTDB (lo alimenta el
+// listener de .info/connected en startFirebaseSync). `ready` solo dice que la
+// sincronización arrancó y NUNCA vuelve a false, así que no sirve para saber si
+// hay señal: el check-in lo usaba y por eso su rama "sin conexión" era
+// inalcanzable y cada escaneo esperaba 8 s a ciegas antes de dar error.
+export const FB = { app: null, db: null, auth: null, ready: false, connected: false };
 export function fbPath(k) { return "sangre_nueva/" + k; }
 
 // Config pública del proyecto de Firebase del equipo (la apiKey de un SDK
@@ -88,7 +93,10 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady) {
   // ponía "on" de forma incondicional en esta línea y el chip se quedaba verde
   // para siempre aunque el teléfono perdiera la red toda la noche — el
   // operador creía que sus ventas estaban respaldadas cuando no lo estaban.
-  onValue(ref(FB.db, ".info/connected"), s => onStatus(s.val() ? "on" : "connecting"));
+  onValue(ref(FB.db, ".info/connected"), s => {
+    FB.connected = !!s.val();
+    onStatus(FB.connected ? "on" : "connecting");
+  });
   Object.keys(SYNC_KEYS).forEach(k => {
     const nodeRef = ref(FB.db, fbPath(k));
     get(nodeRef).then(snap => {

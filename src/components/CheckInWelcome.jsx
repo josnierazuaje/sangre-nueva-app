@@ -5,7 +5,7 @@ import Badge from "./Badge.jsx";
 // ============================================
 // PANTALLA DE BIENVENIDA AL VALIDAR UNA ENTRADA
 // ============================================
-export default function CheckInWelcome({ ticket, ticketTypeInfo, onClose }) {
+export default function CheckInWelcome({ ticket, ticketTypeInfo, onClose, pendiente = false }) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000);
     return () => clearTimeout(t);
@@ -19,6 +19,13 @@ export default function CheckInWelcome({ ticket, ticketTypeInfo, onClose }) {
       <div style={{ marginTop: "12px" }}><Badge color={ticketTypeInfo.color}>{ticketTypeInfo.icon} {ticketTypeInfo.label} · #{ticket.id}</Badge></div>
       {ticketQty(ticket) > 1 &&
         <div style={{ marginTop: "14px", fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(20px,5vw,28px)", letterSpacing: "0.06em", color: "#e3c07a" }}>👥 ADMITE {ticketQty(ticket)} PERSONAS</div>}
+      {/* Sin señal: el ingreso quedó aplicado aquí y en cola. Se dice en ámbar
+          —no en rojo— porque la persona SÍ puede entrar; solo falta que el
+          servidor lo confirme, cosa que la app reintenta sola. */}
+      {pendiente &&
+        <div style={{ marginTop: "16px", maxWidth: "340px", padding: "8px 16px", borderRadius: "12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", color: "#fcd34d", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "15px", lineHeight: 1.35 }}>
+          ⏳ Sin señal — el ingreso quedó en cola y se confirmará solo
+        </div>}
       {/* Único protagonista de la pantalla: el CTA carmesí del sistema */}
       <button onClick={onClose} type="button" className="btn-primary active:scale-95 transition-transform" style={{ marginTop: "36px", padding: "14px 40px", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em", cursor: "pointer" }}>Escanear siguiente</button>
     </div>

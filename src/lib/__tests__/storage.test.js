@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn } from "../storage.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };
@@ -108,6 +108,53 @@ describe("outbox de BOLETAS (ventas que sobreviven a la recarga)", () => {
   it("un respaldo exportado con ventas pendientes no sube `_pending` a la nube", () => {
     const { ticketUpdates } = buildTicketRestore([{ ...V1, _pending: true, _queuedAt: 9 }]);
     expect(ticketUpdates["tickets/" + V1.id]).toEqual(V1);
+  });
+});
+
+describe("check-in — LA regla que decide si una persona entra al recinto", () => {
+  const AHORA = "2026-08-04T20:15:00.000Z";
+  const activa = { id: "PRE-0001", status: "activo", checkedInAt: null, quantity: 2 };
+
+  describe("applyCheckIn", () => {
+    it("boleta activa → pasa a ingresada con la hora, sin tocar lo demás", () => {
+      const out = applyCheckIn(activa, AHORA);
+      expect(out).toEqual({ ...activa, status: "ingresado", checkedInAt: AHORA });
+    });
+    it("CLAVE: una boleta YA ingresada aborta (undefined) — no cuenta doble", () => {
+      expect(applyCheckIn({ ...activa, status: "ingresado" }, AHORA)).toBeUndefined();
+    });
+    it("boleta anulada aborta", () => {
+      expect(applyCheckIn({ ...activa, status: "anulado" }, AHORA)).toBeUndefined();
+    });
+    it("nodo inexistente aborta (no crea boletas de la nada)", () => {
+      expect(applyCheckIn(null, AHORA)).toBeUndefined();
+      expect(applyCheckIn(undefined, AHORA)).toBeUndefined();
+    });
+    it("no muta la boleta original", () => {
+      const orig = { ...activa };
+      applyCheckIn(orig, AHORA);
+      expect(orig).toEqual(activa);
+    });
+  });
+
+  describe("interpretCheckIn (veredicto que ve el portero)", () => {
+    const ingresada = { id: "PRE-0001", status: "ingresado", checkedInAt: AHORA };
+    it("transacción confirmada y quedó ingresada → ok", () => {
+      expect(interpretCheckIn(true, ingresada)).toEqual({ ok: true, ticket: ingresada });
+    });
+    it("abortada porque otra puerta la marcó antes → already", () => {
+      const r = interpretCheckIn(false, ingresada);
+      expect(r.already).toBe(true);
+      expect(r.ticket).toEqual(ingresada);
+    });
+    it("boleta inexistente → error", () => {
+      expect(interpretCheckIn(false, null).error).toBeInstanceOf(Error);
+    });
+    it("boleta anulada → error (no la deja entrar)", () => {
+      const r = interpretCheckIn(false, { id: "PRE-0001", status: "anulado" });
+      expect(r.error).toBeInstanceOf(Error);
+      expect(r.ok).toBeUndefined();
+    });
   });
 });
 

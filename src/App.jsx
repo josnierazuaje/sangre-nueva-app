@@ -39,6 +39,10 @@ export default function App() {
   const [matchups, setMatchups] = useState([]);
   const [super4, setSuper4] = useState([]);
   const [ticketsNew, setTicketsNew] = useState([]);
+  // "cargando" | "listo" | "sin-permiso": lo usa la puerta para no decir
+  // "Boleta no encontrada" cuando en realidad las entradas aún están bajando o
+  // esta cuenta no tiene permiso para leerlas.
+  const [ticketsEstado, setTicketsEstado] = useState("cargando");
   const urlTicketCode = useMemo(() => new URLSearchParams(location.search).get("ticket"), []);
   const urlTicketToken = useMemo(() => new URLSearchParams(location.search).get("t"), []);
   // MODO ESCÁNER (staff de la puerta): el enlace "?scan=1" abre la app SOLO en
@@ -151,7 +155,7 @@ export default function App() {
   // boletas para que varios dispositivos vendiendo a la vez no se pisen.
   function startTicketsSync() {
     migrateTicketsIfNeeded().then(() => {
-      watchTickets(setTicketsNew);
+      watchTickets(setTicketsNew, setTicketsEstado);
       // Re-sube las ventas que quedaron sin confirmar (típico: se vendió sin
       // señal y la app se recargó, o el sistema mató la PWA mientras el
       // vendedor mandaba el voucher por WhatsApp). Crea solo lo que falta en la
@@ -208,6 +212,7 @@ export default function App() {
     } else {
       setCloudMode(false);
       setAuthUser(null);
+      setTicketsEstado("listo"); // modo solo-local: lo local es toda la verdad
     }
   }, []);
 
@@ -482,7 +487,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="max-w-lg mx-auto">
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
-            <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} scanOnly initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />
+            <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} ticketsEstado={ticketsEstado} scanOnly initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />
           </Suspense>
         </div>
       </main>
@@ -595,7 +600,7 @@ export default function App() {
             {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
             {view === "faltante" && <FaltantesView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
             {view === "card" && <FightCardView matchups={matchups} fighters={fighters} super4={super4} />}
-            {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
+            {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} ticketsEstado={ticketsEstado} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
           </Suspense>
         </div>
       </main>
