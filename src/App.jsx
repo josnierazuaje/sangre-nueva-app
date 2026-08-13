@@ -7,6 +7,8 @@ import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
 import { buildEventLabels } from "./lib/eventDates.js";
+import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
+import { printHtml } from "./lib/printHtml.js";
 import EventSettingsDialog from "./components/EventSettingsDialog.jsx";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
@@ -305,6 +307,19 @@ export default function App() {
     alert(`Respaldo del ${c.fecha} restaurado.`);
   }
 
+  // "Cierre del evento": la hoja que resume la velada entera —recaudación,
+  // asistencia real, campeones, escuelas— en una sola carilla imprimible.
+  // Después del evento esos números viven repartidos en cuatro pestañas y
+  // desaparecen al reiniciar; esto los deja en un documento antes de borrar.
+  function cierreEvento() {
+    const resumen = cierreResumen({ fighters, matchups, super4, tickets: ticketsNew });
+    printHtml(buildCierreHtml(resumen, {
+      titulo: eventLabel,
+      fechaEvento: eventLabels.rango,
+      generadoEl: new Date().toLocaleDateString("es-CL"),
+    }));
+  }
+
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
   // vacío para cargar peleadores reales desde cero. Antes de borrar nada:
@@ -314,7 +329,7 @@ export default function App() {
   // Requiere doble confirmación: un confirm() explicando qué se borra, y
   // escribir la palabra BORRAR en un prompt.
   async function resetEvent() {
-    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.";
+    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.\n\nSi todavía no imprimiste el CIERRE DEL EVENTO (recaudación, asistencia y campeones en una hoja), cancela y hazlo primero: está en este mismo menú.";
     if (!confirm(detalle)) return;
     const palabra = prompt("Para confirmar, escribe la palabra BORRAR (en mayúsculas):");
     if (palabra === null) return;
@@ -364,6 +379,7 @@ export default function App() {
     { label: "Importar", danger: false, run: handleImport },
     { label: "Exportar", danger: false, run: handleExport },
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },
+    { label: "Cierre del evento", danger: false, run: cierreEvento },
     { label: "Reiniciar evento", danger: true, run: resetEvent },
   ];
   const menuItemCls = (danger) => "block w-full text-left text-[14px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");

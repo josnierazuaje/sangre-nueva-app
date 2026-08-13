@@ -4,7 +4,10 @@ import { forcedPairingReasons } from "./matchmaking.js";
 
 // Orden de bloques en la planilla: categorías World Boxing de menor a mayor
 // edad, y al final "mixta" (cruce prohibido, va resaltado en rojo).
-const AGE_GROUP_ORDER = ["escolar", "cadete", "juvenil", "adulto", "infantil", "veterano", "mixta"];
+// Orden en que se presentan las categorías de edad (de la más joven a la más
+// mayor, con las de fuera de rango al final). Lo comparte el cierre del evento
+// para listar los peleadores en este mismo orden.
+export const AGE_GROUP_ORDER = ["escolar", "cadete", "juvenil", "adulto", "infantil", "veterano", "mixta"];
 
 // Agrupa las peleas tal como salen en la planilla: por categoría de edad World
 // Boxing (orden de menor a mayor edad, y "mixta" al final), y dentro de cada

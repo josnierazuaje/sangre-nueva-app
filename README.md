@@ -128,6 +128,22 @@ velada ya no exige tocar el repositorio ni desplegar.
   dueño): **no hace falta volver a publicar las reglas** para que funcione.
   Publícalas cuando quieras la validación de formato que trae.
 
+## Cierre del evento
+
+Terminada la velada, los números quedan repartidos en cuatro pestañas y
+desaparecen al reiniciar el evento. El menú ⋮ del dueño tiene **Cierre del
+evento**: abre una hoja imprimible (o "guardar como PDF") con todo el evento en
+una carilla —recaudación total y por tipo de entrada, desglose por método de
+pago, asistencia real (personas que entraron vs. entradas vendidas), peleadores
+por categoría y sexo, peleas que de verdad salieron en la cartelera, campeón de
+cada cinturón y atletas por escuela.
+
+Es el documento para rendir cuentas con los socios y para decidir la próxima
+fecha. **Genéralo antes de "Reiniciar evento"** (el propio diálogo de reinicio lo
+recuerda). La lógica es pura y está testeada en `src/lib/cierreEvento.js`:
+distingue boletas de personas, no cuenta como vendidas las boletas anuladas, y
+con cero ventas informa asistencia "—" en vez de un 0 % engañoso.
+
 ## PWA / offline
 
 El service worker se genera automáticamente con `vite-plugin-pwa`
