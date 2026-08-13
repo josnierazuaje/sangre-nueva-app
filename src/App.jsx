@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { signOut } from "firebase/auth";
 import { FB, SCANNER_EMAIL, parseFbConfig } from "./lib/firebase.js";
-import { save, upsertFighterTx, removeFighterTx, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, outboxList, ticketsOutboxList, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
+import { save, upsertFighterTx, removeFighterTx, clearLocalEventData, outboxList } from "./lib/storage.js";
+import { clearTicketsCache, clearAllTicketsData, restoreTicketsFromBackup, ticketsOutboxList } from "./lib/tickets.js";
+import { backupEventToCloud, listCloudBackups, fetchCloudBackup } from "./lib/backups.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";

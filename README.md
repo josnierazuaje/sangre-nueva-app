@@ -178,9 +178,14 @@ práctica los edita una sola persona a la vez.
 src/
   constants.js        # categorías de peso, niveles, tipos de entrada, helpers
   lib/
-    storage.js         # localStorage + helpers de boletas/contadores
+    storage.js          # localStorage, sync del "blob" y peleadores
+    tickets.js          # boletas: venta, correlativo, puerta y sus colas
+    backups.js          # respaldos del evento en la nube
+    storageKeys.js      # claves de localStorage compartidas por los anteriores
     firebase.js         # inicialización y sync de Firebase (API modular)
-    matchmaking.js       # algoritmo de emparejamiento y sorteo
+    matchmaking.js      # algoritmo de emparejamiento y sorteo
+    eventDates.js       # fechas del evento → etiquetas (puro)
+    cierreEvento.js     # resumen final de la velada + hoja imprimible
   components/          # un componente por archivo
   App.jsx
   main.jsx

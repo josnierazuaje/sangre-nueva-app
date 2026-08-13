@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, initFirebaseApp, initFirebase, startFirebaseSync } from "./firebase.js";
 import {
-  load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets,
-  fetchCloudArray, stripLocalGhosts, outboxList, mergePending, upsertFighterTx,
-  replayTicketsOutbox, saveLocal, reconcileNodeTx,
+  load, save, loadFighters, fetchCloudArray, stripLocalGhosts, outboxList,
+  mergePending, upsertFighterTx, saveLocal, reconcileNodeTx,
 } from "./storage.js";
+import { loadTicketsV4, migrateTicketsIfNeeded, watchTickets, replayTicketsOutbox } from "./tickets.js";
 import { normalizeFighters } from "../constants.js";
 import { DEFAULT_EVENT_DATES, normalizeEventDates } from "./eventDates.js";
 import { normalizeSuper4 } from "./super4.js";
