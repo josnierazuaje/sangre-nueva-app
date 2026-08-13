@@ -4,8 +4,11 @@ import { EVENT_LABELS } from "../constants.js";
 
 // Genera el HTML imprimible del torneo Super 4 (llaves con semifinales y final).
 // Función pura y testeable: recibe las llaves (super4), el índice de peleadores
-// (byId) y la fecha ya formateada (para no depender de new Date() aquí dentro).
-export function buildSuper4Html(super4, byId, fecha = "") {
+// (byId), la fecha de generación ya formateada (para no depender de new Date()
+// aquí dentro) y las etiquetas de las fechas del evento (`labels`), que el
+// organizador edita desde la app. Sin `labels` cae en las del evento por
+// defecto, que es lo que hacía antes de que la fecha fuera editable.
+export function buildSuper4Html(super4, byId, fecha = "", labels = EVENT_LABELS) {
   const nombre = fid => byId[fid]?.fullName || "—";
   const det = fid => { const f = byId[fid]; return f ? escapeHtml(`${(f.gym || "").toUpperCase()} · ${f.weightKg}kg · ${f.age}a`) : ""; };
   const fila = (fid, lado, winner, placeholder) => {
@@ -35,12 +38,12 @@ export function buildSuper4Html(super4, byId, fecha = "") {
         <div class="cat">🏆 ${escapeHtml(bracketPrintTitle(b))} <span class="regla">${escapeHtml(b.regla)}</span></div>
         <div class="bracket">
           <div class="col semis">
-            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 1`, s0.red, s0.blue, s0.winner)}
-            ${match(`${EVENT_LABELS.semiAbbr} · Semifinal 2`, s1.red, s1.blue, s1.winner)}
+            ${match(`${labels.semiAbbr} · Semifinal 1`, s0.red, s0.blue, s0.winner)}
+            ${match(`${labels.semiAbbr} · Semifinal 2`, s1.red, s1.blue, s1.winner)}
           </div>
           <div class="conn"><i class="lt"></i><i class="lb"></i><i class="lv"></i><i class="lm"></i></div>
           <div class="col colfinal">
-            ${match(`${EVENT_LABELS.finalAbbr} · FINAL`, finalistas[0], finalistas[1], b.finalWinner, "Ganador Semifinal 1", "Ganador Semifinal 2")}
+            ${match(`${labels.finalAbbr} · FINAL`, finalistas[0], finalistas[1], b.finalWinner, "Ganador Semifinal 1", "Ganador Semifinal 2")}
             ${b.finalWinner ? `<div class="camp">🏆 Campeón: ${escapeHtml(nombre(b.finalWinner))}</div>` : ""}
           </div>
         </div>
@@ -94,7 +97,7 @@ export function buildSuper4Html(super4, byId, fecha = "") {
       @media print { body { padding:8px; } }
     </style></head><body>
       <div class="doc-header"><h1>TORNEO SUPER 4 — SANGRE NUEVA</h1><p>La Velada · Disputa de cinturones</p></div>
-      <div class="sub">Semifinales: ${EVENT_LABELS.semiLong} · Finales por el cinturón: ${EVENT_LABELS.finalLong}</div>
+      <div class="sub">Semifinales: ${labels.semiLong} · Finales por el cinturón: ${labels.finalLong}</div>
       ${topeNota}
       ${llaves}
       ${pendientes}

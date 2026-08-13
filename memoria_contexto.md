@@ -1,6 +1,6 @@
 # Memoria de contexto — Cartelera + Super 4
 
-_Última actualización: 2026-07-17 · rama base: `main` (commit `ee2ac10`) · última ronda: fantasmas + confirmaciones de alta (§7)_
+_Última actualización: 2026-08-13 · rama base: `main` (commit `4147db3`) · última ronda: fecha editable + cierre del evento + separación de storage (§8)_
 
 Resumen técnico de los cambios recientes en la **pestaña Cartelera** (nombres
 FECHIBOX en el título de categoría al imprimir + reubicación de botones) y de
@@ -340,3 +340,79 @@ Configuración de sitios → Borrar datos, o `chrome://settings/content/all`.
 2. En la nube: el contador de "Peleadores (N)" sube; la búsqueda lo encuentra.
 3. Si algo no cuadra: menú ⋮ → "Recargar desde la nube" (o simplemente recargar:
    el auto-reparo corre solo al conectar).
+
+---
+
+## 8. Después de la velada: fecha editable, cierre y separación de storage (ago 2026)
+
+**Estado: en el árbol de trabajo, sin commitear** (502 tests + build OK). Tres
+cambios independientes; conviene una rama por cada uno.
+
+### 8.1 La fecha del evento dejó de estar en el código
+
+El problema: `EVENT_DATES` estaba escrito en `constants.js`, así que montar la
+próxima velada obligaba a editar el repositorio y desplegar.
+
+- **`src/lib/eventDates.js`** (nuevo, puro): dos fechas ISO `{ semis, final }` →
+  las 7 etiquetas de siempre. Valida contra el calendario real, calcula el día
+  de la semana en **UTC** (con hora local, un navegador al oeste de Greenwich
+  mostraba el día anterior) y cae al valor por defecto campo por campo ante
+  basura, así que la app nunca queda sin fecha.
+- **Casos nuevos que el formato anterior no cubría**: velada de un solo día
+  (no dice "el 1 y el 1") y fechas que cruzan de mes o de año (nombra ambos).
+- **Clave sincronizada `bm_event_dates`** (`SYNC_KEYS`), escritura solo del
+  dueño. El nodo ya quedaba cubierto por la regla `$other`, así que **no hace
+  falta republicar las reglas**; la regla explícita que se agregó solo suma la
+  validación de formato.
+- **`EventSettingsDialog.jsx`**: reemplaza el `prompt()` de una línea. Título +
+  dos fechas + vista previa en vivo de la frase que va a salir impresa. Al staff
+  se le deshabilitan las fechas (su escritura rebotaría y pintaría el chip de
+  rojo por un cambio que no hizo).
+- **Cómo viajan las etiquetas**: por prop a `Super4View` y `FightCardView` (para
+  que redibujen al cambiar la fecha) y como parámetro con valor por defecto a
+  los constructores puros (`buildSuper4Html`, `buildSuper4Pdf`). `pdfSuper4`
+  usa una variable de módulo `L`, el mismo patrón que ya tenía para la paleta.
+- De paso: la cabecera de la Cartelera usaba `capitalize`, que escribía
+  "Sábado 01 Y Domingo 02 De Agosto"; ahora `first-letter:uppercase`.
+
+### 8.2 Cierre del evento
+
+`src/lib/cierreEvento.js` (puro) + entrada **"Cierre del evento"** en el menú ⋮:
+una hoja imprimible con la velada entera —recaudación total y por tipo, pago,
+asistencia real (personas dentro vs. vendidas), peleadores por edad y sexo,
+peleas que **de verdad** salieron en la cartelera, campeón de cada cinturón y
+atletas por escuela—. El diálogo de "Reiniciar evento" ahora recuerda generarlo
+antes de borrar. Detalles con prueba: boletas ≠ personas, las anuladas no suman,
+y con cero ventas la asistencia es "—" (no un 0 % engañoso).
+
+> La hoja declara `background:#fff` y `color-scheme: light`. Sin eso, con el
+> navegador en modo oscuro los títulos de sección salían ilegibles en la vista
+> previa. **Las otras hojas imprimibles (cartelera, Super 4, entradas) siguen
+> sin declararlo**: se salvan porque casi todas sus celdas tienen fondo propio.
+> Es un arreglo pendiente de una línea por hoja.
+
+### 8.3 storage.js dejó de ser un cajón de sastre
+
+931 líneas que mezclaban peleadores, boletas y respaldos → tres módulos, **sin
+cambiar una línea de lógica** (mismo código movido de sitio):
+
+- `storage.js` (414) — localStorage, sync del blob, peleadores y la cola genérica.
+- `tickets.js` (491) — venta, correlativo, puerta, colas de venta e ingreso.
+- `backups.js` (60) — respaldos en la nube.
+- `storageKeys.js` (14) — las claves compartidas. Existe para que la limpieza de
+  `clearLocalEventData` (en storage) conozca las colas de boletas (en tickets)
+  **sin un ciclo de imports**: la dependencia va solo tickets/backups → storage.
+
+También `Super4View.jsx`: `Conector`, `Tarjeta` y `Fila` estaban declaradas
+DENTRO del componente, así que cada render creaba tipos nuevos y React
+desmontaba y remontaba las tarjetas en vez de actualizarlas. Ahora viven en
+`Super4Bracket.jsx` (`Fila` recibe `byId` por prop, que era lo que la ataba al
+cierre del padre). Verificado en el navegador con datos de ejemplo: render
+idéntico y el flujo "＋ Elegir" → elegir peleador → cupo relleno sigue andando.
+
+### 8.4 Cómo verificar sin poder iniciar sesión
+
+Para revisar un componente sin credenciales: `dev-preview.html` + `src/dev-preview.jsx`
+en la raíz (renderizan el componente con datos de ejemplo), `npm run dev` y
+`localhost:8765/dev-preview.html`. **Se borran al terminar, no se commitean.**
+Para las hojas imprimibles, un test temporal que escriba el HTML a un archivo.

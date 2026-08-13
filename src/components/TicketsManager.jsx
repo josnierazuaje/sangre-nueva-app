@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken, clampTicketQty, ticketQty } from "../constants.js";
-import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode, cacheTicketsSiSinNube } from "../lib/storage.js";
+import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode, cacheTicketsSiSinNube } from "../lib/tickets.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
 import CheckInView from "./CheckInView.jsx";

@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { signOut } from "firebase/auth";
 import { FB, SCANNER_EMAIL, parseFbConfig } from "./lib/firebase.js";
-import { load, save, upsertFighterTx, removeFighterTx, clearTicketsCache, clearLocalEventData, backupEventToCloud, clearAllTicketsData, restoreTicketsFromBackup, outboxList, ticketsOutboxList, listCloudBackups, fetchCloudBackup } from "./lib/storage.js";
+import { save, upsertFighterTx, removeFighterTx, clearLocalEventData, outboxList } from "./lib/storage.js";
+import { clearTicketsCache, clearAllTicketsData, restoreTicketsFromBackup, ticketsOutboxList } from "./lib/tickets.js";
+import { backupEventToCloud, listCloudBackups, fetchCloudBackup } from "./lib/backups.js";
 import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
+import { buildEventLabels } from "./lib/eventDates.js";
+import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
+import { printHtml } from "./lib/printHtml.js";
+import EventSettingsDialog from "./components/EventSettingsDialog.jsx";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -49,7 +55,8 @@ export default function App() {
   const {
     fighters, setFighters, matchups, setMatchups, super4, setSuper4,
     tickets: ticketsNew, setTickets: setTicketsNew, ticketsEstado,
-    eventLabel, setEventLabel, sync, authUser, cloudMode, isOwner,
+    eventLabel, setEventLabel, eventDates, setEventDates,
+    sync, authUser, cloudMode, isOwner,
     super4Ready, matchupsReady, conectarConConfig,
   } = useEventSync({
     scanMode,
@@ -78,6 +85,11 @@ export default function App() {
   // el último registro debe mandar sobre el aviso).
   const addedToastOwnerRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  // Las etiquetas de fecha que muestran la cartelera, las llaves y los impresos.
+  // Se derivan de las dos fechas del evento, así que cambiarlas en el diálogo
+  // redibuja todo de una vez.
+  const eventLabels = useMemo(() => buildEventLabels(eventDates), [eventDates]);
   // Todo lo que este dispositivo tiene SIN CONFIRMAR en la nube: altas de
   // peleadores y ventas de entradas. Las dos colas viven en localStorage, así
   // que las dos mueren si se borran los datos locales — por eso logout y
@@ -246,10 +258,10 @@ export default function App() {
   // las planillas de Excel): antes revocaba la URL justo después del click,
   // que es la causa conocida de que en Safari el archivo se descargue VACÍO.
   function handleExport() {
-    const d = { fighters, matchups, super4, ticketsNew };
+    const d = { fighters, matchups, super4, ticketsNew, eventLabel, eventDates };
     downloadBytes(JSON.stringify(d, null, 2), "evento_" + new Date().toISOString().split("T")[0] + ".json", "application/json");
   }
-  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); } restoreTicketsFromImport(d.ticketsNew); } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
+  function handleImport() { const i = document.createElement("input"); i.type = "file"; i.accept = ".json"; i.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); if (d.fighters) { const nf = normalizeFighters(d.fighters); setFighters(nf); save("bm_fighters_v4", nf); } if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); } if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); } if (d.eventLabel) { setEventLabel(d.eventLabel); save("bm_event_label", d.eventLabel); } if (d.eventDates && isOwner) setEventDates(d.eventDates); restoreTicketsFromImport(d.ticketsNew); } catch { alert("JSON inválido"); } }; r.readAsText(f); }; i.click(); }
   // Las boletas viven en nodos individuales en la nube (no en el blob), así que
   // se restauran aparte: requieren conexión y se agregan por id a las
   // existentes; watchTickets refresca la UI al confirmarse la escritura.
@@ -292,8 +304,22 @@ export default function App() {
     if (d.matchups) { setMatchups(d.matchups); save("bm_matchups_v3", d.matchups); }
     if (Array.isArray(d.super4)) { const ns = normalizeSuper4(d.super4); setSuper4(ns); save("bm_super4_v1", ns); }
     if (d.eventLabel) { setEventLabel(d.eventLabel); save("bm_event_label", d.eventLabel); }
+    if (d.eventDates && isOwner) setEventDates(d.eventDates);
     restoreTicketsFromImport(d.ticketsNew);
     alert(`Respaldo del ${c.fecha} restaurado.`);
+  }
+
+  // "Cierre del evento": la hoja que resume la velada entera —recaudación,
+  // asistencia real, campeones, escuelas— en una sola carilla imprimible.
+  // Después del evento esos números viven repartidos en cuatro pestañas y
+  // desaparecen al reiniciar; esto los deja en un documento antes de borrar.
+  function cierreEvento() {
+    const resumen = cierreResumen({ fighters, matchups, super4, tickets: ticketsNew });
+    printHtml(buildCierreHtml(resumen, {
+      titulo: eventLabel,
+      fechaEvento: eventLabels.rango,
+      generadoEl: new Date().toLocaleDateString("es-CL"),
+    }));
   }
 
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
@@ -305,7 +331,7 @@ export default function App() {
   // Requiere doble confirmación: un confirm() explicando qué se borra, y
   // escribir la palabra BORRAR en un prompt.
   async function resetEvent() {
-    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.";
+    const detalle = "¿Reiniciar el evento?\n\nSe borrarán TODOS los peleadores, peleas y boletas (incluidas las entradas ya vendidas).\n\nAntes de borrar se descarga un respaldo y se guarda una copia en la nube. Esta acción no se puede deshacer desde la app.\n\nSi todavía no imprimiste el CIERRE DEL EVENTO (recaudación, asistencia y campeones en una hoja), cancela y hazlo primero: está en este mismo menú.";
     if (!confirm(detalle)) return;
     const palabra = prompt("Para confirmar, escribe la palabra BORRAR (en mayúsculas):");
     if (palabra === null) return;
@@ -315,7 +341,7 @@ export default function App() {
 
     if (FB.ready) {
       try {
-        await backupEventToCloud({ fighters, matchups, super4, ticketsNew, eventLabel, backedUpAt: new Date().toISOString() });
+        await backupEventToCloud({ fighters, matchups, super4, ticketsNew, eventLabel, eventDates, backedUpAt: new Date().toISOString() });
       } catch (e) {
         alert("No se pudo guardar el respaldo en la nube. El reinicio se canceló para no perder datos.\n\nError: " + e.message);
         return;
@@ -336,9 +362,17 @@ export default function App() {
   // al ir a la lista o a "Agregar" se descarta la edición en curso, igual
   // que hacían los botones de la barra inferior.
   function go(k) { if (k === "list" || k === "register") setEditF(null); setView(k); }
-  // Editar el nombre/fecha del evento (la barra inferior en móvil y el pie
-  // del sidebar en escritorio usan el mismo prompt).
-  function editEventLabel() { const cur = load("bm_event_label", "La Velada — próxima fecha por definir"); const v = prompt("Nombre y fecha del evento:", cur); if (v !== null && v.trim()) { save("bm_event_label", v.trim()); setEventLabel(v.trim()); } }
+  // Editar el título y las fechas del evento (la barra inferior en móvil y el
+  // pie del sidebar en escritorio abren el mismo diálogo).
+  function editEventLabel() { setEventDialogOpen(true); }
+  function guardarEvento({ label, dates }) {
+    if (label !== eventLabel) { save("bm_event_label", label); setEventLabel(label); }
+    // Las fechas solo las escribe el dueño (la regla de la base rechaza la
+    // escritura del staff, y el diálogo ya le deshabilita esos campos): no se
+    // intenta guardar lo que va a rebotar y dejar el chip de sincronización en
+    // rojo por un cambio que el staff ni siquiera hizo.
+    if (isOwner && (dates.semis !== eventDates.semis || dates.final !== eventDates.final)) setEventDates(dates);
+  }
   // Acciones del menú del dueño (⋮), compartidas por el header móvil y el
   // pie del sidebar de escritorio.
   const menuActions = [
@@ -347,6 +381,7 @@ export default function App() {
     { label: "Importar", danger: false, run: handleImport },
     { label: "Exportar", danger: false, run: handleExport },
     { label: "Firebase manual", danger: false, run: pasteCustomFbConfig },
+    { label: "Cierre del evento", danger: false, run: cierreEvento },
     { label: "Reiniciar evento", danger: true, run: resetEvent },
   ];
   const menuItemCls = (danger) => "block w-full text-left text-[14px] text-gray-400 hover:bg-white/5 px-3 py-1.5 transition-colors " + (danger ? "hover:text-red-400" : "hover:text-boxing-goldFight");
@@ -496,10 +531,10 @@ export default function App() {
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
             {view === "list" && <FighterList fighters={fighters} onEdit={editFighter} onDelete={delFighter} />}
             {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
-            {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} />}
+            {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} labels={eventLabels} />}
             {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
             {view === "faltante" && <FaltantesView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
-            {view === "card" && <FightCardView matchups={matchups} fighters={fighters} super4={super4} />}
+            {view === "card" && <FightCardView matchups={matchups} fighters={fighters} super4={super4} labels={eventLabels} />}
             {view === "finance" && <TicketsManager tickets={ticketsNew} setTickets={setTicketsNew} ticketsEstado={ticketsEstado} initialTicketCode={urlTicketCode} initialTicketToken={urlTicketToken} />}
           </Suspense>
         </div>
@@ -533,6 +568,8 @@ export default function App() {
             garantiza la entrega) / ⚠️ rojo solo si la nube RECHAZA de verdad;
           — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
+      {eventDialogOpen && <EventSettingsDialog label={eventLabel} dates={eventDates} isOwner={isOwner} onSave={guardarEvento} onClose={() => setEventDialogOpen(false)} />}
+
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
         {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border rounded-2xl " + (addedToast.phase === "error" ? "border-red-500/60" : "border-green-500/60")} style={{ boxShadow: addedToast.phase === "error" ? "0 0 24px rgba(220,38,38,0.25)" : "0 0 24px rgba(34,197,94,0.2)" }}>
           <span className={"text-lg leading-none " + (addedToast.phase === "error" ? "text-red-400" : "text-green-400")}>{addedToast.phase === "error" ? "⚠️" : "✓"}</span>

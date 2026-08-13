@@ -101,6 +101,49 @@ Es un cambio de permisos sobre una base en producción; publícalo tú:
 3. **Cuenta fuera de la lista:** una cuenta autenticada cuyo UID no esté en
    `/staff` no debe ver datos (la app quedará vacía / sin sincronizar).
 
+## Fechas del evento (editables desde la app)
+
+Las dos fechas de la velada —semifinales y final del Super 4— **ya no se
+escriben en el código**. Son un dato del evento (`sangre_nueva/bm_event_dates`,
+dos fechas ISO `{ semis, final }`) que se edita en la app: toca la barra de la
+fecha (móvil) o el chip del pie del menú lateral (escritorio) y se abre el
+diálogo **Datos del evento**, con el título y las dos fechas, y una vista previa
+de cómo va a quedar escrita la fecha antes de guardar.
+
+De ahí salen todas las etiquetas de fecha de la app (`src/lib/eventDates.js`):
+la cabecera de la Cartelera, las tarjetas del Super 4, el PDF y la planilla
+imprimible de llaves, y los subtítulos de las planillas CSV. Montar la próxima
+velada ya no exige tocar el repositorio ni desplegar.
+
+- **Solo el dueño cambia las fechas** (la regla de la base rechaza esa escritura
+  al staff, y el diálogo se los deshabilita). El título sí lo puede editar el
+  staff, como antes.
+- **Casos raros cubiertos**: velada de un solo día (semifinales y final la misma
+  noche), y fechas que cruzan de mes o de año — la frase nombra los dos meses o
+  los dos años para que no quede ambigua.
+- Un valor corrupto en la nube **no deja la app sin fecha**: cae a la fecha por
+  defecto (`DEFAULT_EVENT_DATES`) campo por campo.
+- La regla de `bm_event_dates` en `database.rules.json` es explícita, pero el
+  nodo ya quedaba cubierto por `$other` (lectura del staff, escritura del
+  dueño): **no hace falta volver a publicar las reglas** para que funcione.
+  Publícalas cuando quieras la validación de formato que trae.
+
+## Cierre del evento
+
+Terminada la velada, los números quedan repartidos en cuatro pestañas y
+desaparecen al reiniciar el evento. El menú ⋮ del dueño tiene **Cierre del
+evento**: abre una hoja imprimible (o "guardar como PDF") con todo el evento en
+una carilla —recaudación total y por tipo de entrada, desglose por método de
+pago, asistencia real (personas que entraron vs. entradas vendidas), peleadores
+por categoría y sexo, peleas que de verdad salieron en la cartelera, campeón de
+cada cinturón y atletas por escuela.
+
+Es el documento para rendir cuentas con los socios y para decidir la próxima
+fecha. **Genéralo antes de "Reiniciar evento"** (el propio diálogo de reinicio lo
+recuerda). La lógica es pura y está testeada en `src/lib/cierreEvento.js`:
+distingue boletas de personas, no cuenta como vendidas las boletas anuladas, y
+con cero ventas informa asistencia "—" en vez de un 0 % engañoso.
+
 ## PWA / offline
 
 El service worker se genera automáticamente con `vite-plugin-pwa`
@@ -135,9 +178,14 @@ práctica los edita una sola persona a la vez.
 src/
   constants.js        # categorías de peso, niveles, tipos de entrada, helpers
   lib/
-    storage.js         # localStorage + helpers de boletas/contadores
+    storage.js          # localStorage, sync del "blob" y peleadores
+    tickets.js          # boletas: venta, correlativo, puerta y sus colas
+    backups.js          # respaldos del evento en la nube
+    storageKeys.js      # claves de localStorage compartidas por los anteriores
     firebase.js         # inicialización y sync de Firebase (API modular)
-    matchmaking.js       # algoritmo de emparejamiento y sorteo
+    matchmaking.js      # algoritmo de emparejamiento y sorteo
+    eventDates.js       # fechas del evento → etiquetas (puro)
+    cierreEvento.js     # resumen final de la velada + hoja imprimible
   components/          # un componente por archivo
   App.jsx
   main.jsx

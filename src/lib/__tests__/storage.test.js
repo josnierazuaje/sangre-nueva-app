@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { nodeToArray, applyUpsertFighter, applyRemoveFighter, buildTicketRestore, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn, maxCounterFromTickets, emergencySuffix, descifrarFechaRespaldo } from "../storage.js";
+import { nodeToArray, applyUpsertFighter, applyRemoveFighter, stripLocalGhosts, applyOutboxPut, applyOutboxRemove, pruneOutbox, mergePending, stripUndefined, fighterNodeValue, OUTBOX_TTL_MS } from "../storage.js";
+// Las funciones puras de boletas y de respaldos salieron de storage.js a sus
+// propios módulos (ver la cabecera de storage.js); las pruebas siguen aquí
+// porque cubren el mismo terreno: qué se guarda y qué se sincroniza.
+import { buildTicketRestore, stripLocalFlags, mergePendingTickets, sortTickets, applyCheckIn, interpretCheckIn, maxCounterFromTickets, emergencySuffix } from "../tickets.js";
+import { descifrarFechaRespaldo } from "../backups.js";
 
 const A = { id: "a", fullName: "Ana" };
 const B = { id: "b", fullName: "Beto" };

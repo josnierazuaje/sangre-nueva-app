@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty, findTicketByCode } from "../constants.js";
-import { fetchTicket } from "../lib/storage.js";
+import { fetchTicket } from "../lib/tickets.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
 
 export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken, ticketsEstado = "listo" }) {
