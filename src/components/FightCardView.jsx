@@ -11,10 +11,12 @@ import PageHeader from "./PageHeader.jsx";
 // ============================================
 // FIGHT CARD VIEW
 // ============================================
-export default function FightCardView({ matchups, fighters, super4 = [] }) {
+// `labels`: las etiquetas de las fechas del evento, que el organizador edita
+// desde la app (llegan por prop para que la cartelera se redibuje al cambiarlas).
+export default function FightCardView({ matchups, fighters, super4 = [], labels = EVENT_LABELS }) {
   if (!matchups.length) return <div className="text-center py-16 border border-dashed border-boxing-lineBright rounded-3xl"><div className="text-5xl mb-4 opacity-40">{"\u{1F4CB}"}</div><p className="text-boxing-muted">Primero crea los VS</p></div>;
-  // Fecha REAL del evento (dos días), no la de hoy. Fuente única: EVENT_DATES.
-  const eventDate = EVENT_LABELS.rango;
+  // Fecha REAL del evento (dos días), no la de hoy.
+  const eventDate = labels.rango;
   // Misma revisión en vivo que la pestaña VS: avisa AQUÍ (donde se imprime)
   // si alguna pelea guardada quedó inválida (atleta ya en el Super 4, rival
   // eliminado, misma escuela, experiencia o edad).
@@ -61,7 +63,9 @@ export default function FightCardView({ matchups, fighters, super4 = [] }) {
         <div className="p-5 text-center relative" style={{ background: "radial-gradient(300px 130px at 12% 0%, rgba(155,26,42,0.28), transparent 65%), radial-gradient(300px 130px at 88% 0%, rgba(37,99,235,0.18), transparent 65%), rgba(0,0,0,0.35)" }}>
           <h3 className="titulo-cartel" style={{ fontSize: "26px", letterSpacing: "0.04em" }}>SANGRE NUEVA</h3>
           <p className="titulo-oro" style={{ fontFamily: "'Playfair Display',Georgia,serif", fontStyle: "italic", fontSize: "17px", marginTop: "2px" }}>La Velada</p>
-          <p className="text-boxing-muted text-sm mt-2 capitalize tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
+          {/* first-letter en vez de `capitalize`: la fecha es una frase, y con
+              capitalize salía "Sábado 01 Y Domingo 02 De Agosto De 2026". */}
+          <p className="text-boxing-muted text-sm mt-2 first-letter:uppercase tracking-[0.08em]">{eventDate} · {matchups.length} peleas</p>
         </div>
         {/* Acciones arriba, justo bajo el título del evento, para no tener que bajar hasta el final. */}
         {/* Dos acciones a mitad y mitad: imprimir (o guardar en PDF) y bajar la

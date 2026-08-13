@@ -1,6 +1,8 @@
 // ============================================
 // CONSTANTES
 // ============================================
+import { DEFAULT_EVENT_DATES, describeEventDates, buildEventLabels } from "./lib/eventDates.js";
+
 // Categorías de peso oficiales World Boxing (competiciones generales,
 // vigentes 2026): 10 divisiones por género, distintas entre hombres y
 // mujeres. Todo atleta cae dentro de una división de su género: por debajo
@@ -64,30 +66,19 @@ export function getAgeCategory(age) {
 // ============================================
 // FECHAS DEL EVENTO
 // ============================================
-// La Velada se disputa en dos días: el Super 4 juega las semifinales el
-// sábado 1 de agosto de 2026 y las finales (por el cinturón) el domingo 2.
-// Estas son las fechas REALES del evento, centralizadas aquí: al cambiar la
-// fecha se edita SOLO este bloque y se actualizan planillas y vistas.
-// (El "bm_event_label" editable es un título libre aparte; NINGUNA fecha se
-// deriva de él.) Ojo: `day` va como string de 2 dígitos ("01"/"02") para
-// conservar el cero a la izquierda que muestran las planillas.
-export const EVENT_DATES = {
-  semis: { weekdayFull: "sábado", weekdayAbbr: "Sáb", day: "01", monthName: "agosto", year: 2026 },
-  final: { weekdayFull: "domingo", weekdayAbbr: "Dom", day: "02", monthName: "agosto", year: 2026 },
-};
-// Etiquetas ya compuestas desde EVENT_DATES (única fuente de verdad). El
-// comentario de cada línea muestra la salida exacta con la fecha actual.
-export const EVENT_LABELS = {
-  semiAbbr: `${EVENT_DATES.semis.weekdayAbbr} ${EVENT_DATES.semis.day}`,                                     // "Sáb 01"
-  finalAbbr: `${EVENT_DATES.final.weekdayAbbr} ${EVENT_DATES.final.day}`,                                    // "Dom 02"
-  semiWd: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day}`,                                       // "sábado 01"
-  finalWd: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day}`,                                      // "domingo 02"
-  semiLong: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} de ${EVENT_DATES.semis.monthName}`,   // "sábado 01 de agosto"
-  finalLong: `${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName}`,  // "domingo 02 de agosto"
-  // Rango completo de los dos días CON año, para encabezados y compartir por
-  // WhatsApp (asume mismo mes/año para ambos días, que es el caso del evento).
-  rango: `${EVENT_DATES.semis.weekdayFull} ${EVENT_DATES.semis.day} y ${EVENT_DATES.final.weekdayFull} ${EVENT_DATES.final.day} de ${EVENT_DATES.final.monthName} de ${EVENT_DATES.final.year}`, // "sábado 01 y domingo 02 de agosto de 2026"
-};
+// La Velada se disputa en dos días: el Super 4 juega las semifinales el primero
+// y las finales (por el cinturón) el segundo. Las fechas REALES ya no se
+// escriben acá: son un dato del evento que el organizador edita desde la app
+// (clave sincronizada "bm_event_dates"), así montar la próxima velada no exige
+// tocar el código ni desplegar. Ver src/lib/eventDates.js.
+//
+// Lo que queda aquí es el VALOR POR DEFECTO ya descompuesto y sus etiquetas:
+// lo que se ve mientras el organizador no haya puesto su fecha, y el valor de
+// respaldo de los constructores puros (impresos y planillas) cuando quien los
+// llama no pasa etiquetas. (El "bm_event_label" es un título libre aparte;
+// NINGUNA fecha se deriva de él.)
+export const EVENT_DATES = describeEventDates(DEFAULT_EVENT_DATES);
+export const EVENT_LABELS = buildEventLabels(DEFAULT_EVENT_DATES);
 
 export const EXPERIENCE_LEVELS = [
   { key: "debutante", label: "Debutante", minFights: 0, maxFights: 0, color: "#22C55E" },
@@ -111,6 +102,11 @@ export const SYNC_KEYS = {
   "bm_matchups_v3": [],
   "bm_super4_v1": [],
   "bm_event_label": "La Velada — próxima fecha por definir",
+  // Las dos fechas del evento en ISO ({ semis, final }). Solo el DUEÑO las
+  // escribe (regla "$other" de la base): el staff las lee para que su cartelera
+  // y sus impresos digan la misma fecha, pero no puede moverlas desde su
+  // teléfono a mitad del evento.
+  "bm_event_dates": DEFAULT_EVENT_DATES,
 };
 
 export const TICKET_TYPES_V2 = [

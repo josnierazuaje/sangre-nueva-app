@@ -101,6 +101,33 @@ Es un cambio de permisos sobre una base en producción; publícalo tú:
 3. **Cuenta fuera de la lista:** una cuenta autenticada cuyo UID no esté en
    `/staff` no debe ver datos (la app quedará vacía / sin sincronizar).
 
+## Fechas del evento (editables desde la app)
+
+Las dos fechas de la velada —semifinales y final del Super 4— **ya no se
+escriben en el código**. Son un dato del evento (`sangre_nueva/bm_event_dates`,
+dos fechas ISO `{ semis, final }`) que se edita en la app: toca la barra de la
+fecha (móvil) o el chip del pie del menú lateral (escritorio) y se abre el
+diálogo **Datos del evento**, con el título y las dos fechas, y una vista previa
+de cómo va a quedar escrita la fecha antes de guardar.
+
+De ahí salen todas las etiquetas de fecha de la app (`src/lib/eventDates.js`):
+la cabecera de la Cartelera, las tarjetas del Super 4, el PDF y la planilla
+imprimible de llaves, y los subtítulos de las planillas CSV. Montar la próxima
+velada ya no exige tocar el repositorio ni desplegar.
+
+- **Solo el dueño cambia las fechas** (la regla de la base rechaza esa escritura
+  al staff, y el diálogo se los deshabilita). El título sí lo puede editar el
+  staff, como antes.
+- **Casos raros cubiertos**: velada de un solo día (semifinales y final la misma
+  noche), y fechas que cruzan de mes o de año — la frase nombra los dos meses o
+  los dos años para que no quede ambigua.
+- Un valor corrupto en la nube **no deja la app sin fecha**: cae a la fecha por
+  defecto (`DEFAULT_EVENT_DATES`) campo por campo.
+- La regla de `bm_event_dates` en `database.rules.json` es explícita, pero el
+  nodo ya quedaba cubierto por `$other` (lectura del staff, escritura del
+  dueño): **no hace falta volver a publicar las reglas** para que funcione.
+  Publícalas cuando quieras la validación de formato que trae.
+
 ## PWA / offline
 
 El service worker se genera automáticamente con `vite-plugin-pwa`

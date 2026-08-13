@@ -26,6 +26,12 @@
         ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta' && newData.exists()))"
       },
 
+      "bm_event_dates": {
+        ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
+        ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
+        ".validate": "newData.hasChildren(['semis','final']) && newData.child('semis').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.child('final').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+      },
+
       "counters": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",

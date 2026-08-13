@@ -91,6 +91,12 @@ const TEMAS = {
 // así que no hay forma de que dos temas se pisen a mitad de una planilla.
 let P = TEMAS.oscuro;
 
+// Etiquetas de las fechas del evento en uso ("Sáb 01", "sábado 01 de agosto"…).
+// Mismo trato que la paleta: las fija buildSuper4Pdf al empezar y valen para
+// todo el dibujo de esa planilla. Por defecto, las de la fecha del evento por
+// defecto — lo que hacía este módulo cuando la fecha estaba quemada en el código.
+let L = EVENT_LABELS;
+
 // ---------- Medidas (en puntos: 1 pt = 1/72") ----------
 const MARGEN = 36;
 const ANCHO = A4.width - MARGEN * 2;          // 523.28
@@ -119,10 +125,13 @@ function fondoEn(y) {
 // API
 // ============================================
 // Devuelve los bytes del .pdf. Función pura y testeable: recibe las llaves, el
-// índice de peleadores y la fecha ya formateada (no llama a new Date()).
-// `tema`: "oscuro" (el de la app, por defecto) o "claro" (para imprimir).
-export function buildSuper4Pdf(super4, byId, fecha = "", tema = "oscuro") {
+// índice de peleadores y la fecha de generación ya formateada (no llama a
+// new Date()). `tema`: "oscuro" (el de la app, por defecto) o "claro" (para
+// imprimir). `labels`: las etiquetas de las fechas del evento que el
+// organizador editó; sin ellas, las del evento por defecto.
+export function buildSuper4Pdf(super4, byId, fecha = "", tema = "oscuro", labels = EVENT_LABELS) {
   P = TEMAS[tema] || TEMAS.oscuro;
+  L = labels || EVENT_LABELS;
   const llaves = Array.isArray(super4) ? super4 : [];
   const doc = createPdf({ title: "Torneo Super 4 — Sangre Nueva", author: "Sangre Nueva — La Velada" });
 
@@ -202,7 +211,7 @@ function dibujarCabecera(doc, primera, topeComun) {
   doc.line(A4.width / 2 - wSub / 2 - 26, 64.4, A4.width / 2 - wSub / 2 - 10, 64.4, { stroke: P.oro, lineWidth: 0.7 });
   doc.line(A4.width / 2 + wSub / 2 + 10, 64.4, A4.width / 2 + wSub / 2 + 26, 64.4, { stroke: P.oro, lineWidth: 0.7 });
 
-  doc.text(`Semifinales: ${EVENT_LABELS.semiLong}  ·  Finales por el cinturón: ${EVENT_LABELS.finalLong}`,
+  doc.text(`Semifinales: ${L.semiLong}  ·  Finales por el cinturón: ${L.finalLong}`,
     A4.width / 2, 111, { font: F.sansBold, size: 10, color: P.subtitulo, align: "center" });
 
   if (topeComun != null) {
@@ -274,17 +283,17 @@ function dibujarLlave(doc, b, byId, x, top, topeComun) {
   vena(doc, x + CARD_SEMI, bt + CARD_ALTO + SEMI_SEP + CARD_ALTO / 2, finalX, finalY + CINTA_ALTO + FILA_ALTO * 1.5, P.azul);
 
   tarjeta(doc, byId, x, bt, CARD_SEMI, {
-    etiqueta: `${EVENT_LABELS.semiAbbr} · Semifinal 1`,
+    etiqueta: `${L.semiAbbr} · Semifinal 1`,
     filas: [{ fid: s0.red, lado: "rojo" }, { fid: s0.blue, lado: "azul" }],
     winner: s0.winner,
   });
   tarjeta(doc, byId, x, bt + CARD_ALTO + SEMI_SEP, CARD_SEMI, {
-    etiqueta: `${EVENT_LABELS.semiAbbr} · Semifinal 2`,
+    etiqueta: `${L.semiAbbr} · Semifinal 2`,
     filas: [{ fid: s1.red, lado: "rojo" }, { fid: s1.blue, lado: "azul" }],
     winner: s1.winner,
   });
   tarjeta(doc, byId, finalX, finalY, CARD_FINAL, {
-    etiqueta: `${EVENT_LABELS.finalAbbr} · FINAL`,
+    etiqueta: `${L.finalAbbr} · FINAL`,
     filas: [
       { fid: s0.winner, lado: "rojo", vacio: "Ganador Semifinal 1" },
       { fid: s1.winner, lado: "azul", vacio: "Ganador Semifinal 2" },

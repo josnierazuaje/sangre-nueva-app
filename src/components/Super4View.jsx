@@ -67,7 +67,10 @@ function Pildora({ c, children }) {
 // primer valor de las llaves desde la nube, escribir podría pisar llaves
 // armadas en otro dispositivo.
 // ============================================
-export default function Super4View({ fighters, super4, setSuper4, ready = true }) {
+// `labels`: las etiquetas de las fechas del evento ("Sáb 01", "sábado 01"…),
+// que el organizador edita desde la app. Llegan por prop —y no importadas de
+// constants— para que al cambiar la fecha esta pestaña se vuelva a dibujar sola.
+export default function Super4View({ fighters, super4, setSuper4, ready = true, labels = EVENT_LABELS }) {
   const byId = useMemo(() => { const m = {}; fighters.forEach(f => { m[f.id] = f; }); return m; }, [fighters]);
   // Tope de peleas elegido en el selector (se recuerda localmente). Si no hay
   // preferencia guardada pero existe la del selector anterior (por nivel), se
@@ -237,7 +240,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
   // ---------- Impresión de las llaves ----------
   function printSuper4() {
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
-    printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL")));
+    printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL"), labels));
   }
   // Las mismas llaves como PDF: el dibujo del torneo (semifinales, final y las
   // líneas que las unen) tal como se ve acá, en un archivo cerrado que se manda
@@ -254,7 +257,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
     if (!super4.length) { alert("No hay llaves para descargar. Toca GENERAR LLAVES primero."); return; }
     const fecha = new Date().toLocaleDateString("es-CL");
     downloadBytes(
-      buildSuper4Pdf(super4, byId, fecha, tema),
+      buildSuper4Pdf(super4, byId, fecha, tema, labels),
       pdfFilename("Super 4 Sangre Nueva" + (tema === "claro" ? " (claro)" : ""), fecha.replace(/\//g, "-")),
       PDF_MIME,
     );
@@ -495,7 +498,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
       {/* ===== Las llaves, a todo el ancho: el protagonista de la pestaña ===== */}
       <div className="space-y-4 lg:space-y-6">
       {!super4.length && <div className="lg:max-w-2xl lg:mx-auto rounded-3xl border border-dashed border-boxing-lineBright p-4 text-center space-y-2">
-        <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{EVENT_LABELS.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{EVENT_LABELS.finalWd}</span>.</p>
+        <p className="text-boxing-muted text-sm">Arma automáticamente las llaves de 4 atletas por edad y peso:<br />semifinales el <span className="text-boxing-cream font-semibold">{labels.semiWd}</span> y la final el <span className="text-boxing-goldFight font-semibold">{labels.finalWd}</span>.</p>
         <div className="text-left text-sm text-boxing-muted space-y-1 pt-2">
           {resultado.brackets.length === 0 && resultado.faltantes.length === 0 && <p>Con los filtros actuales no hay atletas para armar llaves. Ajusta la experiencia, la edad o los pesos.</p>}
           {(llavesCap != null ? resultado.brackets.slice(0, llavesCap) : resultado.brackets).map(b => <p key={b.catKey}>✅ <span className="text-boxing-cream">{b.catLabel}</span> — listo (4+)</p>)}
@@ -540,7 +543,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                   const semiLista = !!byId[s.red] && !!byId[s.blue];
                   return (
                     <div key={i} className={i === 0 ? "s4-s1" : "s4-s2"}>
-                      <Tarjeta dia={`${EVENT_LABELS.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
+                      <Tarjeta dia={`${labels.semiAbbr} · Semi ${i + 1}`} decidido={!!s.winner}>
                         <Fila fid={s.red} winner={s.winner} lado="rojo" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.red)} onRemove={() => pedirReemplazo(b.id, i, "red", s.red)} />
                         <Fila fid={s.blue} winner={s.winner} lado="azul" bloqueada={!semiLista} onWin={() => marcarSemi(b.id, i, s.blue)} onRemove={() => pedirReemplazo(b.id, i, "blue", s.blue)} />
                       </Tarjeta>
@@ -580,7 +583,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true }
                   </svg>
                 </div>
                 <div className="s4-final">
-                  <Tarjeta dia={`${EVENT_LABELS.finalAbbr} · Final`} decidido={!!campeon} destacada>
+                  <Tarjeta dia={`${labels.finalAbbr} · Final`} decidido={!!campeon} destacada>
                     <Fila fid={finalistas[0]} winner={campeon} lado="rojo" onWin={() => marcarFinal(b.id, finalistas[0])} placeholder="Ganador Semi 1" bloqueada={!(finalistas[0] && finalistas[1])} />
                     <Fila fid={finalistas[1]} winner={campeon} lado="azul" onWin={() => marcarFinal(b.id, finalistas[1])} placeholder="Ganador Semi 2" bloqueada={!(finalistas[0] && finalistas[1])} />
                   </Tarjeta>

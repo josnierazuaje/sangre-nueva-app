@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { FB, OWNER_EMAIL, DEFAULT_FB_CONFIG, initFirebaseApp, initFirebase, startFirebaseSync } from "./firebase.js";
 import {
-  load, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets,
+  load, save, loadFighters, loadTicketsV4, migrateTicketsIfNeeded, watchTickets,
   fetchCloudArray, stripLocalGhosts, outboxList, mergePending, upsertFighterTx,
   replayTicketsOutbox, saveLocal, reconcileNodeTx,
 } from "./storage.js";
 import { normalizeFighters } from "../constants.js";
+import { DEFAULT_EVENT_DATES, normalizeEventDates } from "./eventDates.js";
 import { normalizeSuper4 } from "./super4.js";
 import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./dedup.js";
 
@@ -39,6 +40,10 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
   // esta cuenta no tiene permiso para leerlas.
   const [ticketsEstado, setTicketsEstado] = useState("cargando");
   const [eventLabel, setEventLabel] = useState(() => load("bm_event_label", "La Velada — próxima fecha por definir"));
+  // Las dos fechas reales del evento (ISO). Se normalizan siempre al entrar —
+  // de localStorage o de la nube— para que un valor corrupto no deje la app sin
+  // fecha ni reviente al imprimir.
+  const [eventDates, setEventDatesState] = useState(() => normalizeEventDates(load("bm_event_dates", DEFAULT_EVENT_DATES)));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [authUser, setAuthUser] = useState(undefined);
   // null = aún no se decide el modo; false = solo-local (sin nube); true = nube.
@@ -57,6 +62,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     else if (k === "bm_matchups_v3") setMatchups(val);
     else if (k === "bm_super4_v1") setSuper4(normalizeSuper4(val));
     else if (k === "bm_event_label") setEventLabel(val);
+    else if (k === "bm_event_dates") setEventDatesState(normalizeEventDates(val));
     // Las boletas no vienen por acá: se sincronizan por nodo individual.
   }
 
@@ -193,6 +199,17 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     });
   }, [cloudMode, hydrated.fighters]);
 
+  // Cambia las fechas del evento en este dispositivo y en la nube. Normaliza
+  // antes de guardar: lo que se comparte con el resto del equipo siempre son dos
+  // fechas válidas. Solo el dueño puede escribir este nodo (regla de la base),
+  // así que la app tampoco ofrece el editor al staff.
+  function setEventDates(dates) {
+    const norm = normalizeEventDates(dates);
+    setEventDatesState(norm);
+    save("bm_event_dates", norm);
+    return norm;
+  }
+
   // Escribir en el Super 4 o en la cartelera antes de recibir su primer valor
   // de la nube pisaría lo que otro dispositivo ya armó.
   const super4Ready = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.super4);
@@ -204,6 +221,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     super4, setSuper4,
     tickets, setTickets, ticketsEstado,
     eventLabel, setEventLabel,
+    eventDates, setEventDates,
     sync, authUser, cloudMode, isOwner,
     super4Ready, matchupsReady,
     conectarConConfig,
