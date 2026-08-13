@@ -416,3 +416,46 @@ Para revisar un componente sin credenciales: `dev-preview.html` + `src/dev-previ
 en la raíz (renderizan el componente con datos de ejemplo), `npm run dev` y
 `localhost:8765/dev-preview.html`. **Se borran al terminar, no se commitean.**
 Para las hojas imprimibles, un test temporal que escriba el HTML a un archivo.
+
+---
+
+## 9. Idea en reserva: peleadores por nodo individual (ago 2026)
+
+**Estado: NO implementada, y a propósito.** Existió una rama
+(`perf/peleadores-nodos-individuales`, commit `a233957`, 18-jul-2026) que movía
+los peleadores del arreglo `bm_fighters_v4` a nodos individuales
+`sangre_nueva/fighters/{id}`, igual que las boletas. Se borró el 13-ago-2026
+tras evaluarla. El commit sigue en el repositorio local mientras dure el reflog
+(~90 días): `git checkout -b revisar a233957` lo recupera; pasado ese plazo, se
+pierde (nunca se subió a GitHub).
+
+**Por qué se descartó, y qué queda vigente de la idea:**
+
+1. **Su motivo original ya no aplica.** Nació porque cada alta reescribía el
+   arreglo completo y el organizador veía varios segundos de "Guardando…". Eso
+   se resolvió por otro camino: con el outbox, el alta confirma al INSTANTE sin
+   esperar a la nube (ver §7.2). La espera visible desapareció.
+
+2. **Lo que sí sigue costando es tráfico, no espera.** Cada cambio en un
+   peleador sube y baja el arreglo entero —unos 22 KB con 87 atletas— a cada
+   dispositivo conectado. Invisible hoy; empieza a importar por encima de ~200
+   atletas o con mala señal en el recinto.
+
+3. **Rebasarla era inviable:** 81 commits de distancia. La rama tocaba 160
+   líneas de `storage.js` (que después cambió 394 y se partió en tres módulos) y
+   55 de `App.jsx` (que cambió 533). El outbox, el auto-reparo de fantasmas y la
+   limpieza de duplicados se escribieron DESPUÉS y todos asumen la forma de
+   arreglo.
+
+4. **Y habría roto el registro del staff.** La rama no tocaba
+   `database.rules.json`, y desde el 4-ago la regla `$other` deja cualquier nodo
+   nuevo bajo `sangre_nueva` como **escritura reservada al dueño**: las cuentas
+   del staff habrían visto sus altas rechazadas, y se habría descubierto el día
+   del pesaje.
+
+**Si algún día hace falta (padrón > ~200 atletas), rehacerlo desde cero sobre el
+código actual**, copiando el patrón que `tickets.js` ya tiene resuelto: nodo por
+id, cola de pendientes que sobrevive a la recarga, migración en caliente
+idempotente que no borra el arreglo viejo, y —esto es lo que la rama olvidaba—
+**reglas nuevas para `fighters/$id` con su `.validate`, publicadas antes de
+desplegar el bundle**. Sale más corto y más seguro que rescatar aquel intento.
