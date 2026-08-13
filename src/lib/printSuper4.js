@@ -55,9 +55,13 @@ export function buildSuper4Html(super4, byId, fecha = "", labels = EVENT_LABELS)
   const pendientes = "";
   const topeNota = topeFights != null ? `<div class="sub" style="background:#e7f0e0;border-color:#8ab06a">Torneo limitado a peleadores con hasta <b>${topeFights} pelea${topeFights === 1 ? "" : "s"}</b></div>` : "";
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Torneo Super 4 — Sangre Nueva</title>
+    <meta name="color-scheme" content="light">
     <style>
       * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-      body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
+      /* Fondo blanco declarado: la hoja se MIRA en pantalla antes de imprimir,
+         y con el navegador en modo oscuro un fondo sin declarar sale negro,
+         dejando ilegible todo lo que no tiene fondo propio. Esto es papel. */
+      body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; background: #fff; }
       .doc-header { background:#000; color:#fff; text-align:center; padding:14px 10px; }
       .doc-header h1 { font-size:20px; letter-spacing:2px; }
       .doc-header p { font-size:11px; color:#e5c76b; margin-top:4px; }
