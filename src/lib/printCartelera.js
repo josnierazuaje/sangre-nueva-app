@@ -112,11 +112,16 @@ export function buildCarteleraHtml(matchups, fighters) {
     return headerRow + groupRows;
   }).join("");
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Planilla de peleadores — Sangre Nueva</title>
+<meta name="color-scheme" content="light">
 <style>
   /* Forzar impresión de los colores de fondo — sin esto, el navegador los
      quita al "Guardar como PDF" y la planilla sale en blanco y negro. */
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;}
+  /* Fondo blanco declarado: la hoja se MIRA en pantalla antes de imprimir, y
+     con el navegador en modo oscuro un fondo sin declarar sale negro. Las
+     celdas tienen color propio y se salvaban, pero los espacios entre tablas
+     y cualquier texto sin fondo quedaban ilegibles. Esto es papel, siempre. */
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;background:#fff;}
   .header{background:#000;color:#FDE047;text-align:center;padding:16px 0;font-size:24px;font-weight:bold;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th,td{border:1px solid #000;padding:6px 8px;text-align:center;}

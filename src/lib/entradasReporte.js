@@ -95,10 +95,14 @@ export function buildEntradasHtml(tickets, subtitulo = "") {
   }).join("");
   const pago = resumenPago(r);
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Entradas — Sangre Nueva</title>
+<meta name="color-scheme" content="light">
 <style>
   /* Forzar impresión de los colores de fondo (sin esto el PDF sale sin color). */
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;}
+  /* Fondo blanco declarado: la hoja se MIRA en pantalla antes de imprimir, y
+     con el navegador en modo oscuro un fondo sin declarar sale negro. Esto es
+     papel, siempre (mismo criterio en las otras hojas imprimibles). */
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#000;background:#fff;}
   .header{background:#000;color:#FDE047;text-align:center;padding:14px 0;font-size:22px;font-weight:bold;}
   .subtitulo{background:#FED7AA;text-align:center;padding:8px;font-size:14px;font-weight:bold;border:1px solid #000;border-top:none;}
   .resumen{text-align:center;padding:9px;font-size:13px;border:1px solid #000;border-top:none;background:#F3F4F6;}
