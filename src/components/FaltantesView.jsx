@@ -7,6 +7,7 @@ import { buildFaltantesCsv } from "../lib/csvPlanillas.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import VSCard from "./VSCard.jsx";
 import PageHeader from "./PageHeader.jsx";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 // ============================================
 // FALTANTES — emparejamiento FORZADO
@@ -15,7 +16,7 @@ import PageHeader from "./PageHeader.jsx";
 // cruce en el VS ni un puesto en el Super 4 (misma verdad que la lista de
 // Peleadores, vía committedFighterIds). Aquí el organizador puede EMPAREJARLOS
 // A LA FUERZA para que nadie se quede sin subir al ring, aunque el cruce rompa
-// las reglas World Boxing / FECHIBOX: cada pelea forzada queda marcada en rojo
+// las reglas de World Boxing: cada pelea forzada queda marcada en rojo
 // con exactamente lo que le falta para ser reglamentaria. Las forzadas se
 // AGREGAN a la cartelera (no reemplazan lo ya armado en el VS).
 export default function FaltantesView({ fighters, matchups, setMatchups, super4 = [], ready, super4Ready }) {
@@ -45,7 +46,7 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
     if (faltantes.length < 2) return;
     const impar = faltantes.length % 2 === 1;
     const msg = `Se emparejará OBLIGATORIAMENTE a ${impar ? `${faltantes.length - 1} de los ${faltantes.length}` : `los ${faltantes.length}`} atletas faltantes` +
-      `, aunque el cruce rompa las reglas World Boxing / FECHIBOX.\n\n` +
+      `, aunque el cruce rompa las reglas de World Boxing.\n\n` +
       `Cada pelea forzada queda marcada en rojo con lo que le faltaría para ser reglamentaria, y se AGREGA a la cartelera (no reemplaza las peleas ya armadas).` +
       (impar ? `\n\nComo el número es impar, 1 atleta quedará sin rival.` : "") +
       `\n\n¿Continuar?`;
@@ -89,7 +90,7 @@ export default function FaltantesView({ fighters, matchups, setMatchups, super4 
   // le falta a cada una y una columna en blanco para la corrección, y hoja
   // "Sin rival" con los que quedaron sueltos.
   function descargarPlanilla() {
-    const fecha = new Date().toLocaleDateString("es-CL");
+    const fecha = new Date().toLocaleDateString(localeDelEventoActivo());
     const sub = `${forced.length} pelea${forced.length === 1 ? "" : "s"} forzada${forced.length === 1 ? "" : "s"}` +
       (faltantes.length ? ` · ${faltantes.length} sin rival` : "");
     downloadBytes(

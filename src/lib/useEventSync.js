@@ -10,6 +10,9 @@ import { normalizeFighters } from "../constants.js";
 import { DEFAULT_EVENT_DATES, normalizeEventDates } from "./eventDates.js";
 import { normalizeSuper4 } from "./super4.js";
 import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./dedup.js";
+import { eventoActivoId, esDuenoDelEvento, EVENTO_LEGACY_ID, META_LEGACY } from "./eventos.js";
+import { leerMetaEvento } from "./eventosNube.js";
+import { leerMetaLocal, guardarMetaLocal } from "./moneda.js";
 
 // ============================================
 // useEventSync — TODO el ciclo de vida de la sincronización
@@ -54,7 +57,15 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
   // null = aún no se decide el modo; false = solo-local (sin nube); true = nube.
   const [cloudMode, setCloudMode] = useState(null);
   const [hydrated, setHydrated] = useState({ fighters: false, matchups: false, super4: false });
-  const isOwner = !!(authUser && authUser.email === OWNER_EMAIL);
+  // Qué velada está abierta en este dispositivo y cuál es su ficha (nombre,
+  // dueño, moneda, precios). Se lee de este aparato antes que de la nube para
+  // que el primer render ya sepa en qué moneda cobra la boletería.
+  const eventoId = eventoActivoId();
+  const [eventoMeta, setEventoMeta] = useState(
+    () => (eventoId === EVENTO_LEGACY_ID ? META_LEGACY : leerMetaLocal()));
+  // El dueño ya no es un correo fijo: es el dueño de ESTA velada (el correo del
+  // creador sigue valiendo como superusuario). Ver esDuenoDelEvento.
+  const isOwner = esDuenoDelEvento(authUser, eventoMeta, { eventoId, superEmail: OWNER_EMAIL });
 
   function keyReady(k) {
     if (k === "bm_fighters_v4") setHydrated(h => (h.fighters ? h : { ...h, fighters: true }));
@@ -85,6 +96,22 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     });
   }
 
+  // Trae la ficha del evento abierto y la deja cacheada. Importa que se
+  // cachee: la moneda y los precios se resuelven al CARGAR la página (ver
+  // constants.js), así que lo que se guarda hoy es lo que la boletería usará en
+  // el próximo arranque, aunque ese día el recinto no tenga señal.
+  //
+  // Un fallo aquí no rompe nada: se sigue con la ficha cacheada. El caso real
+  // que cubre es el teléfono de la puerta entrando por wifi de recinto.
+  function refrescarMeta() {
+    if (eventoId === EVENTO_LEGACY_ID) return; // su ficha vive en el código
+    leerMetaEvento(eventoId).then(m => {
+      if (!m) return;
+      setEventoMeta(m);
+      guardarMetaLocal(m);
+    });
+  }
+
   // Conecta este dispositivo a OTRO proyecto de Firebase (config pegada a mano).
   // Devuelve true si la configuración sirvió.
   function conectarConConfig(cfg) {
@@ -109,7 +136,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
           setAuthUser(user);
           // En modo escáner solo se abre la conexión (para el chip y el
           // check-in) y las boletas: nada de peleadores, cartelera ni Super 4.
-          if (user) { startFirebaseSync(setSync, applyRemote, keyReady, { soloConexion: scanMode }); startTicketsSync(); }
+          if (user) { startFirebaseSync(setSync, applyRemote, keyReady, { soloConexion: scanMode }); startTicketsSync(); refrescarMeta(); }
           else setSync("off");
         });
       } catch (e) { setAuthUser(null); setSync("error"); }
@@ -241,6 +268,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     eventDates, setEventDates,
     eventOrg, setEventOrg,
     sync, authUser, cloudMode, isOwner,
+    eventoId, eventoMeta, refrescarMeta,
     super4Ready, matchupsReady,
     conectarConConfig,
   };

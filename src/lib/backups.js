@@ -1,17 +1,26 @@
 // ============================================
 // RESPALDOS DEL EVENTO EN LA NUBE
 // ============================================
-// "Reiniciar evento" guarda una copia completa en sangre_nueva_backups/{fecha}
-// antes de borrar nada, y desde la app se pueden listar y volver a traer. Ese
-// nodo está protegido en database.rules.json para que SOLO el dueño (por
-// correo) pueda leerlo o escribirlo: contiene el padrón entero, con datos de
-// menores, y los datos de los compradores.
+// "Reiniciar evento" guarda una copia completa en los respaldos DEL EVENTO
+// ({raíz del evento}/backups/{fecha}) antes de borrar nada, y desde la app se
+// pueden listar y volver a traer. Ese nodo está protegido en
+// database.rules.json para que SOLO el dueño pueda leerlo o escribirlo:
+// contiene el padrón entero, con datos de menores, y los datos de los
+// compradores.
 //
 // Salió de storage.js sin cambiar lógica, junto con la separación de boletas.
 
 import { ref, set as dbSet, get } from "firebase/database";
 import { FB } from "./firebase.js";
 import { nodeToArray } from "./storage.js";
+import { rutaBackups, eventoActivoId } from "./eventos.js";
+
+// Dónde guarda sus respaldos el evento ABIERTO. Antes era un nodo global
+// (sangre_nueva_backups) y con varias veladas vivas eso sería una trampa: la
+// lista de "Restaurar respaldo" mezclaría copias de Santiago y de Madrid, y
+// restaurar la equivocada reemplaza el padrón entero. La velada de Chile
+// conserva su nodo de siempre (ver src/lib/eventos.js).
+function raizBackups() { return rutaBackups(eventoActivoId()); }
 
 // Lista los respaldos guardados en la nube, del más nuevo al más viejo, con la
 // fecha ya legible y un resumen de lo que contienen. Hasta ahora "Reiniciar
@@ -20,7 +29,7 @@ import { nodeToArray } from "./storage.js";
 // del organizador. Solo el dueño puede leer ese nodo (ver database.rules.json).
 export async function listCloudBackups() {
   if (!FB.ready) return [];
-  const snap = await get(ref(FB.db, "sangre_nueva_backups"));
+  const snap = await get(ref(FB.db, raizBackups()));
   const val = snap.val() || {};
   return Object.entries(val).map(([clave, d]) => ({
     clave,
@@ -46,7 +55,7 @@ export function descifrarFechaRespaldo(clave) {
 // Trae un respaldo completo de la nube para restaurarlo.
 export async function fetchCloudBackup(clave) {
   if (!FB.ready) return null;
-  const snap = await get(ref(FB.db, "sangre_nueva_backups/" + clave));
+  const snap = await get(ref(FB.db, raizBackups() + "/" + clave));
   return snap.exists() ? snap.val() : null;
 }
 
@@ -55,6 +64,6 @@ export async function backupEventToCloud(data) {
   const key = new Date().toISOString().replace(/[.:]/g, "-");
   // Firebase rechaza valores undefined (ej. notes de un peleador sin notas);
   // el round-trip por JSON los omite igual que ya hace save().
-  await dbSet(ref(FB.db, "sangre_nueva_backups/" + key), JSON.parse(JSON.stringify(data)));
+  await dbSet(ref(FB.db, raizBackups() + "/" + key), JSON.parse(JSON.stringify(data)));
   return key;
 }

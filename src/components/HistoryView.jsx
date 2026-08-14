@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { TICKET_TYPES_V2, fmt$, ticketQty } from "../constants.js";
+import { TICKET_TYPES_V2, fmtDinero, ticketQty } from "../constants.js";
 import Badge from "./Badge.jsx";
 import { normName } from "../lib/dedup.js";
 import { buildEntradasCsv, buildEntradasHtml } from "../lib/entradasReporte.js";
 import { printHtml } from "../lib/printHtml.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import TicketPreview from "./TicketPreview.jsx";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 export default function HistoryView({ tickets, onDelete }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,11 +41,11 @@ export default function HistoryView({ tickets, onDelete }) {
     if (statusFilter !== "all") partes.push(statusFilter === "ingresado" ? "Solo ingresados" : "Solo activas");
     if (searchQuery.trim()) partes.push(`Búsqueda: "${searchQuery.trim()}"`);
     const base = partes.length ? partes.join(" · ") : "Todas las entradas";
-    return `${base} — impreso ${new Date().toLocaleDateString("es-CL")}`;
+    return `${base} — impreso ${new Date().toLocaleDateString(localeDelEventoActivo())}`;
   }
   function imprimirRegistro() { printHtml(buildEntradasHtml(paraReporte, subtituloReporte())); }
   function descargarRegistro() {
-    const fecha = new Date().toLocaleDateString("es-CL").replace(/\//g, "-");
+    const fecha = new Date().toLocaleDateString(localeDelEventoActivo()).replace(/\//g, "-");
     downloadBytes(buildEntradasCsv(paraReporte, subtituloReporte()), csvFilename("Entradas Sangre Nueva", fecha), CSV_MIME);
   }
   if (!tickets.length) return <div className="text-center py-12"><div className="text-5xl mb-3">🎫</div><p className="text-gray-400 text-sm">No hay entradas emitidas aún</p></div>;
@@ -81,7 +82,7 @@ export default function HistoryView({ tickets, onDelete }) {
                 <p className="text-gray-500 text-[14px]">#{t.id} · {t.paymentMethod}{ticketQty(t) > 1 ? " · ×" + ticketQty(t) : ""}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold" style={{ color: ticketTypeInfo.color }}>{fmt$(t.price)}</p>
+                <p className="text-sm font-bold" style={{ color: ticketTypeInfo.color }}>{fmtDinero(t.price)}</p>
                 {/* `_pending`: la venta está guardada en este dispositivo y en
                     cola, pero la nube todavía no la confirmó (se re-sube sola).
                     Se avisa para que nadie borre los datos locales creyendo que

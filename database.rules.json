@@ -2,12 +2,10 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "staff": {
       ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
       ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'"
     },
-
     "sangre_nueva": {
       "bm_fighters_v4": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
@@ -38,19 +36,16 @@
         ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta' && newData.exists()))",
         ".validate": "newData.isString() && newData.val().length <= 80"
       },
-
       "bm_event_dates": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
         ".validate": "newData.hasChildren(['semis','final']) && newData.child('semis').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.child('final').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
       },
-
       "bm_event_org": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
         ".validate": "newData.isString() && newData.val().length <= 60"
       },
-
       "counters": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
@@ -59,7 +54,6 @@
           ".validate": "newData.isNumber() && (!data.exists() || newData.val() >= data.val())"
         }
       },
-
       "tickets": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).exists())",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
@@ -68,16 +62,116 @@
           ".validate": "newData.child('id').val() === $id && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('status').val().matches(/^(activo|ingresado|anulado)$/) && (!newData.child('quantity').exists() || (newData.child('quantity').isNumber() && newData.child('quantity').val() >= 1 && newData.child('quantity').val() <= 20)) && (!newData.child('token').exists() || newData.child('token').val().matches(/^[A-Za-z0-9]{6}$/)) && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('staff').child(auth.uid).val() !== 'puerta' || (data.exists() && data.child('status').val() === 'activo' && newData.child('status').val() === 'ingresado' && newData.child('id').val() === data.child('id').val() && newData.child('token').val() === data.child('token').val() && newData.child('price').val() === data.child('price').val() && newData.child('quantity').val() === data.child('quantity').val() && newData.child('ticketType').val() === data.child('ticketType').val() && newData.child('attendeeName').val() === data.child('attendeeName').val() && newData.child('phone').val() === data.child('phone').val() && newData.child('paymentMethod').val() === data.child('paymentMethod').val() && newData.child('createdAt').val() === data.child('createdAt').val()))"
         }
       },
-
       "$other": {
         ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || (root.child('staff').child(auth.uid).exists() && root.child('staff').child(auth.uid).val() !== 'puerta'))",
         ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'"
       }
     },
-
     "sangre_nueva_backups": {
       ".read": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'",
       ".write": "auth != null && auth.token.email === 'josnier.azuaje@gmail.com'"
+    },
+    "eventos": {
+      "$eid": {
+        ".write": "auth != null && !data.exists() && newData.child('meta/ownerUid').val() === auth.uid",
+        "meta": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || root.child('eventos').child($eid).child('staff').child(auth.uid).exists())",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['nombre','ownerUid']) && newData.child('nombre').isString() && newData.child('nombre').val().length >= 2 && newData.child('nombre').val().length <= 80",
+          "ownerUid": {
+            ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+          },
+          "moneda": {
+            ".validate": "newData.isString() && newData.val().matches(/^(EUR|CLP)$/)"
+          },
+          "precios": {
+            "$tipo": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+            }
+          },
+          "federacion": {
+            ".validate": "newData.isString() && newData.val().matches(/^(FECHIBOX|RFEB|NINGUNA)$/)"
+          }
+        },
+        "staff": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || root.child('eventos').child($eid).child('staff').child(auth.uid).exists())",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)"
+        },
+        "bm_fighters_v4": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
+          "$i": {
+            ".validate": "newData.hasChildren(['id', 'fullName']) && newData.child('id').isString() && newData.child('id').val().length <= 40 && newData.child('fullName').isString() && newData.child('fullName').val().length >= 2 && newData.child('fullName').val().length <= 80 && (!newData.child('gym').exists() || (newData.child('gym').isString() && newData.child('gym').val().length <= 80)) && (!newData.child('phone').exists() || (newData.child('phone').isString() && newData.child('phone').val().length <= 40)) && (!newData.child('notes').exists() || (newData.child('notes').isString() && newData.child('notes').val().length <= 2000)) && (!newData.child('sexo').exists() || newData.child('sexo').val().matches(/^(M|F)$/))"
+          }
+        },
+        "bm_matchups_v3": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
+          "$i": {
+            ".validate": "newData.hasChild('id') && newData.child('id').isString() && newData.child('id').val().length <= 40 && (!newData.child('fighterRedId').exists() || (newData.child('fighterRedId').isString() && newData.child('fighterRedId').val().length <= 40)) && (!newData.child('fighterBlueId').exists() || (newData.child('fighterBlueId').isString() && newData.child('fighterBlueId').val().length <= 40)) && (!newData.child('note').exists() || (newData.child('note').isString() && newData.child('note').val().length <= 500))"
+          }
+        },
+        "bm_super4_v1": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
+          "$i": {
+            ".validate": "newData.hasChild('id') && newData.child('id').isString() && newData.child('id').val().length <= 40 && (!newData.child('catLabel').exists() || (newData.child('catLabel').isString() && newData.child('catLabel').val().length <= 80)) && (!newData.child('regla').exists() || (newData.child('regla').isString() && newData.child('regla').val().length <= 300))"
+          }
+        },
+        "bm_event_label": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "bm_event_dates": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['semis','final']) && newData.child('semis').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.child('final').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+        },
+        "bm_event_org": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          ".validate": "newData.isString() && newData.val().length <= 60"
+        },
+        "counters": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          "$tipo": {
+            ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+            ".validate": "newData.isNumber() && (!data.exists() || newData.val() >= data.val())"
+          }
+        },
+        "tickets": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || root.child('eventos').child($eid).child('staff').child(auth.uid).exists())",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          "$id": {
+            ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta') || (root.child('eventos').child($eid).child('staff').child(auth.uid).val() === 'puerta' && data.exists() && newData.exists()))",
+            ".validate": "newData.child('id').val() === $id && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('status').val().matches(/^(activo|ingresado|anulado)$/) && (!newData.child('quantity').exists() || (newData.child('quantity').isNumber() && newData.child('quantity').val() >= 1 && newData.child('quantity').val() <= 20)) && (!newData.child('token').exists() || newData.child('token').val().matches(/^[A-Za-z0-9]{6}$/)) && ((auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid) || root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta' || (data.exists() && data.child('status').val() === 'activo' && newData.child('status').val() === 'ingresado' && newData.child('id').val() === data.child('id').val() && newData.child('token').val() === data.child('token').val() && newData.child('price').val() === data.child('price').val() && newData.child('quantity').val() === data.child('quantity').val() && newData.child('ticketType').val() === data.child('ticketType').val() && newData.child('attendeeName').val() === data.child('attendeeName').val() && newData.child('phone').val() === data.child('phone').val() && newData.child('paymentMethod').val() === data.child('paymentMethod').val() && newData.child('createdAt').val() === data.child('createdAt').val()))"
+          }
+        },
+        "backups": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)"
+        },
+        "$other": {
+          ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)"
+        }
+      }
+    },
+    "usuarios": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "eventos": {
+          "$eid": {
+            ".validate": "newData.isBoolean()"
+          }
+        }
+      }
     }
   }
 }

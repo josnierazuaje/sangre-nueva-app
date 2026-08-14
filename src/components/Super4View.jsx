@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { save, load, patchSuper4Bracket, mergeSuper4Tx } from "../lib/storage.js";
-import { AGE_CATEGORIES, WEIGHT_CATEGORIES, FECHIBOX_LABEL, EVENT_LABELS, weightRangeLabel } from "../constants.js";
+import { AGE_CATEGORIES, WEIGHT_CATEGORIES, EVENT_LABELS, weightRangeLabel } from "../constants.js";
+import { federacionDelEventoActivo, etiquetaFederacion } from "../lib/federacion.js";
 import { dupKey, normName } from "../lib/dedup.js";
 import { SUPER4_AGE_KEYS, ALL_DIVISION_KEYS, buildSuper4Brackets, setSemiWinner, setFinalWinner, replaceFighter, availableReplacements, bracketMaxFights, bracketConditions } from "../lib/super4.js";
 import { buildSuper4Html } from "../lib/printSuper4.js";
@@ -9,6 +10,7 @@ import { buildSuper4Pdf } from "../lib/pdfSuper4.js";
 import { downloadBytes, pdfFilename, PDF_MIME } from "../lib/download.js";
 import PageHeader from "./PageHeader.jsx";
 import { Conector, Tarjeta, Fila } from "./Super4Bracket.jsx";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);
@@ -241,7 +243,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true, 
   // ---------- Impresión de las llaves ----------
   function printSuper4() {
     if (!super4.length) { alert("No hay llaves para imprimir. Toca GENERAR LLAVES primero."); return; }
-    printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString("es-CL"), labels));
+    printHtml(buildSuper4Html(super4, byId, new Date().toLocaleDateString(localeDelEventoActivo()), labels));
   }
   // Las mismas llaves como PDF: el dibujo del torneo (semifinales, final y las
   // líneas que las unen) tal como se ve acá, en un archivo cerrado que se manda
@@ -256,7 +258,7 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true, 
   // pisen entre sí en la carpeta de descargas.
   function descargarPdf(tema) {
     if (!super4.length) { alert("No hay llaves para descargar. Toca GENERAR LLAVES primero."); return; }
-    const fecha = new Date().toLocaleDateString("es-CL");
+    const fecha = new Date().toLocaleDateString(localeDelEventoActivo());
     downloadBytes(
       buildSuper4Pdf(super4, byId, fecha, tema, labels),
       pdfFilename("Super 4 Sangre Nueva" + (tema === "claro" ? " (claro)" : ""), fecha.replace(/\//g, "-")),
@@ -374,7 +376,9 @@ export default function Super4View({ fighters, super4, setSuper4, ready = true, 
                 <span className={"w-3.5 h-3.5 flex items-center justify-center text-[14px] border rounded-sm flex-shrink-0 " + (on ? "bg-boxing-goldFight border-boxing-goldFight text-black" : "border-boxing-lineBright")}>{on ? "✓" : ""}</span>
                 <span className="flex flex-col leading-tight text-left">
                   <span>{a.label} <span className="text-[14px] text-boxing-muted">({a.minAge}-{a.maxAge})</span></span>
-                  <span className="text-[14px] text-boxing-muted">FECHIBOX: {FECHIBOX_LABEL[a.key] || a.label}</span>
+                  {/* Nombre local de la categoría. Si esta velada no usa
+                      federación, la línea no aparece (ver federacion.js). */}
+                  {etiquetaFederacion(a.key) && <span className="text-[14px] text-boxing-muted">{federacionDelEventoActivo().nombre}: {etiquetaFederacion(a.key)}</span>}
                 </span>
               </button>
             );

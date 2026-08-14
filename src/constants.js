@@ -2,6 +2,7 @@
 // CONSTANTES
 // ============================================
 import { DEFAULT_EVENT_DATES, describeEventDates, buildEventLabels } from "./lib/eventDates.js";
+import { preciosDelEventoActivo, monedaDelEventoActivo, formatearImporte } from "./lib/moneda.js";
 
 // Categorías de peso oficiales World Boxing (competiciones generales,
 // vigentes 2026): 10 divisiones por género, distintas entre hombres y
@@ -49,11 +50,10 @@ export const AGE_CATEGORIES = [
   { key: "juvenil", label: "U19", minAge: 17, maxAge: 18, formato: "3R × 3min", color: "#EF4444" },
   { key: "adulto", label: "Elite", minAge: 19, maxAge: 40, formato: "3R × 3min", color: "#9CA3AF" },
 ];
-// Equivalencia FECHIBOX (nomenclatura chilena) de cada categoría de edad
-// World Boxing: U15=Escolar (13-14), U17=Cadete (15-16), U19=Juvenil (17-18),
-// Elite=Adulto/Elite (19-40). Se muestra junto al nombre World Boxing en las
-// planillas impresas para que se entienda con ambas nomenclaturas.
-export const FECHIBOX_LABEL = { escolar: "Escolar", cadete: "Cadete", juvenil: "Juvenil", adulto: "Adulto/Elite" };
+// La equivalencia local de cada categoría (Escolar, Cadete…) dejó de estar
+// escrita aquí: depende de la federación del país donde se hace la velada, y
+// una planilla impresa con la nomenclatura chilena no la reconoce nadie en
+// Madrid. Ahora es un dato del evento — ver src/lib/federacion.js.
 export function getAgeCategory(age) {
   const c = AGE_CATEGORIES.find(c => age >= c.minAge && age <= c.maxAge);
   if (c) return c;
@@ -86,10 +86,15 @@ export const EXPERIENCE_LEVELS = [
   { key: "amateur", label: "Amateur Avanzado", minFights: 4, maxFights: 10, color: "#F59E0B" },
   { key: "profesional", label: "Clasif. / Pro", minFights: 11, maxFights: null, color: "#DC2626" },
 ];
+// El primero es el que sale marcado por defecto al registrar a un atleta, así
+// que manda el país donde se hacen las veladas: España encabeza la lista y
+// Chile queda justo detrás (el histórico y los contactos de allá siguen a un
+// toque). Portugal y Marruecos entran por los clubes que cruzan a competir.
 export const COUNTRY_CODES = [
-  { code: "+56", flag: "\u{1F1E8}\u{1F1F1}" }, { code: "+58", flag: "\u{1F1FB}\u{1F1EA}" }, { code: "+54", flag: "\u{1F1E6}\u{1F1F7}" },
+  { code: "+34", flag: "\u{1F1EA}\u{1F1F8}" }, { code: "+56", flag: "\u{1F1E8}\u{1F1F1}" }, { code: "+351", flag: "\u{1F1F5}\u{1F1F9}" },
+  { code: "+212", flag: "\u{1F1F2}\u{1F1E6}" }, { code: "+58", flag: "\u{1F1FB}\u{1F1EA}" }, { code: "+54", flag: "\u{1F1E6}\u{1F1F7}" },
   { code: "+52", flag: "\u{1F1F2}\u{1F1FD}" }, { code: "+57", flag: "\u{1F1E8}\u{1F1F4}" }, { code: "+51", flag: "\u{1F1F5}\u{1F1EA}" },
-  { code: "+1", flag: "\u{1F1FA}\u{1F1F8}" }, { code: "+34", flag: "\u{1F1EA}\u{1F1F8}" },
+  { code: "+1", flag: "\u{1F1FA}\u{1F1F8}" },
 ];
 // Claves sincronizadas entre localStorage y Firebase como un solo "blob"
 // (con su valor por defecto cuando no existe aún ni local ni remotamente).
@@ -117,10 +122,17 @@ export const SYNC_KEYS = {
   "bm_event_org": "",
 };
 
+// Los PRECIOS ya no están escritos aquí: salen de la ficha del evento abierto
+// (ver src/lib/moneda.js), así la velada de Santiago sigue en pesos y la de
+// Madrid nace en euros sin tocar el código. Se resuelven una sola vez, al
+// cargar la página: cambiar de evento o editar los precios RECARGA la app —
+// igual que "Firebase manual"—, que es la forma honesta de no dejar media
+// pantalla con la tarifa vieja mientras la puerta está cobrando.
+const PRECIOS = preciosDelEventoActivo();
 export const TICKET_TYPES_V2 = [
-  { key: "inscripcion", label: "Inscripción", price: 5000, color: "#3B82F6", icon: "🥊", capacity: 50 },
-  { key: "preventa", label: "Preventa", price: 7000, color: "#A855F7", icon: "🎟️", capacity: 150 },
-  { key: "puerta", label: "Puerta", price: 10000, color: "#F97316", icon: "🎫", capacity: 120 },
+  { key: "inscripcion", label: "Inscripción", price: PRECIOS.inscripcion, color: "#3B82F6", icon: "🥊", capacity: 50 },
+  { key: "preventa", label: "Preventa", price: PRECIOS.preventa, color: "#A855F7", icon: "🎟️", capacity: 150 },
+  { key: "puerta", label: "Puerta", price: PRECIOS.puerta, color: "#F97316", icon: "🎫", capacity: 120 },
 ];
 export const PAYMENT_METHODS_V2 = ["Efectivo", "Transferencia", "Otro"];
 export const MAX_CAP = 320;
@@ -273,4 +285,8 @@ export function verifyTicketToken(ticket, token, manual) {
   if (match) return "ok";
   return manual ? "warn" : "bad";
 }
-export function fmt$(n) { return "$" + n.toLocaleString("es-CL"); }
+// Importe con la moneda del evento abierto: "$10.000" en Chile, "15,00 €" en
+// España. El nombre dejó de ser fmtDinero porque el símbolo ya no es siempre "$" —
+// y porque un formateador de dinero que se llama "$" invita a volver a escribir
+// el peso a mano en el próximo sitio.
+export function fmtDinero(n) { return formatearImporte(n, monedaDelEventoActivo()); }

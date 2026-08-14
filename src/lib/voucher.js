@@ -11,7 +11,7 @@
 //  · Cero dependencias nuevas: en la puerta del recinto la app carga con red
 //    mala, y ya son 700 KB de firebase + react.
 import QRCode from "qrcode";
-import { fmt$, ticketQty, ticketUnitPrice } from "../constants.js";
+import { fmtDinero, ticketQty, ticketUnitPrice } from "../constants.js";
 
 // Dibuja un rectángulo redondeado (roundRect no existe en navegadores viejos).
 function roundRect(ctx, x, y, w, h, r) {
@@ -131,13 +131,13 @@ export async function buildVoucherCanvas({ ticket, tipo, qrData, estadoTexto, es
   const filas = qty > 1
     ? [
         ["Boleta", "#" + ticket.id, "#f2edf4", "400 24px 'Bebas Neue', sans-serif"],
-        ["Entradas", qty + " × " + fmt$(unit), "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
-        ["Total", fmt$(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
+        ["Entradas", qty + " × " + fmtDinero(unit), "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
+        ["Total", fmtDinero(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
         ["Pago", ticket.paymentMethod || "", "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
       ]
     : [
         ["Boleta", "#" + ticket.id, "#f2edf4", "400 24px 'Bebas Neue', sans-serif"],
-        ["Precio", fmt$(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
+        ["Precio", fmtDinero(ticket.price), col, "700 16px 'Barlow Condensed', sans-serif"],
         ["Pago", ticket.paymentMethod || "", "#f2edf4", "700 16px 'Barlow Condensed', sans-serif"],
       ];
   const labelX = qrX + qrBox + 26;

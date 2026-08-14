@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, FECHIBOX_LABEL, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
+import { WEIGHT_CATEGORIES_M, WEIGHT_CATEGORIES_F, EXPERIENCE_LEVELS, AGE_CATEGORIES, getCategoryInfo, getExperienceInfo, getAgeCategory, weightRangeLabel, getInitials } from "../constants.js";
+import { etiquetaFederacion } from "../lib/federacion.js";
 import Badge from "./Badge.jsx";
 import PageHeader from "./PageHeader.jsx";
 import { escapeHtml } from "../lib/html.js";
@@ -8,6 +9,7 @@ import { printHtml } from "../lib/printHtml.js";
 import { buildFightersCsv } from "../lib/csvPlanillas.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 // Un filtro de la banda: la cifra en oro y la etiqueta en blanco, sin píldora.
 // El activo se marca con el filo de oro de abajo (.filtro.on en index.css), el
@@ -83,7 +85,7 @@ export default function FighterList({ fighters, onEdit, onDelete, onLimpiar }) {
     const filtros = [];
     if (sexFilter !== "all") filtros.push(sexFilter === "F" ? "Femeninas" : "Masculinos");
     if (ageFilter === "invalid") filtros.push("INVÁLIDOS (fuera de rango oficial 13-40)");
-    else if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) filtros.push(`${a.label} (${FECHIBOX_LABEL[a.key] || a.label})`); }
+    else if (ageFilter !== "all") { const a = AGE_CATEGORIES.find(x => x.key === ageFilter); if (a) { const local = etiquetaFederacion(a.key); filtros.push(local ? `${a.label} (${local})` : a.label); } }
     if (categoryFilter !== "all") { const c = getCategoryInfo(categoryFilter); if (c) filtros.push(`División: ${c.label} ${weightRangeLabel(c)} (${c.genero === "F" ? "Mujeres" : "Hombres"})`); }
     if (experienceFilter !== "all") { const e = getExperienceInfo(experienceFilter); if (e) filtros.push(`Nivel: ${e.label}`); }
     if (searchQuery.trim()) filtros.push(`Búsqueda: "${searchQuery.trim()}"`);
@@ -94,7 +96,7 @@ export default function FighterList({ fighters, onEdit, onDelete, onLimpiar }) {
   // y peleas como números de verdad (se puede ordenar y filtrar) y la columna
   // "Rival propuesto" en blanco para anotar a mano.
   function descargarPlanilla() {
-    const fecha = new Date().toLocaleDateString("es-CL");
+    const fecha = new Date().toLocaleDateString(localeDelEventoActivo());
     downloadBytes(
       buildFightersCsv(filtered, subtituloFiltros()),
       csvFilename("Peleadores Sangre Nueva", fecha.replace(/\//g, "-")),
@@ -167,10 +169,10 @@ export default function FighterList({ fighters, onEdit, onDelete, onLimpiar }) {
         <hr className="hilo-ring" />
         <GrupoFiltros titulo="Categoría">
           {/* En móvil solo el nombre World Boxing (U15, U17, U19, Elite); la
-              equivalencia FECHIBOX —útil pero larga— aparece en escritorio, que
-              es donde hay ancho de sobra. Las planillas impresas la siguen
-              llevando siempre. */}
-          {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <Filtro key={a.key} n={c} label={<>{a.label}<span className="hidden lg:inline"> · {FECHIBOX_LABEL[a.key] || a.label}</span></>} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
+              equivalencia de la federación local —útil pero larga— aparece en
+              escritorio, que es donde hay ancho de sobra. Si la velada no usa
+              ninguna federación, no aparece en ningún sitio. */}
+          {AGE_CATEGORIES.map(a => { const c = ageCounts[a.key] || 0; if (!c) return null; return <Filtro key={a.key} n={c} label={<>{a.label}{etiquetaFederacion(a.key) && <span className="hidden lg:inline"> · {etiquetaFederacion(a.key)}</span>}</>} active={ageFilter === a.key} onClick={() => setAgeFilter(ageFilter === a.key ? "all" : a.key)} />; })}
           {invalidCount > 0 && <Filtro n={invalidCount} label="Inválidos" active={ageFilter === "invalid"} onClick={() => setAgeFilter(ageFilter === "invalid" ? "all" : "invalid")} />}
         </GrupoFiltros>
       </div>

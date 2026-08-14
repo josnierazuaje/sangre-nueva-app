@@ -15,7 +15,7 @@
 // dibuja. Ninguna de las dos lee el reloj ni el almacenamiento — la fecha de
 // generación entra como parámetro.
 
-import { TICKET_TYPES_V2, fmt$, ticketQty, getAgeCategory } from "../constants.js";
+import { TICKET_TYPES_V2, fmtDinero, ticketQty, getAgeCategory } from "../constants.js";
 import { escapeHtml } from "./html.js";
 import { bracketPrintTitle } from "./super4.js";
 import { carteleraGroups, AGE_GROUP_ORDER } from "./printCartelera.js";
@@ -131,14 +131,14 @@ export function buildCierreHtml(resumen, { titulo = "", fechaEvento = "", genera
       <td>${v.boletas}</td>
       <td>${v.personas}</td>
       <td>${v.dentro}</td>
-      <td class="der">${escapeHtml(fmt$(v.ingresos))}</td>
+      <td class="der">${escapeHtml(fmtDinero(v.ingresos))}</td>
     </tr>`;
   };
   const tipos = Object.entries(b.porTipo).sort((x, y) => y[1].ingresos - x[1].ingresos).map(filaTipo).join("")
     || `<tr><td class="izq vacio" colspan="5">No se registraron entradas.</td></tr>`;
 
   const pagos = Object.entries(b.porPago).filter(([, v]) => v > 0)
-    .map(([m, v]) => `<span class="pago"><b>${escapeHtml(m)}</b> ${escapeHtml(fmt$(v))}</span>`).join("") || "—";
+    .map(([m, v]) => `<span class="pago"><b>${escapeHtml(m)}</b> ${escapeHtml(fmtDinero(v))}</span>`).join("") || "—";
 
   const cinturones = d.cinturones.length
     ? d.cinturones.map(c => `<tr>
@@ -200,14 +200,14 @@ export function buildCierreHtml(resumen, { titulo = "", fechaEvento = "", genera
 
   <h2>Boletería</h2>
   <div class="cifras">
-    <div class="cifra oro"><span class="n">${escapeHtml(fmt$(b.ingresos))}</span><span class="t">Recaudación</span></div>
+    <div class="cifra oro"><span class="n">${escapeHtml(fmtDinero(b.ingresos))}</span><span class="t">Recaudación</span></div>
     <div class="cifra"><span class="n">${b.personas}</span><span class="t">Entradas vendidas</span></div>
     <div class="cifra"><span class="n">${b.boletas}</span><span class="t">Boletas emitidas</span></div>
   </div>
   <table>
     <thead><tr><th>Tipo</th><th>Boletas</th><th>Personas</th><th>Entraron</th><th>Recaudación</th></tr></thead>
     <tbody>${tipos}</tbody>
-    <tfoot><tr><td class="izq">TOTAL</td><td>${b.boletas}</td><td>${b.personas}</td><td>${b.personasDentro}</td><td class="der">${escapeHtml(fmt$(b.ingresos))}</td></tr></tfoot>
+    <tfoot><tr><td class="izq">TOTAL</td><td>${b.boletas}</td><td>${b.personas}</td><td>${b.personasDentro}</td><td class="der">${escapeHtml(fmtDinero(b.ingresos))}</td></tr></tfoot>
   </table>
   <div>${pagos}</div>
   ${b.anuladas ? `<p class="vacio">${b.anuladas} boleta(s) anulada(s), no incluidas en los totales.</p>` : ""}
