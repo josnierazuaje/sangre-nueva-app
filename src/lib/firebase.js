@@ -70,20 +70,34 @@ export const SCANNER_EMAIL = "escaner@sangrenueva.app";
 // que vive únicamente en la consola de Firebase. Los dominios autorizados están
 // en la consola de reCAPTCHA: sangre-nueva-la-velada.pages.dev y localhost.
 //
-// VACÍA A PROPÓSITO: aquí llegó a estar, por error, la clave SECRETA del par en
-// vez de la del sitio. Dos cosas se aprendieron y por eso este comentario está
-// aquí y no en un documento aparte:
-//   1. Las dos claves son indistinguibles a simple vista (40 caracteres, ambas
-//      empiezan con "6L"), así que confundirlas es fácil y no avisa: reCAPTCHA
-//      solo responde "Invalid site key" y App Check falla en silencio cada
-//      medio minuto, sin romper nada visible.
-//   2. La forma de comprobar cuál es cuál, sin adivinar:
-//        curl -s https://www.google.com/recaptcha/api/siteverify -d secret=LA_CLAVE -d response=x
-//      Si responde "invalid-input-response", es la SECRETA (y hay que rotarla).
-//      Si responde "invalid-input-secret", no lo es — puede ser la del sitio.
-// Mientras esté vacía, App Check no se inicializa: la app funciona igual que
-// antes de instalarlo.
-const RECAPTCHA_SITE_KEY = "";
+// Aquí llegó a estar, por error, la OTRA clave del par (40 caracteres y también
+// empieza con "6L": son indistinguibles a la vista). El fallo no avisa —la app
+// sigue funcionando— y solo se ve en la consola del navegador: reCAPTCHA
+// responde "Invalid site key" y App Check reintenta cada medio minuto.
+//
+// Cómo comprobar una clave ANTES de ponerla aquí. Dos trampas conocidas, las
+// dos pagadas ya con horas de este proyecto:
+//
+//   · `siteverify` NO distingue nada: responde "invalid-input-response" hasta
+//     con la cadena "esto-no-es-una-clave", porque valida el token antes que la
+//     clave. No sirve para saber si un valor es la secreta.
+//   · el endpoint `anchor` sí detecta una clave que no es de sitio ("Invalid
+//     site key"), pero su veredicto de "invalid domain" es un FALSO NEGATIVO
+//     con claves v3: dio "dominio no autorizado" para un dominio que estaba
+//     perfectamente autorizado.
+//
+// La única prueba fiable es pedir un token DESDE el dominio de verdad. En la
+// consola del navegador, abierto el sitio publicado:
+//
+//   grecaptcha.execute("LA_CLAVE", { action: "prueba" }).then(t => console.log(t.length))
+//
+// Si imprime un número de cuatro cifras, la clave y el dominio están bien. Si
+// lanza "Invalid domain for site key", falta autorizar el dominio en la consola
+// de reCAPTCHA. Si lanza "Invalid site key", el valor no es la clave del sitio.
+//
+// Si queda vacía, App Check no se inicializa y la app funciona igual que antes
+// de instalarlo.
+const RECAPTCHA_SITE_KEY = "6LfMH4UtAAAAAF2UdYgQ8gRIBG8R0XpOzofHi0RO";
 
 // Arranca App Check. TODO lo de aquí es "mejor esfuerzo": si reCAPTCHA no
 // carga (sin señal, un bloqueador de anuncios, el wifi del recinto con portal
