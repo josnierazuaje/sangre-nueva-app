@@ -107,6 +107,14 @@ export const SYNC_KEYS = {
   // y sus impresos digan la misma fecha, pero no puede moverlas desde su
   // teléfono a mitad del evento.
   "bm_event_dates": DEFAULT_EVENT_DATES,
+  // Quién organiza ESTA edición ("Azuaje Team & HH Arias", el club que venga
+  // después…). Era texto quemado en tres pantallas y en la hoja de cierre, así
+  // que la app llevaba puesta para siempre la marca de los organizadores de la
+  // primera velada. Ahora es un dato editable y vacío por defecto: si nadie lo
+  // escribe, esa línea sencillamente no aparece — mejor eso que anunciar a
+  // organizadores que no son. Solo el DUEÑO lo escribe (regla de la base),
+  // igual que las fechas.
+  "bm_event_org": "",
 };
 
 export const TICKET_TYPES_V2 = [

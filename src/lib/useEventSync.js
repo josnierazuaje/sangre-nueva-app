@@ -44,6 +44,11 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
   // de localStorage o de la nube— para que un valor corrupto no deje la app sin
   // fecha ni reviente al imprimir.
   const [eventDates, setEventDatesState] = useState(() => normalizeEventDates(load("bm_event_dates", DEFAULT_EVENT_DATES)));
+  // Quién organiza esta edición. Vacío = no se muestra ninguna línea de
+  // organizadores (ver SYNC_KEYS). Se lee de este dispositivo antes de que
+  // llegue la nube para que la pantalla de acceso —que se dibuja SIN sesión—
+  // ya pueda mostrarlo.
+  const [eventOrg, setEventOrgState] = useState(() => load("bm_event_org", ""));
   const [sync, setSync] = useState(() => (localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")) ? "connecting" : "off");
   const [authUser, setAuthUser] = useState(undefined);
   // null = aún no se decide el modo; false = solo-local (sin nube); true = nube.
@@ -63,6 +68,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     else if (k === "bm_super4_v1") setSuper4(normalizeSuper4(val));
     else if (k === "bm_event_label") setEventLabel(val);
     else if (k === "bm_event_dates") setEventDatesState(normalizeEventDates(val));
+    else if (k === "bm_event_org") setEventOrgState(typeof val === "string" ? val : "");
     // Las boletas no vienen por acá: se sincronizan por nodo individual.
   }
 
@@ -210,6 +216,17 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     return norm;
   }
 
+  // Cambia los organizadores de esta edición. Mismo trato que las fechas: solo
+  // el dueño puede escribir el nodo (regla de la base), así que el diálogo no
+  // se lo ofrece al staff. Se recorta al mismo largo que acepta el campo para
+  // que un valor pegado a mano no desborde la cabecera ni la hoja impresa.
+  function setEventOrg(txt) {
+    const limpio = String(txt == null ? "" : txt).trim().slice(0, 60);
+    setEventOrgState(limpio);
+    save("bm_event_org", limpio);
+    return limpio;
+  }
+
   // Escribir en el Super 4 o en la cartelera antes de recibir su primer valor
   // de la nube pisaría lo que otro dispositivo ya armó.
   const super4Ready = cloudMode === false || (cloudMode === true && hydrated.fighters && hydrated.super4);
@@ -222,6 +239,7 @@ export function useEventSync({ scanMode = false, alRecuperar, alConfirmar, alFal
     tickets, setTickets, ticketsEstado,
     eventLabel, setEventLabel,
     eventDates, setEventDates,
+    eventOrg, setEventOrg,
     sync, authUser, cloudMode, isOwner,
     super4Ready, matchupsReady,
     conectarConConfig,

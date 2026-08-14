@@ -4,7 +4,7 @@ import { FB } from "../lib/firebase.js";
 
 // PANTALLA DE INICIO DE SESIÓN
 // ============================================
-export default function LoginScreen({ scanMode = false, initialEmail = "" }) {
+export default function LoginScreen({ scanMode = false, initialEmail = "", organizadores = "" }) {
   const [email, setEmail] = useState(initialEmail);
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
@@ -49,7 +49,10 @@ export default function LoginScreen({ scanMode = false, initialEmail = "" }) {
           rediseño — la marca preside como en el sidebar de escritorio. */}
       <form onSubmit={submit} className="w-full max-w-sm rounded-3xl p-6 space-y-4" style={{ background: "linear-gradient(170deg,#131016,#0c0a0e)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <div className="text-center mb-2">
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600, fontSize: "14px", letterSpacing: "0.35em", textTransform: "uppercase", color: "rgba(138,132,148,0.85)", marginBottom: "12px" }}>Azuaje Team &amp; HH Arias</div>
+          {/* Organizadores de esta edición (dato editable). Acá se dibuja SIN
+              sesión, así que sale del último valor guardado en el dispositivo;
+              en uno recién instalado no hay ninguno y la línea no aparece. */}
+          {organizadores && <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 600, fontSize: "14px", letterSpacing: "0.35em", textTransform: "uppercase", color: "rgba(138,132,148,0.85)", marginBottom: "12px" }}>{organizadores}</div>}
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ width: "86px", height: "auto", display: "block", margin: "0 auto 10px", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))" }} />
           <div className="marca-oro" style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "28px", letterSpacing: "0.14em", lineHeight: 1 }}>SANGRE NUEVA</div>
           <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: "italic", fontSize: "14.5px", color: "rgba(200,160,74,0.9)", marginTop: "3px" }}>La Velada</div>

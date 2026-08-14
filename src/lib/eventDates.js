@@ -16,9 +16,28 @@ const WEEKDAYS_FULL = ["domingo", "lunes", "martes", "miércoles", "jueves", "vi
 const WEEKDAYS_ABBR = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
+// Fecha ISO de HOY, calculada desde el año/mes/día LOCALES y armada en UTC
+// (misma razón que describeEventDate: con hora local, una zona al oeste de
+// Greenwich se corre un día). El `now` entra como parámetro para poder
+// probarla sin depender del reloj de quien corre los tests.
+export function isoDeHoy(now = new Date()) {
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10);
+}
+
 // Fecha por defecto mientras el organizador no haya puesto la suya (y valor
-// inicial del nodo en la nube). Es la velada de referencia del proyecto.
-export const DEFAULT_EVENT_DATES = { semis: "2026-08-01", final: "2026-08-02" };
+// inicial del nodo en la nube): HOY.
+//
+// Antes eran las dos fechas de la velada de agosto de 2026, escritas aquí a
+// mano. Eso convertía a una velada concreta —y ya pasada— en el valor de
+// fábrica de la app: un dispositivo nuevo, o la próxima organización que tome
+// la app, veía su cartelera anunciando sola el "sábado 01 y domingo 02 de
+// agosto de 2026" hasta que alguien se diera cuenta. Con el día de hoy el valor
+// sigue siendo válido para imprimir, pero ya no afirma una fecha ajena: es
+// evidente que hay que cambiarlo en "Datos del evento".
+//
+// El reloj se lee UNA sola vez, al cargar el módulo. El resto de las funciones
+// siguen sin mirar la hora — que es lo que las mantiene puras y testeables.
+export const DEFAULT_EVENT_DATES = { semis: isoDeHoy(), final: isoDeHoy() };
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 

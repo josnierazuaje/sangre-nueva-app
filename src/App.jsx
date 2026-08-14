@@ -56,7 +56,7 @@ export default function App() {
   const {
     fighters, setFighters, matchups, setMatchups, super4, setSuper4,
     tickets: ticketsNew, setTickets: setTicketsNew, ticketsEstado,
-    eventLabel, setEventLabel, eventDates, setEventDates,
+    eventLabel, setEventLabel, eventDates, setEventDates, eventOrg, setEventOrg,
     sync, authUser, cloudMode, isOwner,
     super4Ready, matchupsReady, conectarConConfig,
   } = useEventSync({
@@ -320,6 +320,7 @@ export default function App() {
       titulo: eventLabel,
       fechaEvento: eventLabels.rango,
       generadoEl: new Date().toLocaleDateString("es-CL"),
+      organizadores: eventOrg,
     }));
   }
 
@@ -419,8 +420,12 @@ export default function App() {
   // Editar el título y las fechas del evento (la barra inferior en móvil y el
   // pie del sidebar en escritorio abren el mismo diálogo).
   function editEventLabel() { setEventDialogOpen(true); }
-  function guardarEvento({ label, dates }) {
+  function guardarEvento({ label, dates, org }) {
     if (label !== eventLabel) { save("bm_event_label", label); setEventLabel(label); }
+    // Los organizadores, como las fechas: nodo de escritura reservada al dueño,
+    // así que no se intenta guardar lo que la base va a rebotar (dejando el
+    // chip de sincronización en rojo por un cambio que el staff ni hizo).
+    if (isOwner && org !== eventOrg) setEventOrg(org);
     // Las fechas solo las escribe el dueño (la regla de la base rechaza la
     // escritura del staff, y el diálogo ya le deshabilita esos campos): no se
     // intenta guardar lo que va a rebotar y dejar el chip de sincronización en
@@ -447,7 +452,7 @@ export default function App() {
   const syncLabel = <>{syncDot}{sync === "on" ? "Sincronizado" : sync === "connecting" ? "Conectando…" : sync === "error" ? "Error" : "Nube"}</>;
 
   if (authUser === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", letterSpacing: "0.1em" }}>Cargando…</div>;
-  if (authUser === null) return <LoginScreen scanMode={scanMode} initialEmail={scanMode ? SCANNER_EMAIL : ""} />;
+  if (authUser === null) return <LoginScreen scanMode={scanMode} initialEmail={scanMode ? SCANNER_EMAIL : ""} organizadores={eventOrg} />;
 
   // Modo escáner: chrome mínimo (marca + Salir) y SOLO la pantalla de escanear.
   // Nada de sidebar, navegación, KPIs ni otras vistas — el staff de la puerta
@@ -493,7 +498,9 @@ export default function App() {
           derecho) y el ítem activo como ÚNICO glow del chrome (.nav-lado.on). */}
       <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 relative side-frost">
         <div className="flex flex-col items-center pt-7 pb-5 gap-1" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.35em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          {/* Organizadores de ESTA edición: un dato editable, no la marca de
+              quienes montaron la primera velada. Vacío = no hay línea. */}
+          {eventOrg && <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.35em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>{eventOrg}</div>}
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "72px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(155,26,42,0.4))", marginTop: "4px" }} />
           <div className="text-center leading-none" style={{ marginTop: "2px" }}>
             <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "26px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
@@ -563,7 +570,7 @@ export default function App() {
             conserva la jerarquía completa —sello, escudo, oro, itálica y orla—
             en escala de teléfono. El sidebar de escritorio no se toca. */}
         <div className="flex flex-col items-center pb-2.5 pt-1 gap-0.5" style={{ position: "relative" }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.36em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>Azuaje Team & HH Arias</div>
+          {eventOrg && <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: "14px", fontWeight: 600, letterSpacing: "0.36em", color: "rgba(138,132,148,0.85)", textTransform: "uppercase" }}>{eventOrg}</div>}
           <img src="/assets/logo-sangre-nueva.png" alt="Sangre Nueva" style={{ height: "58px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 8px 20px rgba(155,26,42,0.4))", marginTop: "2px" }} />
           <div className="text-center leading-none" style={{ marginTop: "1px" }}>
             <div className="marca-oro" style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "24px", letterSpacing: "0.12em", lineHeight: 1 }}>SANGRE NUEVA</div>
@@ -624,7 +631,7 @@ export default function App() {
             garantiza la entrega) / ⚠️ rojo solo si la nube RECHAZA de verdad;
           — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
-      {eventDialogOpen && <EventSettingsDialog label={eventLabel} dates={eventDates} isOwner={isOwner} onSave={guardarEvento} onClose={() => setEventDialogOpen(false)} />}
+      {eventDialogOpen && <EventSettingsDialog label={eventLabel} dates={eventDates} org={eventOrg} isOwner={isOwner} onSave={guardarEvento} onClose={() => setEventDialogOpen(false)} />}
 
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">
         {addedToast && <div className={"flex items-center gap-3 bg-boxing-panel shadow-lg px-4 py-3 fade-in border rounded-2xl " + (addedToast.phase === "error" ? "border-red-500/60" : "border-green-500/60")} style={{ boxShadow: addedToast.phase === "error" ? "0 0 24px rgba(220,38,38,0.25)" : "0 0 24px rgba(34,197,94,0.2)" }}>

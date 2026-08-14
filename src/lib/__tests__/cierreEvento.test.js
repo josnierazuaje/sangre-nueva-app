@@ -143,6 +143,20 @@ describe("buildCierreHtml", () => {
     expect(html).toContain("<td class=\"izq vacio\" colspan=\"3\">Sin escuelas registradas.</td>");
   });
 
+  // Los organizadores cambian de una edición a otra: antes estaban escritos en
+  // el código y la hoja anunciaba para siempre a los de la primera velada.
+  it("pone los organizadores que le pasan, y ninguno si no le pasan", () => {
+    const conOrg = buildCierreHtml(cierreResumen(datos), { organizadores: "Club Los Andes & Team Sur" });
+    expect(conOrg).toContain("Sangre Nueva — La Velada · Club Los Andes &amp; Team Sur");
+
+    // Sin organizadores la línea queda solo con el nombre del evento. (Ojo: no
+    // se puede afirmar que la hoja entera no diga "Azuaje" — el peleador de
+    // prueba entrena en "Team Azuaje" y las escuelas sí salen listadas.)
+    const sinOrg = buildCierreHtml(cierreResumen(datos));
+    expect(sinOrg).toContain("Sangre Nueva — La Velada</p>");
+    expect(sinOrg).not.toContain("HH Arias");
+  });
+
   it("escapa el nombre del evento y de las escuelas (no inyecta HTML)", () => {
     const html = buildCierreHtml(cierreResumen({ fighters: [peleador({ gym: "<script>x</script>" })], matchups: [], super4: [], tickets: [] }), { titulo: "<b>hola</b>" });
     expect(html).not.toContain("<script>x</script>");

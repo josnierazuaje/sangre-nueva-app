@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_EVENT_DATES, isValidISODate, normalizeEventDates, describeEventDate, buildEventLabels } from "../eventDates.js";
+import { DEFAULT_EVENT_DATES, isoDeHoy, isValidISODate, normalizeEventDates, describeEventDate, buildEventLabels } from "../eventDates.js";
 import { EVENT_LABELS } from "../../constants.js";
 
 // Las fechas del evento pasaron de estar escritas en el código a ser un dato
@@ -8,6 +8,22 @@ import { EVENT_LABELS } from "../../constants.js";
 // (b) que el día se corra al calcular el día de la semana en otra zona horaria,
 // (c) que al cambiar de mes o de año la frase de la cartelera quede ambigua.
 describe("fechas del evento editables", () => {
+  // La app pasa de mano en mano entre ediciones: el valor de fábrica no puede
+  // ser una velada concreta (la de agosto de 2026 estaba escrita en el código,
+  // así que un dispositivo nuevo anunciaba solo una fecha ajena y ya pasada).
+  describe("valor por defecto", () => {
+    it("es HOY, no una velada escrita a mano", () => {
+      expect(DEFAULT_EVENT_DATES).toEqual({ semis: isoDeHoy(), final: isoDeHoy() });
+      expect(isValidISODate(DEFAULT_EVENT_DATES.semis)).toBe(true);
+    });
+    it("isoDeHoy usa el día LOCAL, sin correrse por la zona horaria", () => {
+      // 23:30 del 31 de diciembre en hora local: en UTC ya es el día siguiente,
+      // pero la velada es la del 31 para quien la organiza.
+      expect(isoDeHoy(new Date(2027, 11, 31, 23, 30))).toBe("2027-12-31");
+      expect(isoDeHoy(new Date(2027, 0, 1, 0, 15))).toBe("2027-01-01");
+    });
+  });
+
   describe("isValidISODate", () => {
     it("acepta una fecha ISO real", () => {
       expect(isValidISODate("2026-08-01")).toBe(true);
