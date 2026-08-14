@@ -115,7 +115,32 @@ dominio". Lo más parecido, y sí existe:
 Ojo con lo que esto sí y no hace: **estorba**, no blinda — un referrer se puede
 falsificar. Lo que de verdad protege los datos son las reglas y el login.
 
-### C. App Check — ✅ instalado, en modo MONITOREO
+### C. App Check — instalado, PERO ESPERANDO LA CLAVE CORRECTA
+
+> **Estado real (14-ago-2026):** el código está puesto, pero **App Check no está
+> funcionando**. En `RECAPTCHA_SITE_KEY` se cargó por error la clave **secreta**
+> del par en vez de la del **sitio**, así que reCAPTCHA respondía "Invalid site
+> key" y App Check fallaba cada 30 segundos (sin romper la app: la capa está en
+> `try/catch`). La constante quedó **vacía**, que desactiva App Check por
+> completo, hasta tener la clave correcta.
+>
+> **Esa clave secreta hay que rotarla**: quedó en el historial del repositorio
+> —que es público— y en un bundle desplegado. Borrarla del código no la borra
+> del historial; lo único que la anula es **generar un par nuevo** en la consola
+> de reCAPTCHA (y borrar el viejo).
+>
+> Las dos claves son indistinguibles a la vista: 40 caracteres y las dos
+> empiezan con `6L`. Para saber cuál es cuál, sin adivinar:
+>
+> ```bash
+> curl -s https://www.google.com/recaptcha/api/siteverify -d secret=LA_CLAVE -d response=x
+> ```
+>
+> `invalid-input-response` → es la **secreta** (va solo en la consola de
+> Firebase). `invalid-input-secret` → **no** es la secreta; puede ser la del
+> sitio, que es la que va en el código.
+
+Cuando esté la clave correcta, esto es lo que ya está resuelto:
 
 Es la respuesta real a "solo mi app puede hablar con mi backend": cada petición
 viaja con un token que solo se consigue ejecutando la app real en un dominio

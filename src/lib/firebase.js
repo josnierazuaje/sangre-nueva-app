@@ -69,7 +69,21 @@ export const SCANNER_EMAIL = "escaner@sangrenueva.app";
 // como el resto de la configuración— y no sirve para nada sin la clave secreta,
 // que vive únicamente en la consola de Firebase. Los dominios autorizados están
 // en la consola de reCAPTCHA: sangre-nueva-la-velada.pages.dev y localhost.
-const RECAPTCHA_SITE_KEY = "6LfMH4UtAAAAAEX9xw3sCHtyFToF2XqyDAn8JtOd";
+//
+// VACÍA A PROPÓSITO: aquí llegó a estar, por error, la clave SECRETA del par en
+// vez de la del sitio. Dos cosas se aprendieron y por eso este comentario está
+// aquí y no en un documento aparte:
+//   1. Las dos claves son indistinguibles a simple vista (40 caracteres, ambas
+//      empiezan con "6L"), así que confundirlas es fácil y no avisa: reCAPTCHA
+//      solo responde "Invalid site key" y App Check falla en silencio cada
+//      medio minuto, sin romper nada visible.
+//   2. La forma de comprobar cuál es cuál, sin adivinar:
+//        curl -s https://www.google.com/recaptcha/api/siteverify -d secret=LA_CLAVE -d response=x
+//      Si responde "invalid-input-response", es la SECRETA (y hay que rotarla).
+//      Si responde "invalid-input-secret", no lo es — puede ser la del sitio.
+// Mientras esté vacía, App Check no se inicializa: la app funciona igual que
+// antes de instalarlo.
+const RECAPTCHA_SITE_KEY = "";
 
 // Arranca App Check. TODO lo de aquí es "mejor esfuerzo": si reCAPTCHA no
 // carga (sin señal, un bloqueador de anuncios, el wifi del recinto con portal
@@ -87,6 +101,10 @@ function initAppCheck(cfg) {
   // Solo para el proyecto propio: con "Firebase manual" se puede conectar el
   // aparato a OTRO proyecto, donde esta clave no está registrada y el token
   // sería inservible.
+  // Sin clave del sitio no se intenta nada: es mejor no tener App Check que
+  // tenerlo fallando cada 30 segundos contra reCAPTCHA (ruido en la consola que
+  // tapa los errores de verdad, y peticiones inútiles desde cada dispositivo).
+  if (!RECAPTCHA_SITE_KEY) return;
   if (appCheckIniciado || cfg.projectId !== DEFAULT_FB_CONFIG.projectId) return;
   try {
     // En localhost no hay reCAPTCHA que valga: este interruptor hace que el SDK
