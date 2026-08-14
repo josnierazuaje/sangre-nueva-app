@@ -70,10 +70,16 @@ export function textoLimpiar(r) {
   ].join("\n");
 }
 
-// Lo que se avisa DESPUÉS de borrar. Repite dónde quedó el respaldo: es el
-// momento en que alguien se da cuenta de que borró de más, y el camino de
-// vuelta tiene que estar a la vista, no en la memoria de quien leyó el aviso
-// anterior.
+// Lo que se avisa DESPUÉS de borrar. Dice tres cosas, y las tres importan en
+// ese momento exacto:
+//  1. qué se borró;
+//  2. dónde quedó el respaldo — es cuando alguien se da cuenta de que borró de
+//     más, y el camino de vuelta tiene que estar a la vista, no en la memoria
+//     de quien leyó el aviso anterior;
+//  3. que la FECHA del evento sigue ahí y se cambia cuando se quiera. Limpiar
+//     no la toca a propósito (no es un dato de atletas), y quedarse con la
+//     fecha de la velada anterior en la cartelera es el error natural de quien
+//     acaba de vaciar todo para montar la siguiente.
 export function textoLimpiado(r, { enLaNube }) {
   const partes = [contar(r.peleadores, "peleador", "peleadores")];
   if (r.peleas) partes.push(contar(r.peleas, "pelea", "peleas"));
@@ -81,5 +87,6 @@ export function textoLimpiado(r, { enLaNube }) {
   const lista = partes.length > 1 ? partes.slice(0, -1).join(", ") + " y " + partes[partes.length - 1] : partes[0];
   return "Listo: se borraron " + lista + ".\n\n" + (enLaNube
     ? "El respaldo se descargó a este dispositivo y también quedó guardado en la nube.\n\nSi hace falta recuperarlo: menú ⋮ → \"Restaurar respaldo de la nube\"."
-    : "El respaldo se descargó a este dispositivo (no hay conexión con la nube, así que esa copia no se pudo guardar allá).\n\nGuarda bien ese archivo: es la única copia.");
+    : "El respaldo se descargó a este dispositivo (no hay conexión con la nube, así que esa copia no se pudo guardar allá).\n\nGuarda bien ese archivo: es la única copia.")
+    + "\n\nLa FECHA y el título del evento NO se borraron: siguen siendo los de la velada anterior. Tócalos para ponerles los de la próxima (\"Datos del evento\").";
 }

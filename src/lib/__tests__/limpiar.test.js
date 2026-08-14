@@ -78,4 +78,14 @@ describe("textoLimpiado", () => {
     expect(t).toContain("única copia");
     expect(t).not.toContain("Restaurar respaldo de la nube");
   });
+
+  // Limpiar no toca la fecha (no es un dato de atletas), así que la cartelera
+  // recién vaciada sigue anunciando la velada ANTERIOR hasta que se cambie.
+  it("recuerda que la fecha del evento quedó viva y hay que cambiarla", () => {
+    [true, false].forEach(enLaNube => {
+      const t = textoLimpiado(resumenLimpiar({ fighters: [peleador("a")] }), { enLaNube });
+      expect(t).toContain("FECHA");
+      expect(t).toContain("Datos del evento");
+    });
+  });
 });
