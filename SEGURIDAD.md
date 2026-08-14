@@ -115,7 +115,7 @@ dominio". Lo más parecido, y sí existe:
 Ojo con lo que esto sí y no hace: **estorba**, no blinda — un referrer se puede
 falsificar. Lo que de verdad protege los datos son las reglas y el login.
 
-### C. App Check — clave correcta puesta y verificada, en modo MONITOREO
+### C. App Check — ✅ FUNCIONANDO, en modo MONITOREO
 
 > **Estado (14-ago-2026):** en `RECAPTCHA_SITE_KEY` llegó a cargarse por error la
 > clave **secreta** del par en vez de la del **sitio**; reCAPTCHA respondía
@@ -128,6 +128,16 @@ falsificar. Lo que de verdad protege los datos son las reglas y el login.
 > la borra del historial; lo único que la anula es **generar un par nuevo** en la
 > consola de reCAPTCHA y borrar el viejo (y entonces hay que actualizar las dos
 > puntas: la secreta en Firebase, la del sitio en el código).
+>
+> **El atasco que costó horas, para no repetirlo:** el error de Firebase era
+> `Invalid reCAPTCHA configuration for app`, y la causa no estaba ni en el
+> código ni en las claves —las dos eran correctas y se comprobó que son pareja—
+> sino en que **la configuración nunca llegaba a guardarse**: en el panel de
+> App Check el botón *Guardar* queda por debajo del borde de la ventana (a
+> ~1023 px, con una ventana de 745), fuera de alcance y sin ninguna señal de
+> que existe. Se resuelve **reduciendo el zoom del navegador (⌘−)** hasta que
+> el botón aparezca. El mismo tipo de trampa que con las reglas de la base:
+> pegar no es publicar.
 >
 > Qué se puede hacer con esa clave filtrada, sin dramatizar: **no** sirve para
 > falsificar tokens de App Check —esos los emite Firebase—, así que nadie se
