@@ -523,7 +523,53 @@ línea de organizadores cuando el dato está vacío.
 
 ---
 
-## 11. Idea en reserva: peleadores por nodo individual (ago 2026)
+## 11. Endurecimiento de seguridad (ago 2026)
+
+**Estado: en la rama `chore/seguridad`** (538 tests + build OK). Documento
+completo para el organizador en **`SEGURIDAD.md`** (qué se hizo, qué tiene que
+hacer él en las consolas, y qué de la lista habitual NO aplica y por qué).
+
+Lo importante de la arquitectura, que decide todo lo demás: **no hay servidor
+propio**. Sitio estático en Cloudflare Pages + Firebase RTDB directo desde el
+navegador. No existe dónde poner CORS, middleware ni rate limiting: el backend
+es Firebase, y ahí se manda con el login y `database.rules.json`.
+
+**Lo que sí se hizo (código):**
+
+- **`.validate` en el servidor** para peleadores, cartelera, Super 4 y título
+  (boletas y fechas ya lo tenían): campos obligatorios, tipos y topes de largo.
+  Los nodos-arreglo además solo aceptan una lista **o** el centinela
+  `__EMPTY__`: cualquier otra cadena suelta se rechaza (antes se podía
+  reemplazar el padrón por un texto de megabytes).
+- **CSP y cabeceras** en `public/_headers` (Vite copia `public/` a `dist/`, que
+  es lo que publica Cloudflare). `script-src 'self'` sin `'unsafe-inline'` —el
+  build no genera scripts en línea, se verificó—, `connect-src` solo a Firebase
+  y `frame-ancestors 'none'`. **Verificado sirviendo `dist` con esas cabeceras
+  puestas**: la app carga con diseño y tipografías, el iframe `srcdoc` de las
+  hojas imprimibles aplica sus estilos, las imágenes `data:` (QR) cargan,
+  Firebase responde y un `fetch` a un dominio ajeno queda **bloqueado por la
+  política** (probado, con el mensaje de la consola como evidencia).
+
+**Un intento descartado, y por qué importa:** reservar el centinela `__EMPTY__`
+al dueño. Rompía un flujo real (el staff borrando al último peleador escribe ese
+centinela) y no protegía de nada, porque quien puede escribirlo puede escribir
+una lista de un elemento. **Lo cazó `reglas.test.js`**, que evalúa el texto real
+del archivo de reglas — la prueba que documentaba ese permiso falló al instante.
+
+De paso se corrigieron dos imprecisiones del propio arnés de pruebas de reglas:
+`hasChildren(['a','b'])` ignoraba la lista de hijos exigidos (así que una regla
+con campos obligatorios se daba por cumplida siempre) y faltaba `hasChild`.
+
+**Pendiente y solo suyo (consolas, sin acceso desde aquí):** publicar las reglas
+en Firebase, restringir la clave de la API por dominio (el análogo real de
+"CORS"), activar **App Check** (el "solo mi app habla con mi backend" de verdad;
+primero en modo monitoreo, activarlo mal deja la app fuera de su propia base) y
+una alerta de gasto en lugar del rate limiting que RTDB no ofrece. Todo con sus
+pasos en `SEGURIDAD.md`.
+
+---
+
+## 12. Idea en reserva: peleadores por nodo individual (ago 2026)
 
 **Estado: NO implementada, y a propósito.** Existió una rama
 (`perf/peleadores-nodos-individuales`, commit `a233957`, 18-jul-2026) que movía
