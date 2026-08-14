@@ -13,7 +13,7 @@ export default defineConfig({
         // hash entre deploys mientras no cambien, así la PWA no re-descarga
         // los 700+ KB de firebase/react cada vez que se toca una línea de la app.
         manualChunks: {
-          "vendor-firebase": ["firebase/app", "firebase/auth", "firebase/database"],
+          "vendor-firebase": ["firebase/app", "firebase/app-check", "firebase/auth", "firebase/database"],
           "vendor-react": ["react", "react-dom"],
         },
       },

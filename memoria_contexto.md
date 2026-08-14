@@ -569,7 +569,45 @@ pasos en `SEGURIDAD.md`.
 
 ---
 
-## 12. Idea en reserva: peleadores por nodo individual (ago 2026)
+## 12. App Check (ago 2026)
+
+**Estado: en la rama `feat/app-check`** (538 tests + build OK). Complementa §11.
+
+Las reglas dicen QUIÉN puede escribir; App Check dice DESDE DÓNDE. Sin él,
+cualquiera con la clave de una cuenta escribe en la base desde un script o una
+copia de la app y las reglas lo dejan pasar, porque para ellas es un usuario
+legítimo.
+
+- **`initAppCheck`** en `src/lib/firebase.js`, llamado dentro de
+  `initFirebaseApp` **entre `initializeApp` y `getDatabase`/`getAuth`**: si se
+  llamara después, las primeras peticiones saldrían sin token y aparecerían como
+  "no verificadas" en las métricas.
+- **Nunca puede tumbar la app**: todo va en `try/catch` y solo avisa por
+  consola. Si reCAPTCHA no carga (sin señal, bloqueador, portal cautivo del
+  recinto), la app sigue registrando y vendiendo igual.
+- Solo se inicializa para el **proyecto propio** (`cfg.projectId ===
+  DEFAULT_FB_CONFIG.projectId`): con "Firebase manual" se puede conectar el
+  aparato a otro proyecto, donde esta clave no está registrada.
+- **La clave del sitio va en el código** (es pública por diseño, como el resto
+  del `firebaseConfig`); la secreta vive solo en la consola de Firebase.
+- En `localhost` se activa el token de depuración del SDK, para que
+  `npm run dev` siga funcionando el día que se active el bloqueo.
+- **La CSP hubo que abrirla** para reCAPTCHA: `www.google.com` y
+  `www.gstatic.com` en `script-src`, `img-src`, `connect-src` y `frame-src`.
+  Verificado con el build servido con las cabeceras reales: reCAPTCHA carga,
+  App Check pide su token y **no hay una sola violación de la política**.
+- `vite.config.js`: `firebase/app-check` se sumó al chunk `vendor-firebase`.
+  Sin eso, sus ~24 KB caían en el chunk principal, que cambia en cada despliegue
+  y se re-descarga entero.
+
+**Está en MONITOREO, no bloquea.** Activar *Aplicar* es una decisión posterior,
+con las métricas a la vista y **nunca en la semana de una velada**: si el wifi
+del recinto tiene portal cautivo o bloquea Google, los teléfonos se quedarían
+sin token y dejarían de vender.
+
+---
+
+## 13. Idea en reserva: peleadores por nodo individual (ago 2026)
 
 **Estado: NO implementada, y a propósito.** Existió una rama
 (`perf/peleadores-nodos-individuales`, commit `a233957`, 18-jul-2026) que movía

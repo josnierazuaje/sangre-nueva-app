@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getDatabase, ref, get, set, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { SYNC_KEYS } from "../constants.js";
@@ -55,9 +56,64 @@ export const OWNER_EMAIL = "josnier.azuaje@gmail.com";
 // oculta todo lo demás. La clave NO va en el código: la comparte el dueño.
 export const SCANNER_EMAIL = "escaner@sangrenueva.app";
 
+// ============================================
+// APP CHECK — que solo ESTA app pueda hablar con la base
+// ============================================
+// El login dice QUIÉN entra; App Check dice DESDE DÓNDE. Sin esto, cualquiera
+// con la clave de una cuenta puede escribir en la base desde un script, un
+// navegador o una copia de la app: las reglas lo dejarían pasar porque, para
+// ellas, es un usuario legítimo. Con App Check, cada petición viaja con un
+// token que solo se consigue ejecutando la app real en un dominio autorizado.
+//
+// Clave del SITIO de reCAPTCHA v3: es pública a propósito —viaja en el bundle,
+// como el resto de la configuración— y no sirve para nada sin la clave secreta,
+// que vive únicamente en la consola de Firebase. Los dominios autorizados están
+// en la consola de reCAPTCHA: sangre-nueva-la-velada.pages.dev y localhost.
+const RECAPTCHA_SITE_KEY = "6LfMH4UtAAAAAEX9xw3sCHtyFToF2XqyDAn8JtOd";
+
+// Arranca App Check. TODO lo de aquí es "mejor esfuerzo": si reCAPTCHA no
+// carga (sin señal, un bloqueador de anuncios, el wifi del recinto con portal
+// cautivo), se avisa por consola y la app SIGUE funcionando. Un fallo de esta
+// capa jamás puede impedir registrar un peleador o vender una entrada — por eso
+// va dentro de un try/catch y nunca lanza hacia arriba.
+//
+// Mientras App Check esté en modo MONITOREO en la consola, un token ausente o
+// inválido no bloquea nada: solo aparece como "petición no verificada" en las
+// métricas. Ese es el modo en el que se despliega, a propósito: primero se mira
+// que los dispositivos de verdad salgan verificados, y solo después se decide
+// activar el bloqueo (y nunca en la semana de una velada).
+let appCheckIniciado = false;
+function initAppCheck(cfg) {
+  // Solo para el proyecto propio: con "Firebase manual" se puede conectar el
+  // aparato a OTRO proyecto, donde esta clave no está registrada y el token
+  // sería inservible.
+  if (appCheckIniciado || cfg.projectId !== DEFAULT_FB_CONFIG.projectId) return;
+  try {
+    // En localhost no hay reCAPTCHA que valga: este interruptor hace que el SDK
+    // imprima en la consola un token de depuración para registrarlo a mano en
+    // App Check → Apps → ⋮ → "Administrar tokens de depuración". Sin esto,
+    // `npm run dev` quedaría fuera el día que se active el bloqueo.
+    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+    initializeAppCheck(FB.app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      // Renueva el token solo antes de que venza (dura 1 hora): sin esto, una
+      // velada de cuatro horas se quedaría sin token a mitad de camino.
+      isTokenAutoRefreshEnabled: true,
+    });
+    appCheckIniciado = true;
+  } catch (e) {
+    console.error("App Check no pudo iniciarse (la app sigue funcionando):", e);
+  }
+}
+
 export function initFirebaseApp(cfg) {
   if (!cfg || !cfg.apiKey || !cfg.databaseURL) return false;
   FB.app = getApps().length ? getApp() : initializeApp(cfg);
+  // ANTES de getDatabase/getAuth: así las peticiones salen ya con su token en
+  // vez de empezar sin él y quedar como "no verificadas" en las métricas.
+  initAppCheck(cfg);
   FB.db = getDatabase(FB.app);
   FB.auth = getAuth(FB.app);
   return true;

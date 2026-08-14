@@ -115,19 +115,42 @@ dominio". Lo más parecido, y sí existe:
 Ojo con lo que esto sí y no hace: **estorba**, no blinda — un referrer se puede
 falsificar. Lo que de verdad protege los datos son las reglas y el login.
 
-### C. App Check — esto sí es "solo mi app puede hablar con mi backend"
+### C. App Check — ✅ instalado, en modo MONITOREO
 
-Es la respuesta real a lo que pediste. Hace que Firebase **rechace cualquier
-petición que no venga de tu app publicada**, aunque quien la haga tenga una
-cuenta válida.
+Es la respuesta real a "solo mi app puede hablar con mi backend": cada petición
+viaja con un token que solo se consigue ejecutando la app real en un dominio
+autorizado, así que **una copia de la app, un script o un navegador cualquiera
+no pueden escribir**, aunque tengan una cuenta válida.
 
-1. Firebase → **App Check** → registra la app web con **reCAPTCHA v3** (te da
-   una *site key*).
-2. Avísame con esa clave a mano y agrego las cuatro líneas que faltan en
-   `src/lib/firebase.js`.
-3. Deja el modo **"sin aplicar" (monitoring)** unos días y recién después
-   actívalo. **Activarlo mal deja la app afuera de su propia base**, y con la
-   velada encima eso es un desastre.
+Hecho: la app web está registrada en App Check con **reCAPTCHA v3**, y el código
+lo inicializa en `initAppCheck` (`src/lib/firebase.js`) antes de tocar la base.
+La clave del sitio es pública y va en el código; la secreta vive solo en la
+consola. La CSP se abrió lo justo para reCAPTCHA (`www.google.com` y
+`www.gstatic.com` en cuatro directivas).
+
+**Está en monitoreo: registra, no bloquea.** Lo que falta es la decisión final:
+
+1. Firebase → **App Check** → pestaña **APIs** → *Realtime Database*: ahí se ve
+   el porcentaje de peticiones **verificadas** frente a las que no.
+2. Déjalo correr unos días de uso normal, **incluida una velada** si puedes.
+3. Cuando el gráfico muestre que prácticamente todo sale verificado, y **nunca
+   en la semana de un evento**, activa *Aplicar*. Desde ese momento lo no
+   verificado se rechaza.
+
+> Antes de aplicar, piensa en el recinto: si su wifi tiene portal cautivo o
+> bloquea Google, los teléfonos no consiguen token y **dejan de vender**. En
+> monitoreo eso no puede pasar. No hay prisa por activarlo.
+
+**Para seguir programando en `localhost`**: al abrir `npm run dev`, la consola
+del navegador imprime `App Check debug token: <uuid>`. Ese token se registra en
+App Check → Apps → ⋮ → *Administrar tokens de depuración*. Es un pase que
+salta la verificación: registra solo el del equipo de desarrollo y bórralo
+cuando no se use.
+
+Si App Check falla (sin señal, un bloqueador, reCAPTCHA caído), la app **sigue
+funcionando**: el código lo envuelve en un `try/catch` y solo avisa por consola.
+Un fallo de esta capa nunca puede impedir registrar un peleador ni vender una
+entrada.
 
 ### D. Alerta de gasto — el sustituto honesto del rate limiting
 
