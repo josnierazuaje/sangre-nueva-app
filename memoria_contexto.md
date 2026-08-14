@@ -800,3 +800,42 @@ Y un módulo nuevo: **`src/lib/fichaEvento.js`**. La ficha de la velada
 `moneda.js`, que se estaba convirtiendo en un cajón de sastre — el mismo camino
 que ya recorrió `storage.js` (§8.3). `moneda.js` se quedó con lo que de verdad
 es moneda: las monedas y el formateo de importes, sin tocar localStorage.
+
+---
+
+## 15. Las reglas de la base, con pruebas (ago 2026)
+
+Las reglas del árbol multi-evento (§14.3) se publicaron el 14-ago-2026. Antes de
+darlas por buenas se comprobaron dos cosas.
+
+**1. Que no rompieran lo que ya funcionaba.** Comparando `database.rules.json`
+entre `be1ff0a` (antes del trabajo) y `main`, los nodos `staff`,
+`sangre_nueva`, `sangre_nueva_backups` y los `.read`/`.write` de la raíz son
+**idénticos byte a byte**. Lo único que se añadió es `eventos` y `usuarios`. La
+velada de Chile no podía verse afectada.
+
+**2. Que las nuevas digan lo que se cree que dicen** —
+`src/lib/__tests__/databaseRules.test.js`, 17 pruebas.
+
+**Qué prueban y qué NO.** No evalúan las reglas: no hay intérprete de la
+gramática de RTDB, y el emulador oficial necesita **Java, que no está instalado
+en este Mac**. Lo que fijan son las propiedades **estructurales** cuyo
+incumplimiento es el error que de verdad se comete al editar este archivo a
+mano: conceder de más por descuido. La evaluación real se sigue comprobando en
+el Simulador de la consola antes de publicar.
+
+**Se verificaron por mutación**, que es lo único que distingue una prueba útil
+de una que pasa siempre. Se aflojó la regla a propósito, cinco veces, y las
+cinco saltó el test:
+
+- un `.read` a nivel de `eventos/$eid` (el fallo que ya se coló una vez durante
+  el desarrollo, ver §14.3);
+- la cuenta de puerta pudiendo leer el padrón de atletas;
+- `ownerUid` reescribible — es decir, poder robar una velada entera;
+- los respaldos legibles por el staff;
+- un `true` suelto en un permiso.
+
+**Qué sigue sin probarse automáticamente:** la evaluación real (que un UID
+concreto pueda o no escribir en una ruta concreta). Si algún día se instala
+Java, el paso natural es `@firebase/rules-unit-testing` contra el emulador de
+RTDB, y estas pruebas estructurales se quedan igual: cubren cosas distintas.
