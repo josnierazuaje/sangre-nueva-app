@@ -1,0 +1,58 @@
+# Cabeceras de seguridad que aplica Cloudflare Pages a todo lo que sirve.
+# Vive en public/ porque Vite copia esa carpeta tal cual a dist/, que es lo que
+# se publica. NO es un archivo de configuración del código: si algo aquí está
+# mal, la app se rompe en producción y no en local (en `npm run dev` estas
+# cabeceras no existen). Por eso cada directiva de abajo dice QUÉ de la app la
+# necesita — para que nadie la recorte a ciegas.
+#
+# Lo que estas cabeceras SÍ hacen: impiden que un script ajeno (inyectado en un
+# comentario, en un nombre de peleador, en una extensión mal hecha) se ejecute o
+# se lleve datos a otro servidor, y que la app se pueda embeber en un sitio
+# ajeno. Lo que NO hacen: proteger la base de datos — eso son las reglas de
+# Firebase (database.rules.json) y el login. Ver SEGURIDAD.md.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# Por qué cada pieza de la CSP, y qué se rompe si se quita:
+#
+#   script-src 'self'          Solo corre el JavaScript servido desde este
+#                              dominio. El build no genera NINGÚN script en
+#                              línea (se verificó en dist/index.html), así que
+#                              aquí no hace falta 'unsafe-inline' — que es
+#                              justo lo que haría inútil a toda la política.
+#   style-src 'unsafe-inline'  La app usa estilos en línea por todos lados
+#                              (style={{...}} de React) y las hojas imprimibles
+#                              llevan su <style> dentro. Sin esto, la app sale
+#                              sin diseño y los impresos en blanco y negro.
+#                              Un estilo no ejecuta código: el riesgo es mucho
+#                              menor que el de un script.
+#   img-src data: blob:        Los códigos QR de las entradas se generan en el
+#                              navegador como data:, y el voucher que se manda
+#                              por WhatsApp se arma como blob:.
+#   font-src 'self'            Las nueve tipografías están servidas desde este
+#                              mismo dominio (public/fonts): no se pide nada a
+#                              Google Fonts, así que nadie de fuera sabe quién
+#                              abre la app.
+#   connect-src …firebaseio    Las únicas conexiones de datos que hace la app:
+#           …googleapis        la base en tiempo real (https y el socket wss) y
+#                              el login de Firebase. Si un script inyectado
+#                              intentara mandar el padrón a otro servidor, el
+#                              navegador lo BLOQUEA — es la directiva que de
+#                              verdad frena un robo de datos.
+#   frame-src 'self'           La impresión usa un <iframe> propio (printHtml).
+#   worker-src 'self'          El service worker de la PWA (offline).
+#   media-src blob:            La cámara del escáner de entradas.
+#   frame-ancestors 'none'     Nadie puede meter la app dentro de un iframe en
+#   + X-Frame-Options: DENY    otro sitio para robar clics o suplantarla.
+#
+# Permissions-Policy deja la CÁMARA habilitada a propósito (camera=(self)): el
+# escáner de la puerta la necesita. Lo demás se apaga.
+#
+# Referrer-Policy: no-referrer — los enlaces de la app salen a WhatsApp; sin
+# esto, wa.me recibiría la URL desde la que se abrió.
