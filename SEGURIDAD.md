@@ -115,14 +115,24 @@ dominio". Lo más parecido, y sí existe:
 Ojo con lo que esto sí y no hace: **estorba**, no blinda — un referrer se puede
 falsificar. Lo que de verdad protege los datos son las reglas y el login.
 
-### C. App Check — instalado, PERO ESPERANDO LA CLAVE CORRECTA
+### C. App Check — clave correcta puesta y verificada, en modo MONITOREO
 
-> **Estado real (14-ago-2026):** el código está puesto, pero **App Check no está
-> funcionando**. En `RECAPTCHA_SITE_KEY` se cargó por error la clave **secreta**
-> del par en vez de la del **sitio**, así que reCAPTCHA respondía "Invalid site
-> key" y App Check fallaba cada 30 segundos (sin romper la app: la capa está en
-> `try/catch`). La constante quedó **vacía**, que desactiva App Check por
-> completo, hasta tener la clave correcta.
+> **Estado (14-ago-2026):** en `RECAPTCHA_SITE_KEY` llegó a cargarse por error la
+> clave **secreta** del par en vez de la del **sitio**; reCAPTCHA respondía
+> "Invalid site key" y App Check fallaba cada 30 segundos, sin romper la app
+> (la capa está en `try/catch`). Ya está la clave correcta, **comprobada en
+> producción**: `grecaptcha.execute` desde el dominio real devolvió un token.
+>
+> **Queda pendiente rotar esa clave secreta**: quedó en el historial del
+> repositorio —que es público— y en un bundle desplegado. Borrarla del código no
+> la borra del historial; lo único que la anula es **generar un par nuevo** en la
+> consola de reCAPTCHA y borrar el viejo (y entonces hay que actualizar las dos
+> puntas: la secreta en Firebase, la del sitio en el código).
+>
+> Qué se puede hacer con esa clave filtrada, sin dramatizar: **no** sirve para
+> falsificar tokens de App Check —esos los emite Firebase—, así que nadie se
+> salta la protección con ella; sí permite gastar tu cuota de verificación de
+> reCAPTCHA.
 >
 > **Esa clave secreta hay que rotarla**: quedó en el historial del repositorio
 > —que es público— y en un bundle desplegado. Borrarla del código no la borra
