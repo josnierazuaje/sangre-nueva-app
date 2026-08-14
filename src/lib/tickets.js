@@ -16,6 +16,7 @@ import { ref, set as dbSet, update as dbUpdate, remove as dbRemove, get, onValue
 import { FB, fbPath, reportSyncError } from "./firebase.js";
 import { load, pruneOutbox, applyOutboxPut, applyOutboxRemove, cloudIntended } from "./storage.js";
 import { TICKETS_OUTBOX_KEY, CHECKIN_OUTBOX_KEY, TICKETS_CACHE_KEY } from "./storageKeys.js";
+import { lsKey } from "./eventos.js";
 
 export function loadTicketsV4() { return load(TICKETS_CACHE_KEY, []); }
 
@@ -46,7 +47,7 @@ export async function fetchTicket(id) {
     return null;
   }
 }
-function cacheTicketsV4(list) { localStorage.setItem(TICKETS_CACHE_KEY, JSON.stringify(list)); }
+function cacheTicketsV4(list) { localStorage.setItem(lsKey(TICKETS_CACHE_KEY), JSON.stringify(list)); }
 export function padN(n) { return String(n).padStart(4, "0"); }
 
 function withTimeout(promise, ms) {
@@ -156,14 +157,14 @@ export function ticketsOutboxList() { return pruneOutbox(load(TICKETS_OUTBOX_KEY
 function ticketsOutboxPut(t) {
   // Igual que en peleadores: anotar el pendiente es lo que SOSTIENE la promesa
   // de entrega, así que si falla (cuota llena) se avisa en el chip.
-  try { localStorage.setItem(TICKETS_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(TICKETS_OUTBOX_KEY, []), t, Date.now()))); }
+  try { localStorage.setItem(lsKey(TICKETS_OUTBOX_KEY), JSON.stringify(applyOutboxPut(load(TICKETS_OUTBOX_KEY, []), t, Date.now()))); }
   catch (e) { reportSyncError("No se pudo anotar la venta pendiente en este dispositivo:", e); }
 }
 function ticketsOutboxRemove(id) {
   // Solo descuenta algo ya confirmado y escribe una cadena más corta (por cuota
   // no puede fallar): basta la consola, nunca debe pintar de rojo una venta que
   // la nube SÍ confirmó.
-  try { localStorage.setItem(TICKETS_OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(TICKETS_OUTBOX_KEY, []), id))); }
+  try { localStorage.setItem(lsKey(TICKETS_OUTBOX_KEY), JSON.stringify(applyOutboxRemove(load(TICKETS_OUTBOX_KEY, []), id))); }
   catch (e) { console.error("No se pudo descontar la venta pendiente en este dispositivo:", e); }
 }
 
@@ -262,11 +263,11 @@ export function interpretCheckIn(committed, val) {
 // reintentarlo al reabrir la app.
 export function checkinOutboxList() { return pruneOutbox(load(CHECKIN_OUTBOX_KEY, []), Date.now()); }
 function checkinOutboxPut(id, manual) {
-  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(CHECKIN_OUTBOX_KEY, []), { id, manual: !!manual }, Date.now()))); }
+  try { localStorage.setItem(lsKey(CHECKIN_OUTBOX_KEY), JSON.stringify(applyOutboxPut(load(CHECKIN_OUTBOX_KEY, []), { id, manual: !!manual }, Date.now()))); }
   catch (e) { console.error("No se pudo anotar el ingreso pendiente en este dispositivo:", e); }
 }
 function checkinOutboxRemove(id) {
-  try { localStorage.setItem(CHECKIN_OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(CHECKIN_OUTBOX_KEY, []), id))); }
+  try { localStorage.setItem(lsKey(CHECKIN_OUTBOX_KEY), JSON.stringify(applyOutboxRemove(load(CHECKIN_OUTBOX_KEY, []), id))); }
   catch (e) { console.error("No se pudo descontar el ingreso pendiente en este dispositivo:", e); }
 }
 
@@ -476,7 +477,7 @@ export async function restoreTicketsFromBackup(tickets) {
   return { agregadas: n, omitidas: omitidos.length };
 }
 
-export function clearTicketsCache() { localStorage.removeItem(TICKETS_CACHE_KEY); }
+export function clearTicketsCache() { localStorage.removeItem(lsKey(TICKETS_CACHE_KEY)); }
 // Borra las boletas reales por completo: los nodos individuales, los
 // contadores, y el arreglo viejo bm_tickets_v4 (si no se borra este último,
 // la migración en caliente lo confundiría con datos pendientes de migrar y

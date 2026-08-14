@@ -14,6 +14,7 @@
 import { ref, set as dbSet, get, runTransaction } from "firebase/database";
 import { SYNC_KEYS } from "../constants.js";
 import { FB, fbPath, reportSyncError } from "./firebase.js";
+import { lsKey } from "./eventos.js";
 import { mergeRegenerated, normalizeSuper4 } from "./super4.js";
 import { OUTBOX_KEY, TICKETS_OUTBOX_KEY, CHECKIN_OUTBOX_KEY, TICKETS_CACHE_KEY } from "./storageKeys.js";
 
@@ -86,10 +87,10 @@ export function applyRemoveFighter(list, id) {
 // (registro de peleadores/matchmaking, no ventas en el mostrador). Las
 // boletas sí se movieron a nodos individuales (más abajo) porque ahí sí hay
 // varios dispositivos vendiendo a la vez el día del evento.
-export function load(k, def) { try { const d = localStorage.getItem(k); return d ? JSON.parse(d) : def; } catch { return def; } }
+export function load(k, def) { try { const d = localStorage.getItem(lsKey(k)); return d ? JSON.parse(d) : def; } catch { return def; } }
 
 export function save(k, v) {
-  localStorage.setItem(k, JSON.stringify(v));
+  localStorage.setItem(lsKey(k), JSON.stringify(v));
   if (FB.ready && Object.prototype.hasOwnProperty.call(SYNC_KEYS, k)) {
     let payload;
     try {
@@ -121,7 +122,7 @@ export function save(k, v) {
 // semifinales distintas de la misma llave no se pisan). `fields` puede traer
 // "semis/N" (una semifinal) y "finalWinner".
 export function patchSuper4Bracket(fullList, bracketId, fields) {
-  localStorage.setItem("bm_super4_v1", JSON.stringify(fullList));
+  localStorage.setItem(lsKey("bm_super4_v1"), JSON.stringify(fullList));
   if (!FB.ready) return;
   const clean = JSON.parse(JSON.stringify(fields));
   const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
@@ -147,7 +148,7 @@ export function patchSuper4Bracket(fullList, bracketId, fields) {
 // primero de forma optimista y luego con el resultado real de la transacción.
 export function mergeSuper4Tx(existingLocal, newBrackets, onMerged, clearKeys = null) {
   const optimista = mergeRegenerated(existingLocal || [], newBrackets, clearKeys);
-  localStorage.setItem("bm_super4_v1", JSON.stringify(optimista));
+  localStorage.setItem(lsKey("bm_super4_v1"), JSON.stringify(optimista));
   onMerged(optimista);
   if (!FB.ready) return;
   const nodeRef = ref(FB.db, fbPath("bm_super4_v1"));
@@ -160,7 +161,7 @@ export function mergeSuper4Tx(existingLocal, newBrackets, onMerged, clearKeys = 
       // con un solo elemento. Se repara AQUÍ, que es la otra puerta de entrada
       // de datos de la nube al estado (la primera es applyRemote en App.jsx).
       const list = normalizeSuper4(nodeToArray(res.snapshot.val()));
-      localStorage.setItem("bm_super4_v1", JSON.stringify(list));
+      localStorage.setItem(lsKey("bm_super4_v1"), JSON.stringify(list));
       onMerged(list);
     })
     .catch(e => reportSyncError("No se pudo sincronizar el Super 4 (el cambio sí quedó guardado localmente):", e));
@@ -193,7 +194,7 @@ export function matchupsTx(aplicar, optimista, onMerged) {
 // Guarda SOLO en este dispositivo, sin tocar la nube. Lo usa la reconciliación
 // automática, que a la nube escribe por transacción (reconcileNodeTx).
 export function saveLocal(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); }
+  try { localStorage.setItem(lsKey(k), JSON.stringify(v)); }
   catch (e) { console.error("No se pudo guardar " + k + " en este dispositivo:", e); }
 }
 
@@ -315,11 +316,11 @@ export function mergePending(fighters, pending) {
 //    hasta el .catch de la transacción.
 export function outboxList() { return pruneOutbox(load(OUTBOX_KEY, []), Date.now()); }
 function outboxPut(f) {
-  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxPut(load(OUTBOX_KEY, []), f, Date.now()))); }
+  try { localStorage.setItem(lsKey(OUTBOX_KEY), JSON.stringify(applyOutboxPut(load(OUTBOX_KEY, []), f, Date.now()))); }
   catch (e) { reportSyncError("No se pudo anotar el registro pendiente en este dispositivo:", e); }
 }
 function outboxRemove(id) {
-  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
+  try { localStorage.setItem(lsKey(OUTBOX_KEY), JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
   catch (e) { console.error("No se pudo descontar el registro pendiente en este dispositivo:", e); }
 }
 // Tira la cola ENTERA. La usa el vaciado a propósito del padrón ("Limpiar"):
@@ -328,7 +329,7 @@ function outboxRemove(id) {
 // nube los peleadores pendientes y reaparecerían resucitados en todos los
 // dispositivos, sin que nadie los volviera a registrar.
 export function outboxClear() {
-  try { localStorage.removeItem(OUTBOX_KEY); }
+  try { localStorage.removeItem(lsKey(OUTBOX_KEY)); }
   catch (e) { console.error("No se pudo vaciar la cola de registros pendientes:", e); }
 }
 // ¿Este dispositivo usa la nube? (misma condición con la que App decide el
@@ -373,7 +374,7 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
   // excepción salía hasta el formulario. Se avisa y se sigue — la nube es el
   // destino que de verdad importa.
   try {
-    localStorage.setItem(k, JSON.stringify(optimisticList));
+    localStorage.setItem(lsKey(k), JSON.stringify(optimisticList));
   } catch (e) {
     reportSyncError("No se pudo guardar la copia local de los peleadores en este dispositivo:", e);
   }
@@ -405,19 +406,19 @@ function fighterArrayTx(apply, optimisticList, onMerged, onError) {
 // que un aparato perdido o prestado no los exponga sin autenticación. La nube
 // es la fuente de verdad: al volver a iniciar sesión se re-sincroniza todo.
 export function clearLocalEventData() {
-  Object.keys(SYNC_KEYS).forEach(k => localStorage.removeItem(k));
-  localStorage.removeItem(TICKETS_CACHE_KEY);
+  Object.keys(SYNC_KEYS).forEach(k => localStorage.removeItem(lsKey(k)));
+  localStorage.removeItem(lsKey(TICKETS_CACHE_KEY));
   // También los PENDIENTES del outbox: traen datos de peleadores (incluye
   // menores) y no deben quedar legibles sin login. Además, "Recargar desde la
   // nube" usa esta misma limpieza como reparación de un clic: si el outbox
   // sobreviviera, el replay re-fusionaría justo el registro que se intentaba
   // purgar, y un pendiente encolado por una cuenta podría terminar re-subido
   // por la cuenta que inicie sesión después.
-  localStorage.removeItem(OUTBOX_KEY);
+  localStorage.removeItem(lsKey(OUTBOX_KEY));
   // También los pendientes de VENTA: traen datos del comprador y, igual que los
   // de peleadores, no deben quedar legibles sin login ni sobrevivir a un
   // "Recargar desde la nube" (los guards de App.jsx avisan antes de borrarlos).
-  localStorage.removeItem(TICKETS_OUTBOX_KEY);
-  localStorage.removeItem(CHECKIN_OUTBOX_KEY);
+  localStorage.removeItem(lsKey(TICKETS_OUTBOX_KEY));
+  localStorage.removeItem(lsKey(CHECKIN_OUTBOX_KEY));
 }
 

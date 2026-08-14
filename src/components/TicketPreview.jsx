@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { TICKET_TYPES_V2, fmt$, ticketQty, ticketUnitPrice } from "../constants.js";
+import { TICKET_TYPES_V2, fmtDinero, ticketQty, ticketUnitPrice } from "../constants.js";
 import { waChatUrl } from "../lib/whatsapp.js";
 import { buildVoucherFile, voucherFileName } from "../lib/voucher.js";
 import Badge from "./Badge.jsx";
@@ -161,8 +161,8 @@ export default function TicketPreview({ ticket }) {
           <div className="bg-white rounded-xl p-1.5 flex-shrink-0"><QRDisplay data={qrData} size={96} /></div>
           <div className="flex-1 space-y-2">
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Boleta</span><span className="font-black text-white text-base" style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", letterSpacing: "1px" }}>#{ticket.id}</span></div>
-            {qty > 1 && <div className="flex justify-between"><span className="text-gray-400 text-sm">Cantidad</span><span className="text-white text-sm font-semibold">{qty} entradas · {fmt$(unit)} c/u</span></div>}
-            <div className="flex justify-between"><span className="text-gray-400 text-sm">{qty > 1 ? "Total" : "Precio"}</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmt$(ticket.price)}</span></div>
+            {qty > 1 && <div className="flex justify-between"><span className="text-gray-400 text-sm">Cantidad</span><span className="text-white text-sm font-semibold">{qty} entradas · {fmtDinero(unit)} c/u</span></div>}
+            <div className="flex justify-between"><span className="text-gray-400 text-sm">{qty > 1 ? "Total" : "Precio"}</span><span className="font-bold text-sm" style={{ color: ticketTypeInfo.color }}>{fmtDinero(ticket.price)}</span></div>
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Pago</span><span className="text-white text-sm">{ticket.paymentMethod}</span></div>
             <div className="flex justify-between"><span className="text-gray-400 text-sm">Estado</span>
               <Badge variant="filled" color={estadoColor}>{ticket.status === "ingresado" ? "✓ Ingresado" : "● Activo"}</Badge>

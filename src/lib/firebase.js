@@ -3,6 +3,7 @@ import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getDatabase, ref, get, set, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { SYNC_KEYS } from "../constants.js";
+import { fbPathEvento, lsKey } from "./eventos.js";
 
 // `connected` refleja el estado REAL del socket con RTDB (lo alimenta el
 // listener de .info/connected en startFirebaseSync). `ready` solo dice que la
@@ -10,7 +11,10 @@ import { SYNC_KEYS } from "../constants.js";
 // hay señal: el check-in lo usaba y por eso su rama "sin conexión" era
 // inalcanzable y cada escaneo esperaba 8 s a ciegas antes de dar error.
 export const FB = { app: null, db: null, auth: null, ready: false, connected: false };
-export function fbPath(k) { return "sangre_nueva/" + k; }
+// Dónde vive cada dato: ya no es un prefijo fijo, sino el rincón del evento
+// ABIERTO en este dispositivo (ver src/lib/eventos.js). La velada de Chile
+// sigue devolviendo "sangre_nueva/…", así que para ella nada cambió.
+export function fbPath(k) { return fbPathEvento(k); }
 
 // Config pública del proyecto de Firebase del equipo (la apiKey de un SDK
 // web de Firebase no es secreta: la seguridad la dan las Reglas de la base
@@ -198,7 +202,7 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady, opts = {}) {
     get(nodeRef).then(snap => {
       // Primera conexion: si la nube esta vacia y aqui hay datos, subimos los locales
       if (snap.val() === null) {
-        const localRaw = localStorage.getItem(k);
+        const localRaw = localStorage.getItem(lsKey(k));
         if (localRaw) { try { set(nodeRef, JSON.parse(localRaw)); } catch (e) { console.error("No se pudo subir " + k + " a Firebase en la primera conexión:", e); } }
       }
       let first = true;
@@ -208,14 +212,14 @@ export function startFirebaseSync(onStatus, onRemote, onKeyReady, opts = {}) {
         // escribe save() (RTDB borra los nodos con []); se traduce de vuelta.
         const remote = (val === null || val === undefined) ? SYNC_KEYS[k] : (val === "__EMPTY__" ? [] : val);
         const remoteRaw = JSON.stringify(remote);
-        if (localStorage.getItem(k) !== remoteRaw) { // distinto: aplica el cambio remoto
+        if (localStorage.getItem(lsKey(k)) !== remoteRaw) { // distinto: aplica el cambio remoto
           // La caché local es un acelerador, no el dato: si no se puede
           // escribir (cuota llena) el cambio remoto debe llegar IGUAL a la app.
           // Sin este guard la excepción sale del callback y ni onRemote ni
           // onKeyReady se ejecutan, así que esta clave deja de recibir datos de
           // la nube el resto de la sesión y el replay del outbox —que espera a
           // que la clave esté lista— no corre nunca.
-          try { localStorage.setItem(k, remoteRaw); } catch (e) { console.error("No se pudo cachear " + k + " en este dispositivo:", e); }
+          try { localStorage.setItem(lsKey(k), remoteRaw); } catch (e) { console.error("No se pudo cachear " + k + " en este dispositivo:", e); }
           onRemote(k, remote);
         }
         if (first) { first = false; onKeyReady?.(k); }

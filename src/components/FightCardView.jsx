@@ -7,6 +7,7 @@ import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
 import PageHeader from "./PageHeader.jsx";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 // ============================================
 // FIGHT CARD VIEW
@@ -48,7 +49,7 @@ export default function FightCardView({ matchups, fighters, super4 = [], labels 
     const n = carteleraGroups(matchups, fighters).reduce((s, g) => s + g.list.length, 0);
     downloadBytes(
       buildCarteleraCsv(matchups, fighters, `${eventDate} · ${n} pelea${n === 1 ? "" : "s"}`),
-      csvFilename("Cartelera Sangre Nueva", new Date().toLocaleDateString("es-CL").replace(/\//g, "-")),
+      csvFilename("Cartelera Sangre Nueva", new Date().toLocaleDateString(localeDelEventoActivo()).replace(/\//g, "-")),
       CSV_MIME,
     );
   }

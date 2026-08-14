@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty, findTicketByCode } from "../constants.js";
 import { fetchTicket } from "../lib/tickets.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
+import { localeDelEventoActivo } from "../lib/moneda.js";
 
 export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken, ticketsEstado = "listo" }) {
   const [input, setInput] = useState(initialCode ? initialCode.toUpperCase() : "");
@@ -249,7 +250,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
       {result && typeof result === "object" && (() => {
         const ticketTypeInfo = TICKET_TYPES_V2.find(t => t.key === result.ticketType) || TICKET_TYPES_V2[0];
         const cantidad = ticketQty(result);
-        const inAt = result.checkedInAt ? new Date(result.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : null;
+        const inAt = result.checkedInAt ? new Date(result.checkedInAt).toLocaleTimeString(localeDelEventoActivo(), { hour: "2-digit", minute: "2-digit" }) : null;
         // QR falsificado: el token no coincide con la boleta. Se bloquea el
         // ingreso; si de verdad es el dueño, el staff puede validar a mano.
         if (verify === "bad") {
@@ -306,7 +307,7 @@ export default function CheckInView({ tickets, onCheckIn, initialCode, initialTo
       {checkedInLog.length > 0 && <div><p className="text-[14px] text-boxing-muted uppercase tracking-[0.22em] mb-2">Registro de ingresos ({checkedInLog.length})</p>
         <div className="space-y-1.5">{registroVisible.map(t => {
           const ticketTypeInfo = TICKET_TYPES_V2.find(x => x.key === t.ticketType) || TICKET_TYPES_V2[0];
-          const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+          const time = t.checkedInAt ? new Date(t.checkedInAt).toLocaleTimeString(localeDelEventoActivo(), { hour: "2-digit", minute: "2-digit" }) : "--:--";
           return <div key={t.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)" }}><div className="flex items-center gap-2 min-w-0"><span style={{ color: ticketTypeInfo.color }}>{ticketTypeInfo.icon}</span><span className="text-white text-sm truncate">{t.attendeeName}</span>{ticketQty(t) > 1 && <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: "#e3c07a" }}>×{ticketQty(t)}</span>}</div><div className="flex items-center gap-2 flex-shrink-0"><span className="text-[14px] text-gray-500">{time}</span><span className="text-[14px] text-green-400">#{t.id}</span></div></div>;
         })}</div>
       </div>}

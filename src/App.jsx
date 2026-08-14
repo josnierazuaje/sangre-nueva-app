@@ -8,11 +8,14 @@ import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
+import { guardarEventoActivo } from "./lib/eventos.js";
+import { guardarMetaLocal, localeDelEventoActivo } from "./lib/moneda.js";
 import { buildEventLabels } from "./lib/eventDates.js";
 import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
 import { resumenLimpiar, textoLimpiar, textoLimpiado } from "./lib/limpiar.js";
 import { printHtml } from "./lib/printHtml.js";
 import EventSettingsDialog from "./components/EventSettingsDialog.jsx";
+import EventosDialog from "./components/EventosDialog.jsx";
 import FighterList from "./components/FighterList.jsx";
 import FaltantesView from "./components/FaltantesView.jsx";
 import FighterForm from "./components/FighterForm.jsx";
@@ -58,6 +61,7 @@ export default function App() {
     tickets: ticketsNew, setTickets: setTicketsNew, ticketsEstado,
     eventLabel, setEventLabel, eventDates, setEventDates, eventOrg, setEventOrg,
     sync, authUser, cloudMode, isOwner,
+    eventoId, eventoMeta,
     super4Ready, matchupsReady, conectarConConfig,
   } = useEventSync({
     scanMode,
@@ -87,6 +91,7 @@ export default function App() {
   const addedToastOwnerRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [eventosDialogOpen, setEventosDialogOpen] = useState(false);
   // Las etiquetas de fecha que muestran la cartelera, las llaves y los impresos.
   // Se derivan de las dos fechas del evento, así que cambiarlas en el diálogo
   // redibuja todo de una vez.
@@ -319,7 +324,7 @@ export default function App() {
     printHtml(buildCierreHtml(resumen, {
       titulo: eventLabel,
       fechaEvento: eventLabels.rango,
-      generadoEl: new Date().toLocaleDateString("es-CL"),
+      generadoEl: new Date().toLocaleDateString(localeDelEventoActivo()),
       organizadores: eventOrg,
     }));
   }
@@ -412,6 +417,26 @@ export default function App() {
     alert("Evento reiniciado. El respaldo se descargó" + (FB.ready ? " y también quedó guardado en la nube." : "."));
   }
 
+  // ---- Cambiar de velada ----
+  // Se recuerda el evento elegido en este dispositivo y se RECARGA. Recargar no
+  // es pereza: los listeners de Firebase del evento anterior siguen montados
+  // sobre sus rutas, y dejarlos vivos mientras entran datos de otro evento es
+  // exactamente cómo un peleador terminaría apareciendo en la velada
+  // equivocada. Al recargar, todo (rutas, caché local, moneda y precios) se
+  // resuelve otra vez desde cero para la velada nueva.
+  function cambiarDeEvento(id) {
+    if (!guardarEventoActivo(id)) { alert("No se pudo abrir esa velada en este dispositivo."); return; }
+    location.reload();
+  }
+  // Una velada recién creada se abre sola: es lo que el organizador espera
+  // después de rellenar el formulario. La ficha se cachea ANTES de recargar
+  // para que el primer render ya cobre en la moneda correcta.
+  function abrirEventoNuevo(meta) {
+    if (!guardarEventoActivo(meta.id)) { alert("La velada se creó, pero no se pudo abrir en este dispositivo."); return; }
+    guardarMetaLocal(meta);
+    location.reload();
+  }
+
   const nav = (active) => "flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors " + (active ? "text-boxing-goldFight" : "text-boxing-muted active:text-gray-300");
   // Cambio de pestaña compartido por las dos navegaciones (móvil y sidebar):
   // al ir a la lista o a "Agregar" se descarta la edición en curso, igual
@@ -435,6 +460,7 @@ export default function App() {
   // Acciones del menú del dueño (⋮), compartidas por el header móvil y el
   // pie del sidebar de escritorio.
   const menuActions = [
+    { label: "Veladas", danger: false, run: () => setEventosDialogOpen(true) },
     { label: "Recargar desde la nube", danger: false, run: reloadFromCloud },
     { label: "Restaurar respaldo de la nube", danger: false, run: restaurarDesdeLaNube },
     { label: "Importar", danger: false, run: handleImport },
@@ -631,6 +657,14 @@ export default function App() {
             garantiza la entrega) / ⚠️ rojo solo si la nube RECHAZA de verdad;
           — rojo con 🗑️: DESHACER un borrado (un toque errado en la papelera se
             sincroniza a la nube; sin esto sería irreversible). */}
+      {eventosDialogOpen && <EventosDialog
+        user={authUser} eventoId={eventoId} eventoMeta={eventoMeta} isOwner={isOwner}
+        pendientes={pendientesLocales()}
+        onCambiar={cambiarDeEvento}
+        onCreado={abrirEventoNuevo}
+        onMetaCambiada={meta => { guardarMetaLocal(meta); location.reload(); }}
+        onClose={() => setEventosDialogOpen(false)} />}
+
       {eventDialogOpen && <EventSettingsDialog label={eventLabel} dates={eventDates} org={eventOrg} isOwner={isOwner} onSave={guardarEvento} onClose={() => setEventDialogOpen(false)} />}
 
       {(addedToast || undoDelete) && <div className="fixed left-1/2 -translate-x-1/2 z-50 bottom-20 lg:bottom-6 w-[calc(100%-32px)] max-w-md space-y-2">

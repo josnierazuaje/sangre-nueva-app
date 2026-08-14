@@ -101,6 +101,35 @@ Es un cambio de permisos sobre una base en producción; publícalo tú:
 3. **Cuenta fuera de la lista:** una cuenta autenticada cuyo UID no esté en
    `/staff` no debe ver datos (la app quedará vacía / sin sincronizar).
 
+## Varias veladas en la misma app (multi-evento)
+
+Cada velada es un **evento** con su propio padrón, cartelera, Super 4,
+boletería y respaldos. Se cambia de una a otra desde el menú ⋮ → **Veladas**.
+
+- **La velada de Chile no se movió**: su id interno es `sangre_nueva` y sigue
+  leyendo y escribiendo en las rutas de siempre. Un dispositivo que ya tenía la
+  PWA instalada la reabre y ve exactamente lo de antes, sin migrar nada.
+- **Las veladas nuevas** viven en `eventos/{id}/…` y su dueño es quien las crea
+  (`meta.ownerUid`), no un correo escrito en el código.
+- **Cambiar de velada recarga la app** a propósito (ver `memoria_contexto.md`
+  §14.5).
+- **La moneda, los precios de las entradas y la nomenclatura de categorías**
+  son datos de cada velada: se editan en Veladas → "Moneda y precios".
+
+### Dar de alta a alguien del staff en una velada nueva
+
+Igual que antes, pero el nodo es del evento: Firebase Console → Realtime
+Database → `eventos/{id}/staff/{UID}` con valor `true` (o `"puerta"` para la
+cuenta del escáner). El dueño del evento no necesita estar en la lista.
+
+### ⚠️ Antes de usar una velada nueva: publicar las reglas
+
+El árbol `eventos/` y el índice `usuarios/` **no existen en las reglas
+publicadas** hasta que se suba el `database.rules.json` de este repositorio
+(Firebase Console → Realtime Database → Reglas, o `firebase deploy --only
+database`). Sin eso, crear una velada nueva falla con "permiso denegado" —
+la velada de Chile sigue funcionando igual, porque sus reglas no cambiaron.
+
 ## Fechas del evento (editables desde la app)
 
 Las dos fechas de la velada —semifinales y final del Super 4— **ya no se

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TICKET_TYPES_V2, MAX_CAP, fmt$, genTicketToken, clampTicketQty, ticketQty } from "../constants.js";
+import { TICKET_TYPES_V2, MAX_CAP, fmtDinero, genTicketToken, clampTicketQty, ticketQty } from "../constants.js";
 import { nextTicketId, addTicketNode, checkInTicketTx, removeTicketNode, cacheTicketsSiSinNube } from "../lib/tickets.js";
 import SellView from "./SellView.jsx";
 import HistoryView from "./HistoryView.jsx";
@@ -112,9 +112,9 @@ export default function TicketsManager({ tickets, setTickets, initialTicketCode,
         </div>
         <div className="kpi-oro order-2 p-4 lg:order-1 lg:row-span-2 lg:p-7 flex flex-col justify-center min-w-0">
           <p className="text-[14px] lg:text-sm font-semibold uppercase tracking-[0.32em]" style={{ color: "rgba(200,160,74,0.85)" }}>Ingresos</p>
-          <p className="titulo-oro italic leading-[1.06] mt-1 truncate" style={{ fontSize: "clamp(30px,7vw,64px)", fontVariantNumeric: "tabular-nums", filter: "drop-shadow(0 0 18px rgba(200,160,74,0.35))" }}>{fmt$(kpis.revenue)}</p>
+          <p className="titulo-oro italic leading-[1.06] mt-1 truncate" style={{ fontSize: "clamp(30px,7vw,64px)", fontVariantNumeric: "tabular-nums", filter: "drop-shadow(0 0 18px rgba(200,160,74,0.35))" }}>{fmtDinero(kpis.revenue)}</p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[14px] tracking-[0.08em] text-boxing-muted">
-            {Object.entries(kpis.byPayment).filter(([, v]) => v > 0).map(([m, v]) => <span key={m}>{m}: <b className="text-boxing-cream font-semibold">{fmt$(v)}</b></span>)}
+            {Object.entries(kpis.byPayment).filter(([, v]) => v > 0).map(([m, v]) => <span key={m}>{m}: <b className="text-boxing-cream font-semibold">{fmtDinero(v)}</b></span>)}
             <span>{kpis.total} boleta{kpis.total !== 1 ? "s" : ""} · {kpis.people} persona{kpis.people !== 1 ? "s" : ""}</span>
           </div>
         </div>

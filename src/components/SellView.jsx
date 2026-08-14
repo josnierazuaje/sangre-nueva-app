@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { TICKET_TYPES_V2, PAYMENT_METHODS_V2, MAX_TICKET_QTY, fmt$ } from "../constants.js";
+import { TICKET_TYPES_V2, PAYMENT_METHODS_V2, MAX_TICKET_QTY, fmtDinero } from "../constants.js";
 import { PREFIJO_CL, telefonoIngresado } from "../lib/whatsapp.js";
 import TicketPreview from "./TicketPreview.jsx";
 
@@ -89,7 +89,7 @@ export default function SellView({ onAdd }) {
                 style={{ "--c": TYPE_RGB[t.key] || "168,85,247", color: type === t.key ? t.color : "#6B7280" }}>
                 <div className="text-lg">{t.icon}</div>
                 <div className="tracking-[0.12em] uppercase mt-0.5 text-boxing-cream">{t.label}</div>
-                <div className="text-[14px] mt-0.5" style={{ color: type === t.key ? t.color : "#6b5f6e", fontVariantNumeric: "tabular-nums" }}>{fmt$(t.price)}</div>
+                <div className="text-[14px] mt-0.5" style={{ color: type === t.key ? t.color : "#6b5f6e", fontVariantNumeric: "tabular-nums" }}>{fmtDinero(t.price)}</div>
               </button>
             ))}
           </div>
@@ -109,8 +109,8 @@ export default function SellView({ onAdd }) {
                 style={{ borderColor: "rgba(255,255,255,0.14)", color: "#e8ddd0", background: "#1c1620" }}>+</button>
             </div>
             <div className="text-right leading-tight">
-              <div className="text-[14px] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>{qty} × {fmt$(ticketTypeInfo.price)}</div>
-              <div className="titulo-oro text-2xl" style={{ fontVariantNumeric: "tabular-nums" }}>{fmt$(total)}</div>
+              <div className="text-[14px] text-boxing-muted" style={{ fontVariantNumeric: "tabular-nums" }}>{qty} × {fmtDinero(ticketTypeInfo.price)}</div>
+              <div className="titulo-oro text-2xl" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtDinero(total)}</div>
             </div>
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function SellView({ onAdd }) {
         {/* La campana de la venta: único glow permanente del panel. */}
         <button type="submit" disabled={submitting} className="btn-primary w-full py-3.5 font-black"
           style={{ fontFamily: "'Bebas Neue',Impact,sans-serif", fontSize: "17px", letterSpacing: "3px", fontVariantNumeric: "tabular-nums" }}>
-          {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmt$(total) + (qty > 1 ? " (" + qty + ")" : "")}
+          {submitting ? "Emitiendo..." : "🎫 EMITIR — " + fmtDinero(total) + (qty > 1 ? " (" + qty + ")" : "")}
         </button>
       </form>
       {last && <div ref={voucherRef} className="space-y-2 fade-in"><p className="text-[14px] text-green-400 font-bold uppercase tracking-widest text-center">✓ Entrada emitida exitosamente</p><TicketPreview key={last.id} ticket={last} /></div>}

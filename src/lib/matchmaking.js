@@ -245,7 +245,7 @@ export function bestMatchAll(fighters, attempts = 250) {
 // EMPAREJAMIENTO FORZADO — la pestaña "Faltantes"
 // ============================================
 // Empareja OBLIGATORIAMENTE a los atletas que quedaron sin pelea, aunque el
-// cruce rompa las reglas World Boxing / FECHIBOX. No es para armar la cartelera
+// cruce rompa las reglas de World Boxing. No es para armar la cartelera
 // (para eso está bestMatchAll, que NUNCA rompe una regla): es el último recurso
 // para que nadie se quede sin subir al ring, dejando cada incumplimiento
 // escrito en rojo para que el organizador lo negocie o lo corrija.

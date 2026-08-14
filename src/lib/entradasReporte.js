@@ -8,9 +8,10 @@
 // entradas (grupo/familia): por eso se distingue BOLETAS de PERSONAS (suma de
 // cantidades), igual que en los KPIs de la pestaña Entradas.
 
-import { TICKET_TYPES_V2, fmt$, ticketQty } from "../constants.js";
+import { TICKET_TYPES_V2, fmtDinero, ticketQty } from "../constants.js";
 import { csvDocument } from "./csv.js";
 import { escapeHtml } from "./html.js";
+import { localeDelEventoActivo } from "./moneda.js";
 
 // Totales del registro (sobre la lista que se le pase, ya filtrada).
 export function entradasResumen(tickets) {
@@ -33,7 +34,7 @@ function estadoLabel(s) { return s === "ingresado" ? "Ingresado" : "Activo"; }
 function horaIngreso(t) {
   if (!t || !t.checkedInAt) return "";
   try {
-    return new Date(t.checkedInAt).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return new Date(t.checkedInAt).toLocaleString(localeDelEventoActivo(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   } catch { return ""; }
 }
 
@@ -41,7 +42,7 @@ const COLS = ["N°", "Boleta", "Asistente", "Tipo", "Cant.", "Precio", "Pago", "
 
 // "Efectivo: $70.000 · Transferencia: $168.000"
 function resumenPago(r) {
-  return Object.entries(r.byPayment).filter(([, v]) => v > 0).map(([m, v]) => `${m}: ${fmt$(v)}`).join(" · ");
+  return Object.entries(r.byPayment).filter(([, v]) => v > 0).map(([m, v]) => `${m}: ${fmtDinero(v)}`).join(" · ");
 }
 
 // ============================================
@@ -52,7 +53,7 @@ export function buildEntradasCsv(tickets, subtitulo = "") {
   const rows = [];
   rows.push(["Sangre Nueva — La Velada · Registro de entradas"]);
   if (subtitulo) rows.push([subtitulo]);
-  rows.push([`${r.boletas} boletas · ${r.personas} personas · Ingresos ${fmt$(r.ingresos)}`]);
+  rows.push([`${r.boletas} boletas · ${r.personas} personas · Ingresos ${fmtDinero(r.ingresos)}`]);
   const pago = resumenPago(r);
   if (pago) rows.push([pago]);
   rows.push([`Check-in: ${r.personasDentro} de ${r.personas} personas dentro (${r.boletasDentro} de ${r.boletas} boletas)`]);
@@ -87,7 +88,7 @@ export function buildEntradasHtml(tickets, subtitulo = "") {
       <td class="izq">${escapeHtml(t.attendeeName || "")}</td>
       <td>${escapeHtml(tipoLabel(t.ticketType))}</td>
       <td>${ticketQty(t)}</td>
-      <td class="der">${escapeHtml(fmt$(t.price || 0))}</td>
+      <td class="der">${escapeHtml(fmtDinero(t.price || 0))}</td>
       <td>${escapeHtml(t.paymentMethod || "")}</td>
       <td>${ingresado ? "✓ Ingresado" : "● Activo"}</td>
       <td>${escapeHtml(horaIngreso(t))}</td>
@@ -120,11 +121,11 @@ export function buildEntradasHtml(tickets, subtitulo = "") {
 <body>
 <div class="header">Sangre Nueva — La Velada · Registro de Entradas</div>
 ${subtitulo ? `<div class="subtitulo">${escapeHtml(subtitulo)}</div>` : ""}
-<div class="resumen"><b>${r.boletas} boletas · ${r.personas} personas · ${escapeHtml(fmt$(r.ingresos))}</b>${pago ? " — " + escapeHtml(pago) : ""} — Check-in: ${r.personasDentro}/${r.personas} personas dentro</div>
+<div class="resumen"><b>${r.boletas} boletas · ${r.personas} personas · ${escapeHtml(fmtDinero(r.ingresos))}</b>${pago ? " — " + escapeHtml(pago) : ""} — Check-in: ${r.personasDentro}/${r.personas} personas dentro</div>
 <table>
 <thead><tr>${COLS.map(c => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>
 <tbody>${filas}</tbody>
-<tfoot><tr><td colspan="4">TOTAL</td><td>${r.personas}</td><td class="der">${escapeHtml(fmt$(r.ingresos))}</td><td colspan="3"></td></tr></tfoot>
+<tfoot><tr><td colspan="4">TOTAL</td><td>${r.personas}</td><td class="der">${escapeHtml(fmtDinero(r.ingresos))}</td><td colspan="3"></td></tr></tfoot>
 </table>
 </body></html>`;
 }

@@ -1,4 +1,5 @@
-import { getAgeCategory, getCategoryInfo, getWeightCategory, weightRangeLabel, FECHIBOX_LABEL } from "../constants.js";
+import { getAgeCategory, getCategoryInfo, getWeightCategory, weightRangeLabel } from "../constants.js";
+import { etiquetaFederacion } from "./federacion.js";
 import { escapeHtml } from "./html.js";
 import { forcedPairingReasons } from "./matchmaking.js";
 
@@ -35,9 +36,9 @@ export function carteleraGroups(matchups, fighters) {
     const peso = x => Number(x.r.weightKg) + Number(x.b.weightKg);
     const list = groups[k].sort((x1, x2) => peso(x1) - peso(x2));
     const cat = k === "mixta" ? null : getAgeCategory(list[0].r.age);
-    const fechibox = cat ? FECHIBOX_LABEL[cat.key] : null;
+    const local = cat ? etiquetaFederacion(cat.key) : "";
     const headerText = cat
-      ? `${cat.label}${fechibox ? " · " + fechibox : ""} · ${cat.formato}`.toUpperCase()
+      ? `${cat.label}${local ? " · " + local : ""} · ${cat.formato}`.toUpperCase()
       : "⚠ CATEGORÍAS DE EDAD MEZCLADAS — REVISAR (WORLD BOXING NO PERMITE ESTE CRUCE)";
     return { key: k, headerText, mixta: k === "mixta", list };
   });

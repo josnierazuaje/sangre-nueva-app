@@ -658,3 +658,125 @@ id, cola de pendientes que sobrevive a la recarga, migración en caliente
 idempotente que no borra el arreglo viejo, y —esto es lo que la rama olvidaba—
 **reglas nuevas para `fighters/$id` con su `.validate`, publicadas antes de
 desplegar el bundle**. Sale más corto y más seguro que rescatar aquel intento.
+
+---
+
+## 14. Multi-evento y mudanza a España (ago 2026)
+
+La app manejaba **una** velada. Todo colgaba de `sangre_nueva/…` en Firebase y
+de unas claves fijas de localStorage, así que montar la siguiente exigía
+"Reiniciar evento" — que **borra la anterior**. Eso ya costó caro: la cartelera
+y los resultados del Super 4 de la velada del 1-2 de agosto no se pueden
+reconstruir (§8, y el cierre en PDF fuera del repositorio). Además Josnier se
+muda a España, así que la moneda, la nomenclatura de categorías y los prefijos
+telefónicos chilenos escritos en el código dejaban de servir.
+
+### 14.1 Cada velada, su propio rincón de la base
+
+Nuevo módulo **`src/lib/eventos.js`** (puro y con pruebas): dado el id del
+evento abierto, decide **dónde vive cada dato**.
+
+```
+eventos/{id}/meta            eventos/{id}/bm_fighters_v4
+eventos/{id}/staff           eventos/{id}/tickets/{boleta}
+eventos/{id}/backups         usuarios/{uid}/eventos/{id}
+```
+
+**La velada de Chile NO se movió ni un byte.** Su id es el centinela
+`sangre_nueva` y `rutaEvento()` le devuelve las rutas de siempre
+(`sangre_nueva/…`, `sangre_nueva_backups`, `staff`), con sus reglas y sus 42
+boletas intactas. Lo mismo con localStorage: `claveLocal()` devuelve la clave
+sin prefijo para el histórico, así que **los dispositivos que ya tienen la PWA
+instalada no migran nada** y al reabrir ven exactamente lo de ayer. Migrar datos
+reales de producción —cobros hechos, datos de menores— no aportaba nada que no
+diera un `if` en una función pura.
+
+Las claves de los eventos nuevos van prefijadas (`ev:{id}:bm_fighters_v4`). Lo
+que **más importa** aquí no es la caché sino **las tres colas de pendientes**
+(peleadores, ventas, check-ins): sin prefijo, una venta que quedó sin subir en
+Santiago reaparecería en la boletería de Madrid al reconectar.
+
+Puntos de entrada únicos, para que ningún módulo pueda olvidarse:
+`fbPath()` (firebase.js) ahora delega en `fbPathEvento()`, y `load/save/
+saveLocal` traducen la clave con `lsKey()`.
+
+### 14.2 El dueño dejó de ser un correo escrito en el código
+
+`isOwner` era `authUser.email === OWNER_EMAIL`. Ahora es **el dueño de ESTA
+velada** (`meta.ownerUid`), con el correo del creador de la app como
+**superusuario** — `esDuenoDelEvento()`, pura y probada. Eso es lo que permite
+que la app la use más de un organizador sin que ninguno vea los datos del otro,
+y es la pieza que faltaba para poder venderla.
+
+El **staff también es por evento** (`eventos/{id}/staff`): el entrenador que
+ayuda en la puerta en Madrid no tiene por qué ver el padrón de otra velada.
+
+**Por qué hay un índice `usuarios/{uid}/eventos`:** RTDB no sabe responder "los
+eventos cuyo dueño soy yo" sin dar permiso de lectura sobre TODOS —incluidos los
+de otros organizadores, con sus menores dentro—. Cada usuario lleva su lista de
+ids y luego pide la ficha de cada uno.
+
+### 14.3 Reglas nuevas (hay que publicarlas)
+
+`database.rules.json` gana el árbol `eventos/$eid` y `usuarios/$uid`, con las
+**mismas validaciones de contenido** que ya protegían el árbol viejo (copiadas
+nodo a nodo, no reinventadas). Las reglas de `sangre_nueva` y `staff` **no se
+tocaron**.
+
+Dos decisiones que conviene no deshacer:
+
+- **La creación va en una sola escritura multi-ruta.** Mientras el evento no
+  existe, `.write` a nivel `$eid` deja escribirlo entero a quien se declare
+  dueño en la ficha; en cuanto existe, esa condición es falsa para siempre.
+  Sin esto la creación fallaría a medias: las reglas de los hijos consultan
+  `meta/ownerUid`, que en ese instante todavía no está.
+- **No hay `.read` a nivel `$eid`.** Se probó y estaba mal: en RTDB el permiso
+  del padre **se hereda y gana** sobre cualquier regla más estricta del hijo, así
+  que le habría dado a la cuenta de puerta el padrón completo (con menores) y los
+  respaldos. El permiso se concede hijo por hijo, igual que en el árbol viejo.
+- `meta/ownerUid` tiene `.validate` de solo-escritura-una-vez: cambiarlo es
+  regalar (o robar) la velada entera con su recaudación.
+
+### 14.4 España: moneda, precios y federación como datos del evento
+
+- **`src/lib/moneda.js`**: la moneda y los precios viajan en la ficha del
+  evento. `fmt$` (que escribía `"$" + n.toLocaleString("es-CL")`) pasó a
+  **`fmtDinero`**, que respeta que en España el símbolo va **detrás y con
+  espacio** ("15,00 €") y que el euro **lleva céntimos** y el peso no.
+- **`src/lib/federacion.js`**: `FECHIBOX_LABEL` estaba escrito en el código y
+  salía impreso en la cartelera y en las llaves. Ahora la federación es del
+  evento. ⚠️ **Las etiquetas de la RFEB están puestas de memoria, sin confirmar
+  contra su reglamento**, y por eso la opción por defecto de una velada nueva es
+  **"Solo World Boxing"**: imprimir un nombre local equivocado en una planilla
+  que se entrega a los clubes es peor que no imprimirlo.
+- Prefijos telefónicos con **+34 primero** (y +351/+212 añadidos), y todas las
+  fechas impresas usan el locale del evento en vez de `es-CL` fijo.
+
+**Un bug que cazó una prueba:** `precioValido` aceptaba `null` como precio
+porque `Number(null) === 0`. Una ficha a la que le faltara un tipo de entrada
+habría dejado la puerta **regalando entradas** hasta que alguien mirara el
+cierre.
+
+### 14.5 Por qué cambiar de evento RECARGA la app
+
+La alternativa —cambiar las rutas en caliente— dejaría vivos los listeners de
+`onValue` montados sobre el evento anterior, que es exactamente cómo un peleador
+terminaría apareciendo en la velada equivocada. Recargar es lo único honesto, y
+es lo que ya hacían "Recargar desde la nube" y "Firebase manual". Por el mismo
+motivo recarga al cambiar los precios: `TICKET_TYPES_V2` se resuelve al **cargar
+la página**, y guardar sin recargar dejaría media pantalla con la tarifa vieja
+mientras la puerta cobra.
+
+### 14.6 Lo que este cambio NO hace
+
+- **No hay alta de organizadores desde la app.** Crear la cuenta sigue siendo
+  manual en la consola de Firebase (Authentication). Para vender la app hace
+  falta registro, cobro y un aviso de privacidad — decisiones de negocio, no de
+  código, y meterlas aquí a medias sería peor que no tenerlas.
+- **No hay pantalla para dar de alta staff**: sigue haciéndose en la consola,
+  ahora en `eventos/{id}/staff` en vez de `/staff`.
+- **No se copian peleadores de una velada a otra.** Cada velada nace vacía. Si
+  algún día hace falta un "padrón de club" que sobreviva a las veladas, es un
+  nodo aparte, no un copiar-pegar entre eventos.
+- **El aforo (`capacity`, `MAX_CAP`) sigue en el código.** Es del recinto, y en
+  Madrid será otro; el siguiente candidato a pasar a la ficha del evento.
