@@ -10,7 +10,7 @@ import { buildSuper4Pdf } from "../lib/pdfSuper4.js";
 import { downloadBytes, pdfFilename, PDF_MIME } from "../lib/download.js";
 import PageHeader from "./PageHeader.jsx";
 import { Conector, Tarjeta, Fila } from "./Super4Bracket.jsx";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 // Categorías de edad (World Boxing) que el Super 4 puede armar, con su etiqueta.
 const AGE_OPTIONS = SUPER4_AGE_KEYS.map(k => AGE_CATEGORIES.find(a => a.key === k)).filter(Boolean);

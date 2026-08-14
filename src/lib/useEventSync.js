@@ -12,7 +12,7 @@ import { normalizeSuper4 } from "./super4.js";
 import { reconcileData, dedupeFighters, cleanMatchups, remapSuper4 } from "./dedup.js";
 import { eventoActivoId, esDuenoDelEvento, EVENTO_LEGACY_ID, META_LEGACY } from "./eventos.js";
 import { leerMetaEvento } from "./eventosNube.js";
-import { leerMetaLocal, guardarMetaLocal } from "./moneda.js";
+import { leerMetaLocal, guardarMetaLocal } from "./fichaEvento.js";
 
 // ============================================
 // useEventSync — TODO el ciclo de vida de la sincronización

@@ -2,7 +2,8 @@
 // CONSTANTES
 // ============================================
 import { DEFAULT_EVENT_DATES, describeEventDates, buildEventLabels } from "./lib/eventDates.js";
-import { preciosDelEventoActivo, monedaDelEventoActivo, formatearImporte } from "./lib/moneda.js";
+import { formatearImporte } from "./lib/moneda.js";
+import { preciosDelEventoActivo, monedaDelEventoActivo, aforoDelEventoActivo } from "./lib/fichaEvento.js";
 
 // Categorías de peso oficiales World Boxing (competiciones generales,
 // vigentes 2026): 10 divisiones por género, distintas entre hombres y
@@ -130,12 +131,19 @@ export const SYNC_KEYS = {
 // pantalla con la tarifa vieja mientras la puerta está cobrando.
 const PRECIOS = preciosDelEventoActivo();
 export const TICKET_TYPES_V2 = [
-  { key: "inscripcion", label: "Inscripción", price: PRECIOS.inscripcion, color: "#3B82F6", icon: "🥊", capacity: 50 },
-  { key: "preventa", label: "Preventa", price: PRECIOS.preventa, color: "#A855F7", icon: "🎟️", capacity: 150 },
-  { key: "puerta", label: "Puerta", price: PRECIOS.puerta, color: "#F97316", icon: "🎫", capacity: 120 },
+  { key: "inscripcion", label: "Inscripción", price: PRECIOS.inscripcion, color: "#3B82F6", icon: "🥊" },
+  { key: "preventa", label: "Preventa", price: PRECIOS.preventa, color: "#A855F7", icon: "🎟️" },
+  { key: "puerta", label: "Puerta", price: PRECIOS.puerta, color: "#F97316", icon: "🎫" },
 ];
+// Cada tipo llevaba además un `capacity` (50/150/120) que NO usaba nadie: se
+// declaraba y ahí se quedaba. Se quita en vez de arrastrarlo, porque un cupo
+// por tipo que no frena ninguna venta es una promesa falsa — el día que haga
+// falta limitar la preventa habrá que escribir el freno, no solo el número.
 export const PAYMENT_METHODS_V2 = ["Efectivo", "Transferencia", "Otro"];
-export const MAX_CAP = 320;
+// Aforo del recinto. Era 320 escrito aquí (el del gimnasio de la velada de
+// Chile); ahora sale de la ficha de cada velada, porque en Madrid será otro.
+// Se resuelve al CARGAR la página, igual que los precios: cambiarlo recarga.
+export const MAX_CAP = aforoDelEventoActivo();
 
 // Cuántas entradas se pueden cobrar en UNA sola boleta. Tope generoso para un
 // grupo/familia en la puerta; más que eso conviene emitir dos boletas. La

@@ -5,10 +5,8 @@ import {
   esDuenoDelEvento, eventoActivoId, guardarEventoActivo, _resetEventoActivoCache,
   fbPathEvento, lsKey,
 } from "../eventos.js";
-import {
-  MONEDAS, formatearImporte, preciosPorDefecto, precioValido,
-  monedaDelEventoActivo, preciosDelEventoActivo, guardarMetaLocal, leerMetaLocal,
-} from "../moneda.js";
+import { MONEDAS, formatearImporte, preciosPorDefecto, precioValido } from "../moneda.js";
+import { monedaDelEventoActivo, preciosDelEventoActivo, guardarMetaLocal, leerMetaLocal, aforoDelEventoActivo, aforoValido, AFORO_POR_DEFECTO } from "../fichaEvento.js";
 
 // El entorno de pruebas es "node": no hay localStorage. Se monta uno de mentira
 // porque justo lo que hay que probar es que las claves de dos veladas NO se
@@ -203,5 +201,41 @@ describe("moneda y precios por velada", () => {
     expect(META_LEGACY.moneda).toBe("CLP");
     expect(MONEDAS.CLP.decimales).toBe(0);
     expect(MONEDAS.EUR.decimales).toBe(2);
+  });
+});
+
+describe("aforo del recinto por velada", () => {
+  beforeEach(() => { montarLocalStorage(); _resetEventoActivoCache(); });
+  afterEach(() => { delete globalThis.localStorage; _resetEventoActivoCache(); });
+
+  it("el histórico de Chile conserva el aforo que estaba escrito en el código", () => {
+    expect(aforoDelEventoActivo()).toBe(320);
+    expect(AFORO_POR_DEFECTO).toBe(320);
+  });
+  it("cada velada usa el aforo de su ficha", () => {
+    guardarEventoActivo("madrid-abc123");
+    guardarMetaLocal({ moneda: "EUR", aforo: 180 });
+    expect(aforoDelEventoActivo()).toBe(180);
+  });
+  it("una velada sin aforo en la ficha cae al valor por defecto", () => {
+    guardarEventoActivo("madrid-abc123");
+    guardarMetaLocal({ moneda: "EUR" });
+    expect(aforoDelEventoActivo()).toBe(AFORO_POR_DEFECTO);
+  });
+  it("un aforo CERO nunca llega a la app: dejaría la barra de entradas dividiendo entre cero", () => {
+    guardarEventoActivo("madrid-abc123");
+    guardarMetaLocal({ moneda: "EUR", aforo: 0 });
+    expect(aforoDelEventoActivo()).toBe(AFORO_POR_DEFECTO);
+    expect(Number.isFinite(50 / aforoDelEventoActivo())).toBe(true);
+  });
+  it("aforoValido redondea, rechaza lo absurdo y acepta lo tecleado como texto", () => {
+    expect(aforoValido("180", 320)).toBe(180);
+    expect(aforoValido(180.6, 320)).toBe(181);
+    expect(aforoValido(-5, 320)).toBe(320);
+    expect(aforoValido(999999999, 320)).toBe(320); // un cero de más al teclear
+    expect(aforoValido("", 320)).toBe(320);
+    expect(aforoValido(null, 320)).toBe(320);
+    expect(aforoValido("mucha gente", 320)).toBe(320);
+    expect(aforoValido(1, 320)).toBe(1);
   });
 });

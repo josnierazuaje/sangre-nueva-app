@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { TICKET_TYPES_V2, extractTicketData, verifyTicketToken, ticketQty, findTicketByCode } from "../constants.js";
 import { fetchTicket } from "../lib/tickets.js";
 import CheckInWelcome from "./CheckInWelcome.jsx";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 export default function CheckInView({ tickets, onCheckIn, initialCode, initialToken, ticketsEstado = "listo" }) {
   const [input, setInput] = useState(initialCode ? initialCode.toUpperCase() : "");

@@ -113,8 +113,9 @@ boletería y respaldos. Se cambia de una a otra desde el menú ⋮ → **Veladas
   (`meta.ownerUid`), no un correo escrito en el código.
 - **Cambiar de velada recarga la app** a propósito (ver `memoria_contexto.md`
   §14.5).
-- **La moneda, los precios de las entradas y la nomenclatura de categorías**
-  son datos de cada velada: se editan en Veladas → "Moneda y precios".
+- **La moneda, los precios de las entradas, el aforo del recinto y la
+  nomenclatura de categorías** son datos de cada velada: se editan en
+  Veladas → "Precios y aforo".
 
 ### Dar de alta a alguien del staff en una velada nueva
 

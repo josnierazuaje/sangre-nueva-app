@@ -9,7 +9,7 @@ import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
 import { guardarEventoActivo } from "./lib/eventos.js";
-import { guardarMetaLocal, localeDelEventoActivo } from "./lib/moneda.js";
+import { guardarMetaLocal, localeDelEventoActivo } from "./lib/fichaEvento.js";
 import { buildEventLabels } from "./lib/eventDates.js";
 import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
 import { resumenLimpiar, textoLimpiar, textoLimpiado } from "./lib/limpiar.js";
