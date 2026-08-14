@@ -12,7 +12,7 @@
 # Firebase (database.rules.json) y el login. Ver SEGURIDAD.md.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.google.com https://www.gstatic.com; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.google.com; frame-src 'self' https://www.google.com; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
@@ -22,10 +22,18 @@
 # Por qué cada pieza de la CSP, y qué se rompe si se quita:
 #
 #   script-src 'self'          Solo corre el JavaScript servido desde este
-#                              dominio. El build no genera NINGÚN script en
-#                              línea (se verificó en dist/index.html), así que
-#                              aquí no hace falta 'unsafe-inline' — que es
-#                              justo lo que haría inútil a toda la política.
+#           + google/gstatic   dominio, más el de reCAPTCHA (lo carga App Check
+#                              para demostrar que la petición sale de ESTA app;
+#                              ver initAppCheck en src/lib/firebase.js). El
+#                              build no genera NINGÚN script en línea (se
+#                              verificó en dist/index.html), así que aquí no
+#                              hace falta 'unsafe-inline' — que es justo lo que
+#                              haría inútil a toda la política.
+#                              Los mismos dos dominios aparecen en img-src
+#                              (el distintivo de reCAPTCHA), connect-src (su
+#                              verificación) y frame-src (su iframe oculto).
+#                              Si algún día se quita App Check, se quitan de
+#                              las cuatro directivas y no de otras.
 #   style-src 'unsafe-inline'  La app usa estilos en línea por todos lados
 #                              (style={{...}} de React) y las hojas imprimibles
 #                              llevan su <style> dentro. Sin esto, la app sale
