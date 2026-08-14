@@ -453,6 +453,12 @@ toca las boletas**.
   mientras `newData.exists()`, y el centinela `"__EMPTY__"` existe), así que el
   freno tiene que estar en la interfaz.
 
+**La fecha del evento sobrevive al borrado, a propósito.** `bm_event_label` y
+`bm_event_dates` no son datos de atletas y siguen siendo editables en "Datos
+del evento" (§8.1). Como la cartelera recién vaciada sigue anunciando la velada
+ANTERIOR hasta que se cambien, el aviso final de Limpiar lo dice explícitamente
+(con prueba).
+
 **Bug de paso: el outbox resucitaba lo borrado.** `outboxClear()` (nuevo, en
 `storage.js`) tira la cola entera de altas pendientes. Sin eso, un alta que
 quedó sin confirmar volvía sola a la nube en el próximo arranque (el replay de
