@@ -190,5 +190,36 @@ export function esDuenoDelEvento(user, meta, { eventoId, superEmail } = {}) {
 export function fbPathEvento(clave) { return rutaEvento(eventoActivoId(), clave); }
 export function lsKey(clave) { return claveLocal(eventoActivoId(), clave); }
 
+// Prefijo de TODAS las claves de una velada en este dispositivo. Pura, para
+// poder probar el barrido sin depender de localStorage.
+export function prefijoLocal(eventoId) {
+  return eventoId === EVENTO_LEGACY_ID ? null : "ev:" + eventoId + ":";
+}
+
+// Qué claves hay que borrar de este dispositivo al borrar una velada. Se separa
+// del barrido para poder fijarlo con pruebas: si se quedara corto, en el aparato
+// seguirían los peleadores (con menores) y las boletas de una velada que ya no
+// existe, y "Recargar desde la nube" no los limpiaría porque ya no hay nube que
+// consultar. Devuelve [] para el histórico: sus claves no llevan prefijo y
+// barrer por él borraría las de la velada abierta.
+export function clavesLocalesDeEvento(eventoId, todasLasClaves) {
+  const pre = prefijoLocal(eventoId);
+  if (!pre) return [];
+  return (todasLasClaves || []).filter(k => typeof k === "string" && k.indexOf(pre) === 0);
+}
+
+export function borrarDatosLocalesDeEvento(eventoId) {
+  try {
+    const todas = [];
+    for (let i = 0; i < localStorage.length; i++) todas.push(localStorage.key(i));
+    const suyas = clavesLocalesDeEvento(eventoId, todas);
+    suyas.forEach(k => localStorage.removeItem(k));
+    return suyas.length;
+  } catch (e) {
+    console.error("No se pudieron borrar los datos locales de la velada:", e);
+    return 0;
+  }
+}
+
 // Solo para las pruebas: reinicia la caché entre casos.
 export function _resetEventoActivoCache() { activoCache = null; }

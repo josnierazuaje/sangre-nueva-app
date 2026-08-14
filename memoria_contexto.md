@@ -800,3 +800,94 @@ Y un módulo nuevo: **`src/lib/fichaEvento.js`**. La ficha de la velada
 `moneda.js`, que se estaba convirtiendo en un cajón de sastre — el mismo camino
 que ya recorrió `storage.js` (§8.3). `moneda.js` se quedó con lo que de verdad
 es moneda: las monedas y el formateo de importes, sin tocar localStorage.
+
+---
+
+## 15. Las reglas de la base, con pruebas (ago 2026)
+
+Las reglas del árbol multi-evento (§14.3) se publicaron el 14-ago-2026. Antes de
+darlas por buenas se comprobaron dos cosas.
+
+**1. Que no rompieran lo que ya funcionaba.** Comparando `database.rules.json`
+entre `be1ff0a` (antes del trabajo) y `main`, los nodos `staff`,
+`sangre_nueva`, `sangre_nueva_backups` y los `.read`/`.write` de la raíz son
+**idénticos byte a byte**. Lo único que se añadió es `eventos` y `usuarios`. La
+velada de Chile no podía verse afectada.
+
+**2. Que las nuevas digan lo que se cree que dicen** —
+`src/lib/__tests__/databaseRules.test.js`, 17 pruebas.
+
+**Qué prueban y qué NO.** No evalúan las reglas: no hay intérprete de la
+gramática de RTDB, y el emulador oficial necesita **Java, que no está instalado
+en este Mac**. Lo que fijan son las propiedades **estructurales** cuyo
+incumplimiento es el error que de verdad se comete al editar este archivo a
+mano: conceder de más por descuido. La evaluación real se sigue comprobando en
+el Simulador de la consola antes de publicar.
+
+**Se verificaron por mutación**, que es lo único que distingue una prueba útil
+de una que pasa siempre. Se aflojó la regla a propósito, cinco veces, y las
+cinco saltó el test:
+
+- un `.read` a nivel de `eventos/$eid` (el fallo que ya se coló una vez durante
+  el desarrollo, ver §14.3);
+- la cuenta de puerta pudiendo leer el padrón de atletas;
+- `ownerUid` reescribible — es decir, poder robar una velada entera;
+- los respaldos legibles por el staff;
+- un `true` suelto en un permiso.
+
+**Qué sigue sin probarse automáticamente:** la evaluación real (que un UID
+concreto pueda o no escribir en una ruta concreta). Si algún día se instala
+Java, el paso natural es `@firebase/rules-unit-testing` contra el emulador de
+RTDB, y estas pruebas estructurales se quedan igual: cubren cosas distintas.
+
+---
+
+## 16. Borrar una velada (ago 2026)
+
+Preparando la primera velada de prueba salió el hueco: la app sabía crear
+veladas pero no borrarlas. "Reiniciar evento" vacía los datos, pero el evento se
+queda en la lista para siempre — y una lista que solo crece termina llena de
+pruebas y de veladas de hace tres años.
+
+**Lo que hubo que tocar en las reglas.** El `.write` de `eventos/$eid` solo
+permitía CREAR (`!data.exists()`), así que borrar el nodo era imposible incluso
+para el dueño. Ahora tiene dos ramas excluyentes: crear (si no existía) o borrar
+entero (`!newData.exists()`), las dos exigiendo propiedad. No abre nada nuevo:
+el dueño ya podía escribir en cada hijo por separado.
+
+También hubo que añadir `.read` a nivel del evento **solo para el dueño**: hace
+falta para leer la velada entera y descargar el respaldo antes de borrarla. No
+se hereda nada al staff — la condición es exclusivamente de propiedad.
+
+**Y una corrección de una traducción mía de §14.3.** En el árbol viejo,
+`newData.exists()` limita SOLO al staff: el dueño siempre pudo vaciar un nodo.
+Al copiar las reglas al árbol nuevo quedó aplicado a todos, así que **el dueño
+de una velada no podía usar "Limpiar" ni "Reiniciar evento" en su propia
+velada**. No se había notado porque todavía no existía ninguna velada nueva.
+
+**Las tres protecciones del borrado**, por orden:
+
+1. **Respaldo antes de tocar la nube**, y si la lectura falla se aborta. Igual
+   que "Reiniciar evento" y "Limpiar".
+2. **Hay que escribir el NOMBRE de la velada**, no una palabra fija. Aquí el
+   riesgo no es borrar sin querer: es borrar **la velada equivocada** de una
+   lista, y teclear su nombre obliga a mirar cuál es. La confirmación va
+   DESPUÉS del respaldo, para que arrepentirse deje igualmente la copia.
+3. **El histórico de Chile no se puede borrar** y ni siquiera se le dibuja la
+   papelera. Son datos de una velada disputada y cobrada; si algún día hubiera
+   que borrarlos se hace en la consola, a conciencia.
+
+**Lo local también se limpia** (`borrarDatosLocalesDeEvento`): si no, en el
+aparato quedarían los peleadores —con menores— y las boletas de una velada que
+ya no existe, y "Recargar desde la nube" no los limpiaría porque ya no hay nube
+que consultar. El barrido va por prefijo `ev:{id}:` y **nunca se aplica al
+histórico**, cuyas claves no llevan prefijo: barrerlo por prefijo borraría las
+de la velada abierta.
+
+Si se borra la velada que estaba abierta, la app avisa y **vuelve al
+histórico**: seguir en ella dejaría la app escuchando un nodo que ya no existe,
+con el chip en verde y las pantallas en blanco.
+
+**Todo esto está cubierto por pruebas** (§15), incluidas tres mutaciones nuevas:
+el staff pudiendo borrar la velada, el `.read` del evento abierto al staff, y el
+límite de vaciado suelto aplicando también al dueño.

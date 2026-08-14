@@ -117,6 +117,15 @@ boletería y respaldos. Se cambia de una a otra desde el menú ⋮ → **Veladas
   nomenclatura de categorías** son datos de cada velada: se editan en
   Veladas → "Precios y aforo".
 
+### Borrar una velada
+
+Menú ⋮ → **Veladas** → papelera de la fila. Antes de borrar nada se descarga un
+respaldo completo en JSON y hay que **escribir el nombre exacto** de la velada
+(no una palabra fija: el riesgo aquí es equivocarse de fila). Se borran sus
+datos, sus boletas, sus respaldos en la nube y su copia en este dispositivo.
+
+**El histórico de Chile no se puede borrar desde la app** y no lleva papelera.
+
 ### Dar de alta a alguien del staff en una velada nueva
 
 Igual que antes, pero el nodo es del evento: Firebase Console → Realtime
