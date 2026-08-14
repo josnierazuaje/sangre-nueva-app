@@ -322,6 +322,15 @@ function outboxRemove(id) {
   try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(applyOutboxRemove(load(OUTBOX_KEY, []), id))); }
   catch (e) { console.error("No se pudo descontar el registro pendiente en este dispositivo:", e); }
 }
+// Tira la cola ENTERA. La usa el vaciado a propósito del padrón ("Limpiar"):
+// el outbox está hecho para que un alta sobreviva a la recarga, y sin esto haría
+// justo eso con lo recién borrado — al reabrir la app, el replay re-subiría a la
+// nube los peleadores pendientes y reaparecerían resucitados en todos los
+// dispositivos, sin que nadie los volviera a registrar.
+export function outboxClear() {
+  try { localStorage.removeItem(OUTBOX_KEY); }
+  catch (e) { console.error("No se pudo vaciar la cola de registros pendientes:", e); }
+}
 // ¿Este dispositivo usa la nube? (misma condición con la que App decide el
 // modo). En modo solo-local el outbox no aplica: no hay nube que confirme.
 export function cloudIntended() { return !!(localStorage.getItem("bm_fb_config") || !localStorage.getItem("bm_fb_disabled")); }

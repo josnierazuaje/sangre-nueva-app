@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { signOut } from "firebase/auth";
 import { FB, SCANNER_EMAIL, parseFbConfig } from "./lib/firebase.js";
-import { save, upsertFighterTx, removeFighterTx, clearLocalEventData, outboxList } from "./lib/storage.js";
+import { save, upsertFighterTx, removeFighterTx, clearLocalEventData, outboxList, outboxClear } from "./lib/storage.js";
 import { clearTicketsCache, clearAllTicketsData, restoreTicketsFromBackup, ticketsOutboxList } from "./lib/tickets.js";
 import { backupEventToCloud, listCloudBackups, fetchCloudBackup } from "./lib/backups.js";
 import { normalizeFighters } from "./constants.js";
@@ -10,6 +10,7 @@ import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
 import { buildEventLabels } from "./lib/eventDates.js";
 import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
+import { resumenLimpiar, textoLimpiar, textoLimpiado } from "./lib/limpiar.js";
 import { printHtml } from "./lib/printHtml.js";
 import EventSettingsDialog from "./components/EventSettingsDialog.jsx";
 import FighterList from "./components/FighterList.jsx";
@@ -322,6 +323,55 @@ export default function App() {
     }));
   }
 
+  // "Limpiar" (botón de la pestaña Peleadores): vacía de un clic TODO lo que se
+  // armó con los atletas —el padrón, la cartelera y las llaves del Super 4— para
+  // empezar a cargar la próxima velada desde cero. Antes había que borrar
+  // peleador por peleador desde la lista (setenta papeleras con su confirmación
+  // cada una).
+  //
+  // Por qué NO es "Reiniciar evento" con otro nombre:
+  //  - "Reiniciar" borra ADEMÁS las boletas (dinero cobrado y entradas ya
+  //    escaneadas) y pide escribir BORRAR. Es el cierre de una velada entera.
+  //  - "Limpiar" toca solo datos de atletas y deja la boletería intacta, con una
+  //    sola confirmación — pero esa confirmación dice exactamente qué desaparece
+  //    (textoLimpiar, con pruebas) y el respaldo se guarda igual antes de borrar.
+  // Las tres claves caen juntas a propósito: las peleas y las llaves guardan
+  // ids de peleadores, así que vaciar el padrón y dejarlas vivas llenaría la
+  // Cartelera y el Super 4 de "peleador eliminado".
+  //
+  // Solo lo ve el DUEÑO (App pasa la acción a la lista únicamente si isOwner).
+  // Las reglas de la base dejan escribir el padrón al staff de registro, así que
+  // nada en la nube frenaría a una cuenta prestada que tocara este botón: el
+  // freno es no ofrecérselo.
+  async function limpiarTodo() {
+    const r = resumenLimpiar({ fighters, matchups, super4 });
+    if (r.vacio) { alert("No hay nada que limpiar: no quedan peleadores, peleas ni llaves del Super 4."); return; }
+    if (!confirm(textoLimpiar(r))) return;
+
+    // Respaldo ANTES de tocar nada, igual que "Reiniciar evento": el archivo
+    // local siempre, y la copia en la nube si hay conexión. Si esa copia falla,
+    // se aborta — un borrado de este tamaño no se hace sin red debajo.
+    handleExport();
+    if (FB.ready) {
+      try {
+        await backupEventToCloud({ fighters, matchups, super4, ticketsNew, eventLabel, eventDates, backedUpAt: new Date().toISOString() });
+      } catch (e) {
+        alert("No se pudo guardar el respaldo en la nube. La limpieza se canceló para no perder datos.\n\nError: " + e.message);
+        return;
+      }
+    }
+
+    setFighters([]); save("bm_fighters_v4", []);
+    setMatchups([]); save("bm_matchups_v3", []);
+    setSuper4([]); save("bm_super4_v1", []);
+    // La cola de altas pendientes también: si sobreviviera, al reabrir la app el
+    // replay re-subiría a la nube justo a los peleadores recién borrados.
+    outboxClear();
+    // Las boletas NO se tocan (ni la caché ni la nube): son ingresos ya cobrados.
+
+    alert(textoLimpiado(r, { enLaNube: FB.ready }));
+  }
+
   // "Reiniciar evento" (Fase 5, antes "Restaurar"): ya no repuebla atletas
   // de demostración (se quitaron del código en la Fase 2) — el evento queda
   // vacío para cargar peleadores reales desde cero. Antes de borrar nada:
@@ -352,6 +402,10 @@ export default function App() {
     setMatchups([]); save("bm_matchups_v3", []);
     setSuper4([]); save("bm_super4_v1", []);
     setTicketsNew([]); clearTicketsCache();
+    // Mismo motivo que en "Limpiar": un alta que quedó pendiente en la cola
+    // volvería sola a la nube al reabrir la app, resucitando un peleador del
+    // evento que se acaba de reiniciar.
+    outboxClear();
     try { await clearAllTicketsData(); } catch (e) { console.error("No se pudieron borrar las boletas en Firebase:", e); }
 
     alert("Evento reiniciado. El respaldo se descargó" + (FB.ready ? " y también quedó guardado en la nube." : "."));
@@ -529,7 +583,9 @@ export default function App() {
       <main className="flex-1 min-w-0 overflow-y-auto px-4 pt-4 pb-20 lg:px-6 lg:pt-8 lg:pb-12 xl:px-10" style={{ WebkitOverflowScrolling: "touch" }}>
         <div className="lg:max-w-6xl lg:mx-auto">
           <Suspense fallback={<div style={{ padding: "40px 0", textAlign: "center", color: "#6b5f6e", fontFamily: "'Bebas Neue',sans-serif", letterSpacing: "0.1em" }}>Cargando…</div>}>
-            {view === "list" && <FighterList fighters={fighters} onEdit={editFighter} onDelete={delFighter} />}
+            {/* onLimpiar solo para el dueño: el botón borra el padrón completo
+                del evento, no es una acción de staff. */}
+            {view === "list" && <FighterList fighters={fighters} onEdit={editFighter} onDelete={delFighter} onLimpiar={isOwner ? limpiarTodo : undefined} />}
             {view === "register" && <FighterForm onSubmit={addFighter} editingFighter={editF} existingFighters={fighters} onCancel={editF ? cancel : undefined} />}
             {view === "super4" && <Super4View fighters={fighters} super4={super4} setSuper4={setSuper4} ready={super4Ready} labels={eventLabels} />}
             {view === "vs" && <MatchmakingView fighters={fighters} matchups={matchups} setMatchups={setMatchups} super4={super4} ready={matchupsReady} super4Ready={super4Ready} />}
