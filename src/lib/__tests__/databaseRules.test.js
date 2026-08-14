@@ -56,17 +56,40 @@ describe("las reglas de la velada de Chile no se tocan", () => {
 });
 
 describe("un evento nuevo no concede permisos heredados", () => {
-  it("NO hay .read a nivel del evento", () => {
+  it("el .read del evento es SOLO del dueño, nunca del staff", () => {
     // En RTDB el permiso del padre SE HEREDA y GANA sobre cualquier regla más
-    // estricta del hijo. Un .read aquí le daría a la cuenta de puerta el padrón
-    // completo (con menores) y los respaldos. Se concede hijo por hijo.
-    expect(evento[".read"]).toBeUndefined();
+    // estricta del hijo. Un .read para el staff aquí le daría a la cuenta de
+    // puerta el padrón completo (con menores) y los respaldos. Se concede solo
+    // por propiedad — el dueño ya podía leerlo todo nodo a nodo, y lo necesita
+    // para el respaldo que se descarga antes de borrar la velada.
+    expect(evento[".read"]).toContain("ownerUid");
+    expect(evento[".read"]).not.toContain("staff");
   });
-  it("el .write del evento solo sirve para CREARLO, y solo declarándose dueño", () => {
+  it("el .write del evento solo sirve para CREARLO o para BORRARLO entero", () => {
     const w = evento[".write"];
-    expect(w).toContain("!data.exists()");                       // solo si no existe aún
+    expect(w).toContain("!data.exists()");                       // crear: solo si no existía
     expect(w).toContain("newData.child('meta/ownerUid').val() === auth.uid");
+    expect(w).toContain("!newData.exists()");                    // borrar: solo si no queda nada
     expect(w).toContain("auth != null");
+    // Las dos ramas son excluyentes, así que no hay forma de MODIFICAR el
+    // evento por esta puerta: cada hijo mantiene su propia regla.
+  });
+  it("solo el dueño puede borrar su velada", () => {
+    const borrado = evento[".write"].split("!newData.exists()")[1] || "";
+    expect(borrado).toContain("ownerUid");
+    expect(borrado).not.toContain("staff");
+  });
+  it("el staff sigue sin poder vaciar el padrón, la cartelera ni el Super 4", () => {
+    // newData.exists() limita SOLO al staff: el dueño sí puede usar "Limpiar" y
+    // "Reiniciar evento" en su propia velada, igual que en el árbol viejo.
+    for (const clave of ["bm_fighters_v4", "bm_matchups_v3", "bm_super4_v1"]) {
+      const w = evento[clave][".write"];
+      // El límite tiene que ir PEGADO a la condición de staff. Si estuviera
+      // suelto al principio de la expresión, aplicaría también al dueño y este
+      // no podría usar "Limpiar" ni "Reiniciar evento" en su propia velada.
+      expect(w, clave).toContain("!== 'puerta' && newData.exists()");
+      expect(w.indexOf("newData.exists()"), clave).toBeGreaterThan(w.indexOf("ownerUid"));
+    }
   });
 });
 

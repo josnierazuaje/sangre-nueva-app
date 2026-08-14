@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { EVENTO_LEGACY_ID } from "../lib/eventos.js";
-import { listarMisEventos, crearEvento, actualizarMetaEvento } from "../lib/eventosNube.js";
+import { EVENTO_LEGACY_ID, borrarDatosLocalesDeEvento } from "../lib/eventos.js";
+import { listarMisEventos, crearEvento, actualizarMetaEvento, exportarEvento, borrarEvento } from "../lib/eventosNube.js";
 import { MONEDAS, preciosPorDefecto, formatearImporte, precioValido } from "../lib/moneda.js";
 import { FEDERACIONES } from "../lib/federacion.js";
 import { AFORO_POR_DEFECTO, aforoValido } from "../lib/fichaEvento.js";
 import { DEFAULT_EVENT_DATES } from "../lib/eventDates.js";
+import { downloadBytes } from "../lib/download.js";
 
 // ============================================
 // EVENTOS — abrir otra velada, crear la siguiente
@@ -20,9 +21,10 @@ import { DEFAULT_EVENT_DATES } from "../lib/eventDates.js";
 // anterior, y esa clase de fuga es justo la que hace que un peleador aparezca
 // en la velada equivocada. Recargar es la única forma honesta de soltarlos, y
 // es lo que ya hacen "Recargar desde la nube" y "Firebase manual".
-export default function EventosDialog({ user, eventoId, eventoMeta, isOwner, pendientes, onCambiar, onCreado, onMetaCambiada, onClose }) {
+export default function EventosDialog({ user, eventoId, eventoMeta, isOwner, pendientes, onCambiar, onCreado, onMetaCambiada, onBorrada, onClose }) {
   const [eventos, setEventos] = useState(null); // null = cargando
   const [error, setError] = useState("");
+  const [borrando, setBorrando] = useState(null);
   const [modo, setModo] = useState("lista"); // "lista" | "crear" | "precios"
 
   useEffect(() => {
@@ -35,6 +37,63 @@ export default function EventosDialog({ user, eventoId, eventoMeta, isOwner, pen
 
   const lbl = "block text-[14px] font-semibold text-[rgba(200,160,74,0.55)] mb-1.5 tracking-[0.22em] uppercase";
   const ic = "w-full px-3 py-2.5 input-ink text-base";
+
+  // Borrar una velada entera. Tres cosas la protegen, en este orden:
+  //
+  //  1. Se descarga un respaldo ANTES de tocar la nube, y si esa descarga
+  //     falla se aborta. Es lo mismo que hacen "Reiniciar evento" y "Limpiar":
+  //     un borrado de este tamaño no se hace sin red debajo.
+  //  2. Hay que escribir el NOMBRE de la velada, no una palabra fija. Aquí el
+  //     riesgo no es borrar sin querer, es borrar LA VELADA EQUIVOCADA de una
+  //     lista — y teclear su nombre obliga a mirar cuál es.
+  //  3. El histórico de Chile no se puede elegir (ni se ofrece el botón).
+  async function borrar(ev) {
+    if (borrando) return;
+    if (ev.id === EVENTO_LEGACY_ID) return;
+    if (!confirm(
+      `¿Borrar la velada "${ev.nombre}"?\n\n` +
+      `Se borra TODO lo suyo: peleadores, cartelera, Super 4, boletas (incluidas las ya cobradas) y sus respaldos en la nube.\n\n` +
+      `Las demás veladas no se tocan.\n\nAntes de borrar se descarga una copia completa.`)) return;
+
+    setBorrando(ev.id); setError("");
+    let copia;
+    try {
+      copia = await exportarEvento(ev.id);
+    } catch (e) {
+      console.error("No se pudo leer la velada para respaldarla:", e);
+      setError("No se pudo leer la velada para respaldarla. No se borró nada.");
+      setBorrando(null);
+      return;
+    }
+    downloadBytes(JSON.stringify({ id: ev.id, ...copia }, null, 2),
+      "velada_" + ev.id + "_" + new Date().toISOString().split("T")[0] + ".json",
+      "application/json");
+
+    // La confirmación por nombre va DESPUÉS del respaldo: así, aunque se
+    // arrepienta aquí, la copia ya está en su carpeta de descargas.
+    const escrito = prompt(`Para confirmar, escribe el nombre exacto de la velada:\n\n${ev.nombre}`);
+    if (escrito === null) { setBorrando(null); return; }
+    if (escrito.trim() !== ev.nombre.trim()) {
+      alert("Lo que escribiste no coincide con el nombre. No se borró nada.");
+      setBorrando(null);
+      return;
+    }
+
+    try {
+      await borrarEvento(ev.id, user);
+    } catch (e) {
+      console.error("No se pudo borrar la velada:", e);
+      setError("No se pudo borrar: " + (e.message || "error desconocido"));
+      setBorrando(null);
+      return;
+    }
+    borrarDatosLocalesDeEvento(ev.id);
+    setEventos(lista => (lista || []).filter(x => x.id !== ev.id));
+    setBorrando(null);
+    // Si la borrada era la que estaba abierta, hay que salir de ella: sus rutas
+    // ya no existen y la app se quedaría mirando a un sitio vacío.
+    if (ev.id === eventoId) onBorrada(ev);
+  }
 
   function cambiar(id) {
     if (id === eventoId) { onClose(); return; }
@@ -59,6 +118,7 @@ export default function EventosDialog({ user, eventoId, eventoMeta, isOwner, pen
 
         {modo === "lista" && <ListaEventos
           eventos={eventos} error={error} eventoId={eventoId} onElegir={cambiar}
+          onBorrar={isOwner ? borrar : null} borrando={borrando}
           onCrear={() => setModo("crear")}
           onPrecios={isOwner && eventoId !== EVENTO_LEGACY_ID ? () => setModo("precios") : null}
           meta={eventoMeta} />}
@@ -81,7 +141,7 @@ export default function EventosDialog({ user, eventoId, eventoMeta, isOwner, pen
   );
 }
 
-function ListaEventos({ eventos, error, eventoId, onElegir, onCrear, onPrecios, meta }) {
+function ListaEventos({ eventos, error, eventoId, onElegir, onCrear, onPrecios, meta, onBorrar, borrando }) {
   return (
     <div className="p-4 space-y-3">
       {eventos === null && <p className="text-boxing-muted text-sm py-4 text-center">Buscando tus veladas…</p>}
@@ -89,17 +149,33 @@ function ListaEventos({ eventos, error, eventoId, onElegir, onCrear, onPrecios, 
 
       {eventos && eventos.map(ev => {
         const activo = ev.id === eventoId;
+        // El histórico de Chile nunca lleva papelera: son datos de una velada
+        // ya disputada y cobrada, y la app no ofrece un botón capaz de
+        // hacerlos desaparecer.
+        const sePuedeBorrar = onBorrar && ev.id !== EVENTO_LEGACY_ID;
         return (
-          <button key={ev.id} onClick={() => onElegir(ev.id)}
-            className={"w-full text-left px-3 py-2.5 rounded-2xl border transition-colors " + (activo ? "border-boxing-goldDim bg-black/30" : "border-boxing-line hover:border-boxing-goldDim/50")}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-boxing-cream font-semibold truncate">{ev.nombre || ev.id}</span>
-              {activo && <span className="text-[14px] text-boxing-goldFight tracking-[0.18em] uppercase flex-shrink-0">Abierta</span>}
-            </div>
-            <div className="text-[14px] text-boxing-muted mt-0.5">
-              {ev.id === EVENTO_LEGACY_ID ? "Histórico · Chile" : (ev.pais ? ev.pais + " · " : "") + (MONEDAS[ev.moneda] ? MONEDAS[ev.moneda].codigo : "")}
-            </div>
-          </button>
+          <div key={ev.id}
+            className={"flex items-stretch gap-1 rounded-2xl border transition-colors " + (activo ? "border-boxing-goldDim bg-black/30" : "border-boxing-line hover:border-boxing-goldDim/50")}>
+            <button onClick={() => onElegir(ev.id)} className="flex-1 min-w-0 text-left px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-boxing-cream font-semibold truncate">{ev.nombre || ev.id}</span>
+                {activo && <span className="text-[14px] text-boxing-goldFight tracking-[0.18em] uppercase flex-shrink-0">Abierta</span>}
+              </div>
+              <div className="text-[14px] text-boxing-muted mt-0.5">
+                {ev.id === EVENTO_LEGACY_ID ? "Histórico · Chile" : (ev.pais ? ev.pais + " · " : "") + (MONEDAS[ev.moneda] ? MONEDAS[ev.moneda].codigo : "")}
+              </div>
+            </button>
+            {sePuedeBorrar && <button
+              onClick={() => onBorrar(ev)}
+              disabled={borrando === ev.id}
+              title={"Borrar la velada " + (ev.nombre || ev.id)}
+              aria-label={"Borrar la velada " + (ev.nombre || ev.id)}
+              className="flex-shrink-0 w-11 flex items-center justify-center text-boxing-muted hover:text-red-400 transition-colors disabled:opacity-40">
+              {borrando === ev.id
+                ? <span className="text-[14px]">…</span>
+                : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
+            </button>}
+          </div>
         );
       })}
 

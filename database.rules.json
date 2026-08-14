@@ -73,7 +73,7 @@
     },
     "eventos": {
       "$eid": {
-        ".write": "auth != null && !data.exists() && newData.child('meta/ownerUid').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('meta/ownerUid').val() === auth.uid) || (!newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)))",
         "meta": {
           ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || root.child('eventos').child($eid).child('staff').child(auth.uid).exists())",
           ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)",
@@ -102,7 +102,7 @@
         },
         "bm_fighters_v4": {
           ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
-          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta' && newData.exists()))",
           ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
           "$i": {
             ".validate": "newData.hasChildren(['id', 'fullName']) && newData.child('id').isString() && newData.child('id').val().length <= 40 && newData.child('fullName').isString() && newData.child('fullName').val().length >= 2 && newData.child('fullName').val().length <= 80 && (!newData.child('gym').exists() || (newData.child('gym').isString() && newData.child('gym').val().length <= 80)) && (!newData.child('phone').exists() || (newData.child('phone').isString() && newData.child('phone').val().length <= 40)) && (!newData.child('notes').exists() || (newData.child('notes').isString() && newData.child('notes').val().length <= 2000)) && (!newData.child('sexo').exists() || newData.child('sexo').val().matches(/^(M|F)$/))"
@@ -110,7 +110,7 @@
         },
         "bm_matchups_v3": {
           ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
-          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta' && newData.exists()))",
           ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
           "$i": {
             ".validate": "newData.hasChild('id') && newData.child('id').isString() && newData.child('id').val().length <= 40 && (!newData.child('fighterRedId').exists() || (newData.child('fighterRedId').isString() && newData.child('fighterRedId').val().length <= 40)) && (!newData.child('fighterBlueId').exists() || (newData.child('fighterBlueId').isString() && newData.child('fighterBlueId').val().length <= 40)) && (!newData.child('note').exists() || (newData.child('note').isString() && newData.child('note').val().length <= 500))"
@@ -118,7 +118,7 @@
         },
         "bm_super4_v1": {
           ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
-          ".write": "auth != null && newData.exists() && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
+          ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta' && newData.exists()))",
           ".validate": "!newData.isString() || newData.val() === '__EMPTY__'",
           "$i": {
             ".validate": "newData.hasChild('id') && newData.child('id').isString() && newData.child('id').val().length <= 40 && (!newData.child('catLabel').exists() || (newData.child('catLabel').isString() && newData.child('catLabel').val().length <= 80)) && (!newData.child('regla').exists() || (newData.child('regla').isString() && newData.child('regla').val().length <= 300))"
@@ -162,7 +162,8 @@
         "$other": {
           ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid || (root.child('eventos').child($eid).child('staff').child(auth.uid).exists() && root.child('eventos').child($eid).child('staff').child(auth.uid).val() !== 'puerta'))",
           ".write": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)"
-        }
+        },
+        ".read": "auth != null && (auth.token.email === 'josnier.azuaje@gmail.com' || root.child('eventos').child($eid).child('meta').child('ownerUid').val() === auth.uid)"
       }
     },
     "usuarios": {

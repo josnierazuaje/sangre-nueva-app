@@ -3,6 +3,7 @@ import {
   EVENTO_LEGACY_ID, META_LEGACY, slugify, nuevoEventoId, esEventoIdValido,
   rutaEvento, rutaBackups, rutaMeta, rutaStaff, rutaEventosDeUsuario, claveLocal,
   esDuenoDelEvento, eventoActivoId, guardarEventoActivo, _resetEventoActivoCache,
+  prefijoLocal, clavesLocalesDeEvento, borrarDatosLocalesDeEvento,
   fbPathEvento, lsKey,
 } from "../eventos.js";
 import { MONEDAS, formatearImporte, preciosPorDefecto, precioValido } from "../moneda.js";
@@ -237,5 +238,47 @@ describe("aforo del recinto por velada", () => {
     expect(aforoValido(null, 320)).toBe(320);
     expect(aforoValido("mucha gente", 320)).toBe(320);
     expect(aforoValido(1, 320)).toBe(1);
+  });
+});
+
+describe("borrar una velada limpia también este dispositivo", () => {
+  beforeEach(() => { montarLocalStorage(); _resetEventoActivoCache(); });
+  afterEach(() => { delete globalThis.localStorage; _resetEventoActivoCache(); });
+
+  const CLAVES = [
+    "ev:madrid-abc:bm_fighters_v4",
+    "ev:madrid-abc:bm_tickets_v4",
+    "ev:madrid-abc:bm_tickets_outbox",
+    "ev:getafe-def:bm_fighters_v4",
+    "bm_fighters_v4",          // del histórico, sin prefijo
+    "bm_fb_config",            // del dispositivo, no de ninguna velada
+    "bm_evento_activo",
+  ];
+
+  it("recoge TODAS las claves de esa velada y ninguna más", () => {
+    expect(clavesLocalesDeEvento("madrid-abc", CLAVES).sort()).toEqual([
+      "ev:madrid-abc:bm_fighters_v4",
+      "ev:madrid-abc:bm_tickets_outbox",
+      "ev:madrid-abc:bm_tickets_v4",
+    ]);
+  });
+  it("no confunde una velada con otra cuyo id empiece igual", () => {
+    const claves = ["ev:madrid:bm_fighters_v4", "ev:madrid-abc:bm_fighters_v4"];
+    expect(clavesLocalesDeEvento("madrid", claves)).toEqual(["ev:madrid:bm_fighters_v4"]);
+  });
+  it("el histórico NO se puede barrer por prefijo: sus claves no lo llevan", () => {
+    // Sin este guard, barrer el histórico borraría las claves sin prefijo — que
+    // son justo las de la velada abierta en ese momento.
+    expect(prefijoLocal(EVENTO_LEGACY_ID)).toBe(null);
+    expect(clavesLocalesDeEvento(EVENTO_LEGACY_ID, CLAVES)).toEqual([]);
+  });
+  it("el barrido deja intactas las claves del dispositivo y las de las otras veladas", () => {
+    CLAVES.forEach(k => globalThis.localStorage.setItem(k, "x"));
+    const borradas = borrarDatosLocalesDeEvento("madrid-abc");
+    expect(borradas).toBe(3);
+    expect(globalThis.localStorage.getItem("ev:getafe-def:bm_fighters_v4")).toBe("x");
+    expect(globalThis.localStorage.getItem("bm_fighters_v4")).toBe("x");
+    expect(globalThis.localStorage.getItem("bm_fb_config")).toBe("x");
+    expect(globalThis.localStorage.getItem("ev:madrid-abc:bm_tickets_v4")).toBe(null);
   });
 });

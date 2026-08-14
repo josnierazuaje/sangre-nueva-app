@@ -8,7 +8,7 @@ import { normalizeFighters } from "./constants.js";
 import { normalizeSuper4 } from "./lib/super4.js";
 import { downloadBytes } from "./lib/download.js";
 import { useEventSync } from "./lib/useEventSync.js";
-import { guardarEventoActivo } from "./lib/eventos.js";
+import { guardarEventoActivo, EVENTO_LEGACY_ID } from "./lib/eventos.js";
 import { guardarMetaLocal, localeDelEventoActivo } from "./lib/fichaEvento.js";
 import { buildEventLabels } from "./lib/eventDates.js";
 import { cierreResumen, buildCierreHtml } from "./lib/cierreEvento.js";
@@ -428,6 +428,16 @@ export default function App() {
     if (!guardarEventoActivo(id)) { alert("No se pudo abrir esa velada en este dispositivo."); return; }
     location.reload();
   }
+  // Se borró la velada que estaba abierta: hay que salir de ella antes de nada,
+  // porque sus rutas ya no existen y la app se quedaría escuchando un nodo
+  // vacío (chip en verde, pantallas en blanco, y ninguna pista de por qué).
+  // Se vuelve al histórico, que es el único evento que siempre está.
+  function volverAlHistorico(ev) {
+    alert(`La velada "${ev.nombre}" se borró.\n\nSe abre el histórico de Chile.`);
+    guardarEventoActivo(EVENTO_LEGACY_ID);
+    location.reload();
+  }
+
   // Una velada recién creada se abre sola: es lo que el organizador espera
   // después de rellenar el formulario. La ficha se cachea ANTES de recargar
   // para que el primer render ya cobre en la moneda correcta.
@@ -663,6 +673,7 @@ export default function App() {
         onCambiar={cambiarDeEvento}
         onCreado={abrirEventoNuevo}
         onMetaCambiada={meta => { guardarMetaLocal(meta); location.reload(); }}
+        onBorrada={volverAlHistorico}
         onClose={() => setEventosDialogOpen(false)} />}
 
       {eventDialogOpen && <EventSettingsDialog label={eventLabel} dates={eventDates} org={eventOrg} isOwner={isOwner} onSave={guardarEvento} onClose={() => setEventDialogOpen(false)} />}

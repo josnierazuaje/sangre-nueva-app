@@ -839,3 +839,55 @@ cinco saltó el test:
 concreto pueda o no escribir en una ruta concreta). Si algún día se instala
 Java, el paso natural es `@firebase/rules-unit-testing` contra el emulador de
 RTDB, y estas pruebas estructurales se quedan igual: cubren cosas distintas.
+
+---
+
+## 16. Borrar una velada (ago 2026)
+
+Preparando la primera velada de prueba salió el hueco: la app sabía crear
+veladas pero no borrarlas. "Reiniciar evento" vacía los datos, pero el evento se
+queda en la lista para siempre — y una lista que solo crece termina llena de
+pruebas y de veladas de hace tres años.
+
+**Lo que hubo que tocar en las reglas.** El `.write` de `eventos/$eid` solo
+permitía CREAR (`!data.exists()`), así que borrar el nodo era imposible incluso
+para el dueño. Ahora tiene dos ramas excluyentes: crear (si no existía) o borrar
+entero (`!newData.exists()`), las dos exigiendo propiedad. No abre nada nuevo:
+el dueño ya podía escribir en cada hijo por separado.
+
+También hubo que añadir `.read` a nivel del evento **solo para el dueño**: hace
+falta para leer la velada entera y descargar el respaldo antes de borrarla. No
+se hereda nada al staff — la condición es exclusivamente de propiedad.
+
+**Y una corrección de una traducción mía de §14.3.** En el árbol viejo,
+`newData.exists()` limita SOLO al staff: el dueño siempre pudo vaciar un nodo.
+Al copiar las reglas al árbol nuevo quedó aplicado a todos, así que **el dueño
+de una velada no podía usar "Limpiar" ni "Reiniciar evento" en su propia
+velada**. No se había notado porque todavía no existía ninguna velada nueva.
+
+**Las tres protecciones del borrado**, por orden:
+
+1. **Respaldo antes de tocar la nube**, y si la lectura falla se aborta. Igual
+   que "Reiniciar evento" y "Limpiar".
+2. **Hay que escribir el NOMBRE de la velada**, no una palabra fija. Aquí el
+   riesgo no es borrar sin querer: es borrar **la velada equivocada** de una
+   lista, y teclear su nombre obliga a mirar cuál es. La confirmación va
+   DESPUÉS del respaldo, para que arrepentirse deje igualmente la copia.
+3. **El histórico de Chile no se puede borrar** y ni siquiera se le dibuja la
+   papelera. Son datos de una velada disputada y cobrada; si algún día hubiera
+   que borrarlos se hace en la consola, a conciencia.
+
+**Lo local también se limpia** (`borrarDatosLocalesDeEvento`): si no, en el
+aparato quedarían los peleadores —con menores— y las boletas de una velada que
+ya no existe, y "Recargar desde la nube" no los limpiaría porque ya no hay nube
+que consultar. El barrido va por prefijo `ev:{id}:` y **nunca se aplica al
+histórico**, cuyas claves no llevan prefijo: barrerlo por prefijo borraría las
+de la velada abierta.
+
+Si se borra la velada que estaba abierta, la app avisa y **vuelve al
+histórico**: seguir en ella dejaría la app escuchando un nodo que ya no existe,
+con el chip en verde y las pantallas en blanco.
+
+**Todo esto está cubierto por pruebas** (§15), incluidas tres mutaciones nuevas:
+el staff pudiendo borrar la velada, el `.read` del evento abierto al staff, y el
+límite de vaciado suelto aplicando también al dueño.

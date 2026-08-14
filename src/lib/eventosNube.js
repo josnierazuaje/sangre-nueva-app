@@ -103,6 +103,40 @@ export async function crearEvento({ nombre, dates, pais, moneda, federacion, afo
   return { ...meta, id };
 }
 
+// Se descarga TODO lo de una velada, para el respaldo que se guarda antes de
+// borrarla. Solo el dueño puede leer el nodo entero (regla `.read` del evento);
+// para el staff esa lectura rebota, que es lo que se quiere.
+export async function exportarEvento(eventoId) {
+  if (!FB.ready || !FB.db) throw new Error("No hay conexión con la nube.");
+  if (eventoId === EVENTO_LEGACY_ID) throw new Error("El histórico de Chile no se exporta por aquí.");
+  const snap = await get(ref(FB.db, "eventos/" + eventoId));
+  return snap.exists() ? snap.val() : null;
+}
+
+// Borra una velada entera: sus datos, sus boletas, sus respaldos y su entrada
+// en el índice del dueño.
+//
+// POR QUÉ ES UNA SOLA ESCRITURA. Si se borrara en dos pasos y fallara el
+// segundo, quedaría o un evento huérfano (datos en la base que ya no aparecen
+// en la lista de nadie, incluidos datos de menores) o una entrada del índice
+// apuntando a un evento que ya no existe. Con `update` de varias rutas a null,
+// o se va todo o no se va nada.
+//
+// El HISTÓRICO DE CHILE no se puede borrar desde aquí, y no es un descuido: son
+// los datos de una velada ya disputada —42 boletas cobradas— y la app no tiene
+// por qué ofrecer un botón capaz de hacerlos desaparecer. Si algún día hubiera
+// que borrarlos, se hace en la consola, a mano y a conciencia.
+export async function borrarEvento(eventoId, user) {
+  if (!FB.ready || !FB.db) throw new Error("No hay conexión con la nube.");
+  if (!user) throw new Error("Hay que iniciar sesión.");
+  if (eventoId === EVENTO_LEGACY_ID) throw new Error("La velada de Chile es el histórico: no se borra desde la app.");
+  if (!esEventoIdValido(eventoId)) throw new Error("Ese identificador de velada no es válido.");
+  const updates = {};
+  updates["eventos/" + eventoId] = null;
+  updates[rutaEventosDeUsuario(user.uid) + "/" + eventoId] = null;
+  await dbUpdate(ref(FB.db), updates);
+}
+
 // Cambia datos de la ficha que el dueño puede editar desde la app (hoy: el
 // nombre visible, la moneda, los precios y el aforo). No toca ownerUid ni
 // creadoEl — las reglas de la base tampoco lo permitirían.
