@@ -600,6 +600,17 @@ legítimo.
   Sin eso, sus ~24 KB caían en el chunk principal, que cambia en cada despliegue
   y se re-descarga entero.
 
+**Verificado en producción (14-ago-2026):** el canje devuelve HTTP 200 y la app
+guarda su token (ttl 24 h). Llegar ahí costó tres rondas por dos trampas que
+conviene recordar: (a) las claves del sitio y secreta son indistinguibles a la
+vista y se cargaron cambiadas de lugar —en el código y en la consola—, y (b) el
+botón *Guardar* del panel de App Check queda fuera de la pantalla, así que la
+configuración se pegaba pero nunca se guardaba; se arregla con ⌘− en el
+navegador. Ojo también con los métodos de comprobación: `siteverify` no
+distingue una clave de otra y el endpoint `anchor` da falsos "dominio no
+autorizado" con claves v3. Lo único fiable es `grecaptcha.execute` desde el
+dominio real.
+
 **Está en MONITOREO, no bloquea.** Activar *Aplicar* es una decisión posterior,
 con las métricas a la vista y **nunca en la semana de una velada**: si el wifi
 del recinto tiene portal cautivo o bloquea Google, los teléfonos se quedarían
