@@ -7,7 +7,7 @@ import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { matchupConflicts } from "../lib/conflicts.js";
 import { super4FighterIds } from "../lib/super4.js";
 import PageHeader from "./PageHeader.jsx";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 // ============================================
 // FIGHT CARD VIEW

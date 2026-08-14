@@ -3,6 +3,7 @@ import { EVENTO_LEGACY_ID } from "../lib/eventos.js";
 import { listarMisEventos, crearEvento, actualizarMetaEvento } from "../lib/eventosNube.js";
 import { MONEDAS, preciosPorDefecto, formatearImporte, precioValido } from "../lib/moneda.js";
 import { FEDERACIONES } from "../lib/federacion.js";
+import { AFORO_POR_DEFECTO, aforoValido } from "../lib/fichaEvento.js";
 import { DEFAULT_EVENT_DATES } from "../lib/eventDates.js";
 
 // ============================================
@@ -107,7 +108,7 @@ function ListaEventos({ eventos, error, eventoId, onElegir, onCrear, onPrecios, 
       <div className="space-y-2 pt-1">
         <button onClick={onCrear} className="btn-gold w-full py-2.5 text-sm font-bold tracking-[0.14em] uppercase">Crear velada nueva</button>
         {onPrecios && <button onClick={onPrecios} className="w-full py-2.5 rounded-full border border-boxing-line text-boxing-muted hover:text-boxing-cream text-sm font-bold tracking-[0.14em] uppercase transition-colors">
-          Moneda y precios{meta && MONEDAS[meta.moneda] ? " · " + meta.moneda : ""}
+          Precios y aforo{meta && MONEDAS[meta.moneda] ? " · " + meta.moneda : ""}
         </button>}
       </div>
     </div>
@@ -119,6 +120,7 @@ function CrearEvento({ user, lbl, ic, onCancel, onCreado }) {
   const [moneda, setMoneda] = useState("EUR");
   const [pais, setPais] = useState("ES");
   const [federacion, setFederacion] = useState("NINGUNA");
+  const [aforo, setAforo] = useState(AFORO_POR_DEFECTO);
   const [semis, setSemis] = useState(DEFAULT_EVENT_DATES.semis);
   const [final, setFinal] = useState(DEFAULT_EVENT_DATES.final);
   const [guardando, setGuardando] = useState(false);
@@ -128,7 +130,7 @@ function CrearEvento({ user, lbl, ic, onCancel, onCreado }) {
     if (nombre.trim().length < 2 || guardando) return;
     setGuardando(true); setError("");
     try {
-      const meta = await crearEvento({ nombre, dates: { semis, final }, pais, moneda, federacion, user });
+      const meta = await crearEvento({ nombre, dates: { semis, final }, pais, moneda, federacion, aforo, user });
       onCreado(meta);
     } catch (e) {
       console.error("No se pudo crear la velada:", e);
@@ -177,6 +179,12 @@ function CrearEvento({ user, lbl, ic, onCancel, onCreado }) {
           </p>
         </div>
 
+        <div>
+          <label className={lbl}>Aforo del recinto</label>
+          <input type="number" min="1" step="10" value={aforo} onChange={e => setAforo(e.target.value)} className={ic} />
+          <p className="text-[14px] text-boxing-muted mt-1">Cuántas personas caben. Es el número contra el que la pestaña Entradas mide lo vendido ("77 / {aforoValido(aforo, AFORO_POR_DEFECTO)}").</p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Semifinales</label>
@@ -213,6 +221,7 @@ function PreciosEvento({ eventoId, meta, lbl, ic, onCancel, onGuardado }) {
   const monedaInicial = meta && MONEDAS[meta.moneda] ? meta.moneda : "EUR";
   const [moneda, setMoneda] = useState(monedaInicial);
   const [federacion, setFederacion] = useState((meta && meta.federacion) || "NINGUNA");
+  const [aforo, setAforo] = useState((meta && meta.aforo) || AFORO_POR_DEFECTO);
   const [precios, setPrecios] = useState(() => (meta && meta.precios) || preciosPorDefecto(monedaInicial));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -233,8 +242,9 @@ function PreciosEvento({ eventoId, meta, lbl, ic, onCancel, onGuardado }) {
       puerta: precioValido(precios.puerta, 0),
     };
     try {
-      await actualizarMetaEvento(eventoId, { moneda, federacion, precios: limpios });
-      onGuardado({ ...meta, moneda, federacion, precios: limpios });
+      const aforoLimpio = aforoValido(aforo, AFORO_POR_DEFECTO);
+      await actualizarMetaEvento(eventoId, { moneda, federacion, aforo: aforoLimpio, precios: limpios });
+      onGuardado({ ...meta, moneda, federacion, aforo: aforoLimpio, precios: limpios });
     } catch (e) {
       console.error("No se pudieron guardar los precios:", e);
       setError(e.message || "No se pudieron guardar.");
@@ -274,11 +284,17 @@ function PreciosEvento({ eventoId, meta, lbl, ic, onCancel, onGuardado }) {
           </div>
         ))}
 
-        {/* La app resuelve los precios al cargar la página (constants.js), así
+        <div>
+          <label className={lbl}>Aforo del recinto</label>
+          <input type="number" min="1" step="10" value={aforo} onChange={e => setAforo(e.target.value)} className={ic} />
+        </div>
+
+        {/* La app resuelve los precios y el aforo al cargar la página
+            (constants.js), así
             que guardarlos sin recargar dejaría la pantalla de venta con la
             tarifa vieja. Se avisa antes en vez de recargar por sorpresa. */}
         <p className="text-[14px] text-boxing-muted leading-relaxed">
-          Al guardar, la app se recarga para que la venta y las boletas usen la tarifa nueva.
+          Al guardar, la app se recarga para que la venta, las boletas y la barra de aforo usen los valores nuevos.
           Las boletas YA emitidas conservan el precio con el que se cobraron.
         </p>
 

@@ -21,6 +21,7 @@ import {
 } from "./eventos.js";
 import { DEFAULT_EVENT_DATES } from "./eventDates.js";
 import { MONEDAS, MONEDA_POR_DEFECTO, preciosPorDefecto } from "./moneda.js";
+import { aforoValido, AFORO_POR_DEFECTO } from "./fichaEvento.js";
 import { FEDERACIONES, FEDERACION_POR_DEFECTO } from "./federacion.js";
 
 // Ficha de un evento. Devuelve null si no existe o si esta cuenta no tiene
@@ -71,7 +72,7 @@ export async function listarMisEventos(user) {
 // pero ocupando su id) o una ficha sin entrada en el índice (datos que el dueño
 // ya no encuentra desde la app). Con `update` de varias rutas, o entra todo o
 // no entra nada.
-export async function crearEvento({ nombre, dates, pais, moneda, federacion, user }, sufijoId) {
+export async function crearEvento({ nombre, dates, pais, moneda, federacion, aforo, user }, sufijoId) {
   if (!FB.ready || !FB.db) throw new Error("No hay conexión con la nube.");
   if (!user) throw new Error("Hay que iniciar sesión para crear un evento.");
   const limpio = String(nombre || "").trim().slice(0, 80);
@@ -90,6 +91,7 @@ export async function crearEvento({ nombre, dates, pais, moneda, federacion, use
     moneda: mon,
     federacion: FEDERACIONES[federacion] ? federacion : FEDERACION_POR_DEFECTO,
     precios: preciosPorDefecto(mon),
+    aforo: aforoValido(aforo, AFORO_POR_DEFECTO),
     creadoEl: new Date().toISOString(),
   };
   const updates = {};
@@ -102,7 +104,7 @@ export async function crearEvento({ nombre, dates, pais, moneda, federacion, use
 }
 
 // Cambia datos de la ficha que el dueño puede editar desde la app (hoy: el
-// nombre visible, la moneda y los precios de las entradas). No toca ownerUid ni
+// nombre visible, la moneda, los precios y el aforo). No toca ownerUid ni
 // creadoEl — las reglas de la base tampoco lo permitirían.
 export async function actualizarMetaEvento(eventoId, cambios) {
   if (eventoId === EVENTO_LEGACY_ID) throw new Error("La velada de Chile es un histórico: su ficha no se edita.");
@@ -111,6 +113,7 @@ export async function actualizarMetaEvento(eventoId, cambios) {
   if (cambios.nombre != null) permitidos.nombre = String(cambios.nombre).trim().slice(0, 80);
   if (cambios.moneda && MONEDAS[cambios.moneda]) permitidos.moneda = cambios.moneda;
   if (cambios.precios) permitidos.precios = cambios.precios;
+  if (cambios.aforo !== undefined) permitidos.aforo = aforoValido(cambios.aforo, AFORO_POR_DEFECTO);
   if (cambios.pais != null) permitidos.pais = String(cambios.pais).slice(0, 2).toUpperCase();
   if (cambios.federacion && FEDERACIONES[cambios.federacion]) permitidos.federacion = cambios.federacion;
   if (!Object.keys(permitidos).length) return null;

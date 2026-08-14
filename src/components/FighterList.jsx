@@ -9,7 +9,7 @@ import { printHtml } from "../lib/printHtml.js";
 import { buildFightersCsv } from "../lib/csvPlanillas.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import { normName } from "../lib/dedup.js";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 // Un filtro de la banda: la cifra en oro y la etiqueta en blanco, sin píldora.
 // El activo se marca con el filo de oro de abajo (.filtro.on en index.css), el

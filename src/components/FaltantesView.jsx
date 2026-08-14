@@ -7,7 +7,7 @@ import { buildFaltantesCsv } from "../lib/csvPlanillas.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import VSCard from "./VSCard.jsx";
 import PageHeader from "./PageHeader.jsx";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 // ============================================
 // FALTANTES — emparejamiento FORZADO

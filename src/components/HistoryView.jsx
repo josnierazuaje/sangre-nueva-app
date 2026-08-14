@@ -6,7 +6,7 @@ import { buildEntradasCsv, buildEntradasHtml } from "../lib/entradasReporte.js";
 import { printHtml } from "../lib/printHtml.js";
 import { downloadBytes, csvFilename, CSV_MIME } from "../lib/download.js";
 import TicketPreview from "./TicketPreview.jsx";
-import { localeDelEventoActivo } from "../lib/moneda.js";
+import { localeDelEventoActivo } from "../lib/fichaEvento.js";
 
 export default function HistoryView({ tickets, onDelete }) {
   const [searchQuery, setSearchQuery] = useState("");

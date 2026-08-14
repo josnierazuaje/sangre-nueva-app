@@ -6,8 +6,9 @@
 // y 10.000. Mudarse a España con eso puesto significa una boletería que cobra
 // "$10.000" por una entrada de 10 €.
 //
-// Ahora la moneda y los precios viajan en la ficha del evento (`meta`), así que
-// la velada de Santiago sigue en pesos —sus 42 boletas cuadran igual que
+// Ahora la moneda y los precios viajan en la ficha del evento (./fichaEvento.js
+// es quien la lee), así que la velada de Santiago sigue en pesos —sus 42
+// boletas cuadran igual que
 // siempre— y la de Madrid nace en euros. Y no hay que tocar el código para
 // abrir la siguiente en otro país.
 //
@@ -18,7 +19,6 @@
 //  · el euro lleva céntimos y el peso chileno no. Redondear un precio de 12,50 €
 //    a 13 € porque el formateador no tiene decimales es dinero mal cobrado.
 
-import { EVENTO_LEGACY_ID, eventoActivoId, lsKey } from "./eventos.js";
 
 export const MONEDAS = {
   EUR: {
@@ -62,56 +62,6 @@ export function formatearImporte(n, codigo) {
   // El espacio antes del símbolo en euros es el que manda la norma española y
   // el que espera cualquiera que lea la boleta allí ("15 €", no "15€").
   return m.simboloDetras ? txt + " " + m.simbolo : m.simbolo + txt;
-}
-
-// ============================================
-// LA FICHA DEL EVENTO ABIERTO, EN ESTE DISPOSITIVO
-// ============================================
-// La moneda hace falta ANTES de que conteste la nube: el primer render ya
-// pinta precios. Por eso la ficha se cachea en localStorage —igual que los
-// peleadores o las boletas— y se lee de ahí al arrancar.
-export const META_CACHE_KEY = "bm_event_meta";
-
-export function leerMetaLocal() {
-  try {
-    const raw = localStorage.getItem(lsKey(META_CACHE_KEY));
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
-}
-
-export function guardarMetaLocal(meta) {
-  try { localStorage.setItem(lsKey(META_CACHE_KEY), JSON.stringify(meta || {})); }
-  catch (e) { console.error("No se pudo cachear la ficha del evento en este dispositivo:", e); }
-}
-
-// Moneda del evento abierto. El histórico de Chile no tiene ficha en la nube
-// (ver eventos.js): su moneda está fijada, no heredada del defecto.
-export function monedaDelEventoActivo() {
-  if (eventoActivoId() === EVENTO_LEGACY_ID) return MONEDA_LEGACY;
-  const meta = leerMetaLocal();
-  return meta && MONEDAS[meta.moneda] ? meta.moneda : MONEDA_POR_DEFECTO;
-}
-
-// Formato de fecha del país de la velada: 14/8/2026 en España, 14-08-2026 en
-// Chile. Lo usa el pie de la hoja de cierre, que es un documento que se
-// entrega impreso.
-export function localeDelEventoActivo() {
-  return monedaInfo(monedaDelEventoActivo()).locale;
-}
-
-export function preciosDelEventoActivo() {
-  const moneda = monedaDelEventoActivo();
-  const meta = eventoActivoId() === EVENTO_LEGACY_ID ? null : leerMetaLocal();
-  const guardados = meta && meta.precios ? meta.precios : null;
-  const base = preciosPorDefecto(moneda);
-  if (!guardados) return base;
-  // Un precio suelto corrupto (o un tipo de entrada nuevo que la ficha vieja no
-  // conocía) cae al valor por defecto en vez de dejar la venta en NaN.
-  return {
-    inscripcion: precioValido(guardados.inscripcion, base.inscripcion),
-    preventa: precioValido(guardados.preventa, base.preventa),
-    puerta: precioValido(guardados.puerta, base.puerta),
-  };
 }
 
 // El cero SÍ es un precio válido (una entrada de cortesía), pero un campo

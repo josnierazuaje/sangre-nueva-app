@@ -91,6 +91,9 @@
           },
           "federacion": {
             ".validate": "newData.isString() && newData.val().matches(/^(FECHIBOX|RFEB|NINGUNA)$/)"
+          },
+          "aforo": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100000"
           }
         },
         "staff": {

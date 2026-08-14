@@ -18,7 +18,7 @@
 // en una planilla que se entrega a los clubes.
 
 import { EVENTO_LEGACY_ID, eventoActivoId } from "./eventos.js";
-import { leerMetaLocal } from "./moneda.js";
+import { leerMetaLocal } from "./fichaEvento.js";
 
 export const FEDERACIONES = {
   FECHIBOX: {

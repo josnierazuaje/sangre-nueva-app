@@ -778,5 +778,25 @@ mientras la puerta cobra.
 - **No se copian peleadores de una velada a otra.** Cada velada nace vacía. Si
   algún día hace falta un "padrón de club" que sobreviva a las veladas, es un
   nodo aparte, no un copiar-pegar entre eventos.
-- **El aforo (`capacity`, `MAX_CAP`) sigue en el código.** Es del recinto, y en
-  Madrid será otro; el siguiente candidato a pasar a la ficha del evento.
+### 14.7 El aforo también salió del código
+
+`MAX_CAP = 320` era el aforo del gimnasio de la velada de Chile, escrito en
+`constants.js`. Ahora es `meta.aforo` de cada velada y se edita en Veladas →
+"Precios y aforo". El histórico conserva sus 320 exactos.
+
+Dos decisiones de esta parte:
+
+- **`capacity` (50/150/120 por tipo de entrada) se eliminó, no se movió.** No lo
+  usaba nadie: se declaraba y ahí se quedaba. Un cupo por tipo que no frena
+  ninguna venta es una promesa falsa; el día que haga falta limitar la preventa
+  habrá que escribir el freno, no solo el número.
+- **`aforoValido()` rechaza el cero** (y lo negativo, y el "un cero de más"). La
+  barra de la pestaña Entradas divide entre ese número: un 0 la dejaría en
+  Infinity, y eso se descubriría el día del evento por un campo mal tecleado
+  semanas antes.
+
+Y un módulo nuevo: **`src/lib/fichaEvento.js`**. La ficha de la velada
+(moneda, precios, aforo, locale, y su caché en el dispositivo) vivía dentro de
+`moneda.js`, que se estaba convirtiendo en un cajón de sastre — el mismo camino
+que ya recorrió `storage.js` (§8.3). `moneda.js` se quedó con lo que de verdad
+es moneda: las monedas y el formateo de importes, sin tocar localStorage.

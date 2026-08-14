@@ -11,7 +11,7 @@
 import { TICKET_TYPES_V2, fmtDinero, ticketQty } from "../constants.js";
 import { csvDocument } from "./csv.js";
 import { escapeHtml } from "./html.js";
-import { localeDelEventoActivo } from "./moneda.js";
+import { localeDelEventoActivo } from "./fichaEvento.js";
 
 // Totales del registro (sobre la lista que se le pase, ya filtrada).
 export function entradasResumen(tickets) {
