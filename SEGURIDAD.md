@@ -130,15 +130,22 @@ falsificar. Lo que de verdad protege los datos son las reglas y el login.
 > de reCAPTCHA (y borrar el viejo).
 >
 > Las dos claves son indistinguibles a la vista: 40 caracteres y las dos
-> empiezan con `6L`. Para saber cuál es cuál, sin adivinar:
+> empiezan con `6L`. La única forma fiable de comprobar una clave es pedir un
+> token **desde el dominio de verdad** — abre el sitio publicado y, en la
+> consola del navegador:
 >
-> ```bash
-> curl -s https://www.google.com/recaptcha/api/siteverify -d secret=LA_CLAVE -d response=x
+> ```js
+> grecaptcha.execute("LA_CLAVE", { action: "prueba" }).then(t => console.log(t.length))
 > ```
 >
-> `invalid-input-response` → es la **secreta** (va solo en la consola de
-> Firebase). `invalid-input-secret` → **no** es la secreta; puede ser la del
-> sitio, que es la que va en el código.
+> Un número de cuatro cifras = clave y dominio correctos. "Invalid site key" =
+> no es la clave del sitio (probablemente es la secreta). "Invalid domain for
+> site key" = falta autorizar el dominio.
+>
+> Dos atajos que **no** funcionan, para que nadie los vuelva a intentar:
+> `siteverify` responde `invalid-input-response` hasta con una cadena inventada
+> (valida el token antes que la clave), y el endpoint `anchor` da "invalid
+> domain" en dominios que sí están autorizados cuando la clave es v3.
 
 Cuando esté la clave correcta, esto es lo que ya está resuelto:
 

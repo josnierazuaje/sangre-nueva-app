@@ -75,17 +75,25 @@ export const SCANNER_EMAIL = "escaner@sangrenueva.app";
 // sigue funcionando— y solo se ve en la consola del navegador: reCAPTCHA
 // responde "Invalid site key" y App Check reintenta cada medio minuto.
 //
-// Cómo comprobar una clave ANTES de ponerla aquí, que es lo que evita repetirlo
-// (ojo: `siteverify` NO sirve — responde "invalid-input-response" hasta con una
-// cadena inventada, porque valida el token antes que la clave):
+// Cómo comprobar una clave ANTES de ponerla aquí. Dos trampas conocidas, las
+// dos pagadas ya con horas de este proyecto:
 //
-//   CO=$(printf 'https://sangre-nueva-la-velada.pages.dev:443' | base64)
-//   curl -s "https://www.google.com/recaptcha/api2/anchor?ar=1&k=LA_CLAVE&co=$CO&size=invisible&cb=x" \
-//     | grep -oiE "invalid site key|invalid domain|recaptcha-token"
+//   · `siteverify` NO distingue nada: responde "invalid-input-response" hasta
+//     con la cadena "esto-no-es-una-clave", porque valida el token antes que la
+//     clave. No sirve para saber si un valor es la secreta.
+//   · el endpoint `anchor` sí detecta una clave que no es de sitio ("Invalid
+//     site key"), pero su veredicto de "invalid domain" es un FALSO NEGATIVO
+//     con claves v3: dio "dominio no autorizado" para un dominio que estaba
+//     perfectamente autorizado.
 //
-//   "invalid site key"  → no es una clave de sitio (probablemente es la secreta)
-//   "invalid domain"    → sí es la del sitio, pero falta autorizar ese dominio
-//   "recaptcha-token"   → correcta y con el dominio autorizado
+// La única prueba fiable es pedir un token DESDE el dominio de verdad. En la
+// consola del navegador, abierto el sitio publicado:
+//
+//   grecaptcha.execute("LA_CLAVE", { action: "prueba" }).then(t => console.log(t.length))
+//
+// Si imprime un número de cuatro cifras, la clave y el dominio están bien. Si
+// lanza "Invalid domain for site key", falta autorizar el dominio en la consola
+// de reCAPTCHA. Si lanza "Invalid site key", el valor no es la clave del sitio.
 //
 // Si queda vacía, App Check no se inicializa y la app funciona igual que antes
 // de instalarlo.
