@@ -162,7 +162,7 @@ export default function FighterForm({ onSubmit, editingFighter, existingFighters
             Nivel: {experienceInfo.label}
           </span>}
         </div>
-        <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" list="gym-options" value={gym} onChange={e => setGym(titleCaseLive(e.target.value))} placeholder="Team Azuaje" maxLength={60} autoComplete="off" className={ic} /><datalist id="gym-options">{gymOptions.map(g => <option key={g} value={g} />)}</datalist>{errors.gym && <p className="text-red-400 text-sm mt-1">{errors.gym}</p>}</div>
+        <div><label className={lbl}>Escuela / Gimnasio</label><input type="text" list="gym-options" value={gym} onChange={e => setGym(titleCaseLive(e.target.value))} placeholder="Nombre del club" maxLength={60} autoComplete="off" className={ic} /><datalist id="gym-options">{gymOptions.map(g => <option key={g} value={g} />)}</datalist>{errors.gym && <p className="text-red-400 text-sm mt-1">{errors.gym}</p>}</div>
         <div><label className={lbl}>Sexo</label>
           {/* Báscula de pesaje: el pulgar cruza la pista y cambia su resplandor
               de cobalto a rosa. Mismo setter de siempre, solo cambia la piel. */}

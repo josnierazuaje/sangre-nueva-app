@@ -4,7 +4,7 @@
 // Pasada la velada, el organizador tiene los datos repartidos: la recaudación
 // en la pestaña Entradas, los campeones en el Super 4, las peleas en la
 // Cartelera y los atletas en Peleadores. Para rendir cuentas con los socios
-// (Azuaje Team & HH Arias) y para decidir la próxima fecha hay que juntarlo
+// (los clubes que organizan la edición) y para decidir la próxima fecha hay que juntarlo
 // todo a mano, y a los pocos días el evento se reinicia y esos números se van.
 //
 // Esto arma UNA hoja con el cierre completo: boletería, asistencia real,
@@ -120,7 +120,7 @@ export function cierreResumen({ fighters, matchups, super4, tickets }) {
 // `titulo` es el nombre del evento; `fechaEvento`, la frase de las fechas
 // reales; `generadoEl`, la fecha de impresión (entra como parámetro para que la
 // función siga siendo pura).
-export function buildCierreHtml(resumen, { titulo = "", fechaEvento = "", generadoEl = "" } = {}) {
+export function buildCierreHtml(resumen, { titulo = "", fechaEvento = "", generadoEl = "", organizadores = "" } = {}) {
   const { boleteria: b, deportivo: d, escuelas } = resumen;
   const pct = b.asistencia == null ? "—" : Math.round(b.asistencia * 100) + "%";
 
@@ -192,7 +192,7 @@ export function buildCierreHtml(resumen, { titulo = "", fechaEvento = "", genera
 <body>
 <div class="header">
   <h1>CIERRE DEL EVENTO</h1>
-  <p>Sangre Nueva — La Velada · Azuaje Team &amp; HH Arias</p>
+  <p>Sangre Nueva — La Velada${organizadores ? " · " + escapeHtml(organizadores) : ""}</p>
   ${titulo ? `<p>${escapeHtml(titulo)}</p>` : ""}
   ${fechaEvento ? `<p class="fecha">${escapeHtml(fechaEvento)}</p>` : ""}
 </div>

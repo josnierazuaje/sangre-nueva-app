@@ -479,7 +479,51 @@ probó** — desde una sesión de Claude no hay sesión de Firebase.
 
 ---
 
-## 10. Idea en reserva: peleadores por nodo individual (ago 2026)
+## 10. La marca de los organizadores dejó de estar en el código (ago 2026)
+
+**Estado: en la rama `feat/marca-editable`** (apilada sobre `feat/boton-limpiar`;
+525 tests + build OK). **Mergear primero `feat/boton-limpiar`.**
+
+**El problema:** la app llevaba escrita a fuego la marca de quienes montaron la
+primera velada. "Azuaje Team & HH Arias" aparecía en cuatro sitios
+(`App.jsx` ×2 —sidebar y cabecera móvil—, `LoginScreen.jsx` y la hoja de
+`cierreEvento.js`), y las fechas del 1 y 2 de agosto de 2026 seguían siendo el
+valor de fábrica en `eventDates.js`. Para la próxima edición —otros
+organizadores, otra fecha— eso obligaba a tocar el repositorio.
+
+- **`bm_event_org`** (clave sincronizada nueva, vacía por defecto): quién
+  organiza ESTA edición. Se edita en "Datos del evento", junto al título y las
+  fechas, con vista previa. **Vacío es válido**: la línea desaparece de las tres
+  pantallas y de la hoja de cierre — mejor eso que anunciar organizadores que no
+  son. `buildCierreHtml` recibe `organizadores` como opción (con prueba).
+- **Escritura solo del dueño**, igual que las fechas: la regla `$other` ya
+  dejaba cualquier nodo nuevo bajo `sangre_nueva` reservado al dueño, así que
+  **no hace falta republicar las reglas**; la regla explícita que se agregó solo
+  suma el `.validate` (string ≤ 60). El diálogo deshabilita el campo al staff
+  para no mandar una escritura que la base va a rebotar (chip en rojo por un
+  cambio que el staff ni hizo).
+- **La pantalla de acceso** se dibuja SIN sesión, así que toma el valor del
+  último guardado en el dispositivo (`load("bm_event_org", "")`, vía prop desde
+  App). En un aparato recién instalado no hay ninguno y la línea no sale.
+- **`DEFAULT_EVENT_DATES` ahora es HOY** (`isoDeHoy()`, leído una vez al cargar
+  el módulo; el resto de `eventDates.js` sigue puro). Ya no queda ninguna velada
+  concreta escrita en el código. Ojo con el efecto en los tests: el valor por
+  defecto pasó a ser una velada **de un solo día**, así que `EVENT_LABELS.rango`
+  no lleva " y " — `eventDates.test.js` probaba los dos días contra el valor por
+  defecto y ahora lo hace con un par explícito, que es como corresponde.
+- De paso, el `placeholder` del campo Escuela dejó de sugerir "Team Azuaje"
+  (decía el club del dueño a todo el que registra un atleta) y el diálogo ganó
+  `max-h-[90vh] overflow-y-auto`: con el campo nuevo ya no cabía entero en un
+  teléfono chico y los botones quedaban fuera de pantalla.
+
+**Verificado** en el navegador con `dev-preview` (borrado después, §8.4): el
+diálogo a 375px con el campo nuevo y los botones visibles, la vista previa
+mostrando organizadores + la frase de un solo día, y la pantalla de acceso sin
+línea de organizadores cuando el dato está vacío.
+
+---
+
+## 11. Idea en reserva: peleadores por nodo individual (ago 2026)
 
 **Estado: NO implementada, y a propósito.** Existió una rama
 (`perf/peleadores-nodos-individuales`, commit `a233957`, 18-jul-2026) que movía
