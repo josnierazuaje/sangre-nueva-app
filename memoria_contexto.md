@@ -419,7 +419,61 @@ Para las hojas imprimibles, un test temporal que escriba el HTML a un archivo.
 
 ---
 
-## 9. Idea en reserva: peleadores por nodo individual (ago 2026)
+## 9. Botón "Limpiar" en Peleadores (ago 2026)
+
+**Estado: en la rama `feat/boton-limpiar`, sin mergear** (520 tests + build OK).
+
+**El problema real:** para montar la próxima velada hay que vaciar el padrón, y
+los dos caminos que existían eran malos. Borrar peleador por peleador desde la
+lista son setenta papeleras con su confirmación cada una (se hizo a mano: el
+padrón bajó de 87 a 70). Y "Reiniciar evento" (menú ⋮) borra ADEMÁS las boletas
+—dinero cobrado y entradas ya escaneadas— y exige escribir la palabra BORRAR.
+
+**Lo que se hizo:** un botón **🧹 Limpiar** en la barra de la pestaña
+Peleadores, junto a 🖨️ y 📊. Borra en un clic las **tres** claves que dependen
+de los atletas —`bm_fighters_v4`, `bm_matchups_v3` y `bm_super4_v1`— y **no
+toca las boletas**.
+
+- Las tres caen juntas **a propósito**: las peleas y las llaves guardan *ids* de
+  peleadores, así que vaciar solo el padrón dejaría la Cartelera y el Super 4
+  llenos de "peleador eliminado".
+- **Una sola confirmación**, pero que no puede mentir: `src/lib/limpiar.js`
+  (puro, 10 tests) cuenta lo que va a desaparecer y arma el texto. Las pruebas
+  fijan que diga las cifras exactas, que avise que el borrado **alcanza a todo
+  el equipo** (se sincroniza, no es "mi teléfono"), que prometa que las entradas
+  quedan intactas, y que recuerde el **Cierre del evento** antes de borrar.
+- **Respaldo antes de tocar nada**, igual que "Reiniciar evento": archivo JSON
+  local siempre + copia en `sangre_nueva_backups/`. Si la copia en la nube
+  falla, se **aborta** el borrado. El aviso final repite el camino de vuelta
+  (menú ⋮ → "Restaurar respaldo de la nube"), y sin conexión avisa que el
+  archivo descargado es la única copia.
+- **Solo para el dueño**: `App.jsx` pasa `onLimpiar` a `FighterList` únicamente
+  si `isOwner`; con la sesión del staff el botón no se dibuja. Las reglas de la
+  base **no** frenarían a una cuenta de staff (les permiten escribir el padrón
+  mientras `newData.exists()`, y el centinela `"__EMPTY__"` existe), así que el
+  freno tiene que estar en la interfaz.
+
+**Bug de paso: el outbox resucitaba lo borrado.** `outboxClear()` (nuevo, en
+`storage.js`) tira la cola entera de altas pendientes. Sin eso, un alta que
+quedó sin confirmar volvía sola a la nube en el próximo arranque (el replay de
+`useEventSync`) y el peleador reaparecía en todos los dispositivos después del
+borrado. **"Reiniciar evento" tenía el mismo agujero** y se corrigió en el mismo
+cambio (una línea).
+
+**Móvil:** la fila de controles pasó a `flex-wrap` (con `min-w-[150px]` en el
+selector de categoría) porque el botón no cabía: a 375px queda `Todas
+categorías · Recientes · 🖨️` en una línea y `📊 · 🧹 Limpiar` en la siguiente,
+en vez de aplastar el selector. En escritorio (`lg:flex-nowrap`) sigue todo en
+una sola fila, como estaba.
+
+**Verificado:** 520/520 tests + build, y el componente en el navegador a 1440px
+y 375px con `dev-preview` (borrado después, ver §8.4): el clic dispara la
+advertencia con las cifras correctas. **El borrado real contra producción no se
+probó** — desde una sesión de Claude no hay sesión de Firebase.
+
+---
+
+## 10. Idea en reserva: peleadores por nodo individual (ago 2026)
 
 **Estado: NO implementada, y a propósito.** Existió una rama
 (`perf/peleadores-nodos-individuales`, commit `a233957`, 18-jul-2026) que movía

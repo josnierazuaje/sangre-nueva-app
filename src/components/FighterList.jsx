@@ -39,7 +39,9 @@ function GrupoFiltros({ titulo, children }) {
 // Ojo: acá NO hay filtro de "Faltantes". Los peleadores sin compromiso tienen
 // su propia pestaña en el menú de la izquierda (FaltantesView), que además
 // sabe emparejarlos; repetirlo como filtro solo llenaba la franja.
-export default function FighterList({ fighters, onEdit, onDelete }) {
+// `onLimpiar` (opcional) borra el padrón entero: llega SOLO cuando la sesión es
+// la del dueño; con la del staff el botón ni se dibuja.
+export default function FighterList({ fighters, onEdit, onDelete, onLimpiar }) {
   const [searchQuery, setSearchQuery] = useState(""); const [categoryFilter, setCategoryFilter] = useState("all"); const [experienceFilter, setExperienceFilter] = useState("all"); const [sortBy, setSortBy] = useState("recent"); const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [sexFilter, setSexFilter] = useState("all"); // "all" | "M" | "F"
   const [ageFilter, setAgeFilter] = useState("all"); // "all" | clave de categoría de edad
@@ -178,8 +180,13 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
       {/* Pozos de tinta: .input-ink trae fondo hundido, radio 14px, placeholder
           apagado y el halo cobalto de foco — aquí solo queda el tamaño. */}
       <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="input-ink w-full px-3 py-2.5 text-sm lg:flex-1" />
-      <div className="flex gap-2 lg:flex-shrink-0">
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input-ink flex-1 px-2 py-2 text-sm">
+      {/* En escritorio los controles siguen en una sola fila, como siempre. En
+          móvil se permite el salto de línea (flex-wrap) porque el botón Limpiar
+          no cabe: sin esto el selector de categoría se aplastaba hasta quedar
+          ilegible. El min-w del selector es lo que empuja el salto en vez del
+          aplastamiento. */}
+      <div className="flex gap-2 flex-wrap lg:flex-nowrap lg:flex-shrink-0">
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input-ink flex-1 min-w-[150px] px-2 py-2 text-sm">
           <option value="all">Todas categorías</option>
           <optgroup label="Hombres">{WEIGHT_CATEGORIES_M.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
           <optgroup label="Mujeres">{WEIGHT_CATEGORIES_F.map(c => <option key={c.key} value={c.key}>{c.label} ({weightRangeLabel(c)})</option>)}</optgroup>
@@ -187,6 +194,13 @@ export default function FighterList({ fighters, onEdit, onDelete }) {
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="input-ink px-2 py-2 text-sm"><option value="recent">Recientes</option><option value="name">Nombre</option><option value="weight">Peso</option><option value="experience">Experiencia</option></select>
         <button onClick={printList} title="Imprimir la lista visible (con los filtros activos)" className="btn-gold px-3 py-2 text-sm">🖨️</button>
         <button onClick={descargarPlanilla} title="Descargar la lista visible para editarla en Google Sheets o Numbers (archivo CSV)" className="px-3 py-2 text-sm rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white transition-colors">📊</button>
+        {/* "Limpiar": borra TODO el padrón, no la lista filtrada que se está
+            viendo (por eso lleva la palabra escrita y el color del peligro, en
+            vez de parecer el "quitar filtros" que suele significar esa palabra
+            en una barra de búsqueda; para eso ya está el filtro "Todos"). La
+            advertencia con el detalle de lo que desaparece la muestra App.jsx
+            al tocarlo. */}
+        {onLimpiar && <button onClick={onLimpiar} title="Borrar TODOS los peleadores registrados, las peleas y las llaves del Super 4. Pide confirmación y guarda un respaldo antes." className="px-3 py-2 text-sm rounded-2xl border border-red-500/40 text-red-400 hover:text-red-300 hover:bg-red-900/25 hover:border-red-500/70 transition-colors whitespace-nowrap">🧹 Limpiar</button>}
       </div>
       </div>
       {/* Móvil: lista vertical de siempre. Escritorio: cuadrícula de 2
